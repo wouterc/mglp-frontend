@@ -1,10 +1,9 @@
 // src/components/SagsForm.jsx
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
-// BEST PRACTICE: API URL'en defineres ét sted. I et rigtigt projekt ville denne komme fra en miljøvariabel (f.eks. en .env-fil).
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
-function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
+function SagsForm({ onSave, onCancel, sagTilRedigering }) {
   // Udvid state til at inkludere alle nye adressefelter
   const [sagsData, setSagsData] = useState({
     alias: '',
@@ -32,6 +31,9 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
       setSagsData({
           ...sagTilRedigering,
           status: sagTilRedigering.status ? sagTilRedigering.status.id : null,
+          // Problem 2: Sikrer at ID'et er en string, så det matcher <option value="...id..."> i dropdown'en.
+          // React sammenligner <select> value med <option> value med '==='.
+          bolig_anvendelse_id: sagTilRedigering.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : (sagTilRedigering.bolig_anvendelse_id ? String(sagTilRedigering.bolig_anvendelse_id) : ''),
       });
     }
   }, [sagTilRedigering]);
@@ -41,7 +43,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
     const fetchBbrAnvendelser = async () => {
         try {
             // Antager at dette endpoint returnerer en liste af anvendelseskoder
-            const response = await fetch(`${API_BASE_URL}/bbr-anvendelser/`);
+            const response = await fetch(`${API_BASE_URL}/kerne/bbr-anvendelser/`);
             if (!response.ok) throw new Error('Kunne ikke hente BBR-anvendelser');
             const data = await response.json();
             setBbrAnvendelser(data);
@@ -72,15 +74,28 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
       delete dataToSave.sags_nr;
       delete dataToSave.status;
     }
-    
+
+    // Problem 1: Omdøb 'bolig_anvendelse_id' til 'bolig_anvendelse', som backend-API'et forventer for en relation.
+    // Hvis værdien er en tom streng (fra "Vælg..."), sendes `null` i stedet.
+    // Dette er den korrekte måde at opdatere en foreign key på via et REST API.
+    dataToSave.bolig_anvendelse = sagsData.bolig_anvendelse_id || null;
+    delete dataToSave.bolig_anvendelse_id;
+
     // Logik til at sende data til backend
     const url = erRedigering ? `${API_BASE_URL}/sager/${dataToSave.id}/` : `${API_BASE_URL}/sager/`;
     const method = erRedigering ? 'PUT' : 'POST';
     try {
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSave) });
-      if (!response.ok) throw new Error('Netværks-svar var ikke ok');
+      if (!response.ok) {
+        // For at give bedre fejlfinding, kan vi logge hvad serveren svarer
+        const errorBody = await response.json().catch(() => ({ detail: 'Ukendt serverfejl.' }));
+        console.error('Fejl fra server:', errorBody);
+        throw new Error(`Netværks-svar var ikke ok: ${response.status}`);
+      }
       onSave();
-    } catch (error) { console.error('Fejl ved lagring af sag:', error); }
+    } catch (error) {
+      console.error('Fejl ved lagring af sag:', error);
+    }
   };
   
   // Tjek om de påkrævede felter er udfyldt for at aktivere "Gem"-knappen
@@ -202,4 +217,3 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
 }
 
 export default SagsForm;
-

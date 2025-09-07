@@ -1,5 +1,6 @@
 // src/pages/SagsoversigtPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { API_BASE_URL } from '../config';
 import SagsForm from '../components/SagsForm';
 // Importer de nye ikoner til knapperne
 import { Edit, ArrowUp, ArrowDown, FileText, Folder, ListChecks, PlusCircle, FunnelX } from 'lucide-react'; 
@@ -18,14 +19,68 @@ function SagsoversigtPage() {
   const [sortConfig, setSortConfig] = useState({ key: 'sags_nr', direction: 'ascending' });
 
   // ... (hentSager, useMemo, og alle andre funktioner er uændrede) ...
-  async function hentSager() { try { const response = await fetch('http://127.0.0.1:8000/api/sager/'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const data = await response.json(); setSager(data); } catch (e) { setError('Kunne ikke hente sagsdata. Sikr at backend-serveren kører.'); console.error("Fejl ved hentning af sager:", e); } }
+  async function hentSager() { try { const response = await fetch(`${API_BASE_URL}/sager/`); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const data = await response.json(); setSager(data); } catch (e) { setError('Kunne ikke hente sagsdata. Sikr at backend-serveren kører.'); console.error("Fejl ved hentning af sager:", e); } }
   useEffect(() => { hentSager(); }, []);
-  const sorteredeOgFiltreredeSager = useMemo(() => { let filtreret = [...sager]; const isSpecificSearch = filter.sags_nr || filter.status; if (isSpecificSearch) { filtreret = sager.filter(sag => { if (filter.sags_nr) { return sag.sags_nr?.toString().includes(filter.sags_nr); } if (filter.status) { const searchLower = filter.status.toLowerCase(); const statusMatch = sag.status?.beskrivelse.toLowerCase().includes(searchLower) || sag.status?.status_nummer.toString().includes(searchLower); return statusMatch; } return true; }); } else { filtreret = filtreret.filter(sag => { if (!sag.status) return !visLukkede && !visAnnullerede; const kategori = sag.status.status_kategori; if (!visLukkede && !visAnnullerede) return kategori === 0; if (visLukkede && kategori === 1) return true; if (visAnnullerede && kategori === 9) return true; return false; }); if (filter.alias) { filtreret = filtreret.filter(sag => sag.alias?.toLowerCase().includes(filter.alias.toLowerCase())); } if (filter.hovedansvarlige) { filtreret = filtreret.filter(sag => sag.hovedansvarlige?.toLowerCase().includes(filter.hovedansvarlige.toLowerCase())); } if (filter.adresse) { filtreret = filtreret.filter(sag => sag.fuld_adresse?.toLowerCase().includes(filter.adresse.toLowerCase())); } } if (sortConfig.key !== null) { filtreret.sort((a, b) => { const aValue = a[sortConfig.key] || ''; const bValue = b[sortConfig.key] || ''; if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1; if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1; return 0; }); } return filtreret; }, [sager, filter, sortConfig, visLukkede, visAnnullerede]);
+  const sorteredeOgFiltreredeSager = useMemo(() => {
+    const getNestedValue = (obj, path) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
+
+    let filtreret = [...sager];
+
+    // Tjek om der er en specifik søgning på sagsnr eller status
+    const isSpecificSearch = filter.sags_nr || filter.status;
+
+    if (isSpecificSearch) {
+      // Håndter specifik søgning
+      filtreret = filtreret.filter(sag => {
+        if (filter.sags_nr && !sag.sags_nr?.toString().includes(filter.sags_nr)) {
+          return false;
+        }
+        if (filter.status) {
+          const searchLower = filter.status.toLowerCase();
+          const statusMatch = sag.status?.beskrivelse.toLowerCase().includes(searchLower) ||
+                              sag.status?.status_nummer.toString().includes(searchLower);
+          if (!statusMatch) return false;
+        }
+        return true;
+      });
+    } else {
+      // Håndter generelle filtre
+      filtreret = filtreret.filter(sag => {
+        // Status kategori filter
+        if (!sag.status) return !visLukkede && !visAnnullerede;
+        const kategori = sag.status.status_kategori;
+        const isVisibleStatus = (kategori === 0 && !visLukkede && !visAnnullerede) ||
+                                (kategori === 1 && visLukkede) ||
+                                (kategori === 9 && visAnnullerede);
+        if (!isVisibleStatus) return false;
+
+        // Tekstfiltre
+        if (filter.alias && !sag.alias?.toLowerCase().includes(filter.alias.toLowerCase())) return false;
+        if (filter.hovedansvarlige && !sag.hovedansvarlige?.toLowerCase().includes(filter.hovedansvarlige.toLowerCase())) return false;
+        if (filter.adresse && !sag.fuld_adresse?.toLowerCase().includes(filter.adresse.toLowerCase())) return false;
+
+        return true;
+      });
+    }
+
+    // Anvend sortering
+    if (sortConfig.key) {
+      filtreret.sort((a, b) => {
+        const aValue = getNestedValue(a, sortConfig.key) || '';
+        const bValue = getNestedValue(b, sortConfig.key) || '';
+        if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtreret;
+  }, [sager, filter, sortConfig, visLukkede, visAnnullerede]);
   const requestSort = (key) => { let direction = 'ascending'; if (sortConfig.key === key && sortConfig.direction === 'ascending') { direction = 'descending'; } setSortConfig({ key, direction }); };
   const handleFilterChange = (e) => { const { name, value } = e.target; setFilter(prevFilter => ({ ...prevFilter, [name]: value })); };
   const handleNulstilFiltre = () => { setFilter({ sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' }); setVisLukkede(false); setVisAnnullerede(false); };
   const handleOpretNySag = () => { setSagTilRedigering(null); setVisForm(true); }; const handleRedigerSag = (sag) => { setSagTilRedigering(sag); setVisForm(true); }; const handleAnnuller = () => { setVisForm(false); setSagTilRedigering(null); }; const handleRaekkeKlik = (sagId) => { setUdfoldetSagId(udfoldetSagId === sagId ? null : sagId); }; const handleSaveSag = () => { hentSager(); setVisForm(false); setSagTilRedigering(null); };
-  if (error) return <div className="text-red-500 p-4">{error}</div>; if (visForm) return <SagsForm onSave={handleSaveSag} onCancel={handleAnnuller} sagTilRedigering={sagTilRedigering} alleStatusser={sager.map(s => s.status).filter(Boolean)} />;
+  if (error) return <div className="text-red-500 p-4">{error}</div>; if (visForm) return <SagsForm onSave={handleSaveSag} onCancel={handleAnnuller} sagTilRedigering={sagTilRedigering} />;
   const getSortIcon = (key) => { if (sortConfig.key !== key) return null; if (sortConfig.direction === 'ascending') return <ArrowUp className="inline-block ml-1 h-4 w-4" />; return <ArrowDown className="inline-block ml-1 h-4 w-4" />; };
 
   return (
@@ -77,7 +132,7 @@ function SagsoversigtPage() {
       
       <div className="overflow-x-auto rounded-lg shadow-md">
         <table className="min-w-full bg-white">
-          <thead className="bg-gray-800 text-white text-sm"> {/* Mindre font i header */}
+          <thead className="bg-gray-800 text-white text-sm">
             <tr>
               <th className="text-left py-2 px-4 uppercase font-semibold" onClick={() => requestSort('sags_nr')}>SagsNr{getSortIcon('sags_nr')}</th>
               <th className="text-left py-2 px-4 uppercase font-semibold" onClick={() => requestSort('alias')}>Alias{getSortIcon('alias')}</th>
@@ -87,9 +142,7 @@ function SagsoversigtPage() {
               <th className="text-left py-2 px-4 uppercase font-semibold">Handlinger</th>
             </tr>
           </thead>
-          <tbody className="text-gray-700 text-sm"> {/* Mindre font i tabel-kroppen */}
-            {sorteredeOgFiltreredeSager.map(sag => (
-              <React.Fragment key={sag.id}>
+          <tbody className="text-gray-700 text-sm">{sorteredeOgFiltreredeSager.map(sag => (<React.Fragment key={sag.id}>
                 <tr onClick={() => handleRaekkeKlik(sag.id)} className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer">
                   <td className="py-2 px-4">{sag.sags_nr}</td>
                   <td className="py-2 px-4">{sag.alias}</td>
@@ -101,9 +154,7 @@ function SagsoversigtPage() {
                   </td>
                 </tr>
                 {udfoldetSagId === sag.id && ( <tr className="bg-gray-50"><td colSpan="6" className="p-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><h4 className="font-bold text-gray-700">Boliginformation</h4><p><span className="font-semibold">Type:</span> {sag.bolig_type}</p><p><span className="font-semibold">Matrikel:</span> {sag.bolig_matrikel}</p></div><div><h4 className="font-bold text-gray-700">Kommentar</h4><p>{sag.kommentar || "Ingen kommentar"}</p></div></div></td></tr> )}
-              </React.Fragment>
-            ))}
-          </tbody>
+              </React.Fragment>))}</tbody>
         </table>
       </div>
     </div>
