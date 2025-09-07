@@ -1,21 +1,29 @@
 // src/components/SagsForm.jsx
 import React, { useState, useEffect } from 'react';
 
+// BEST PRACTICE: API URL'en defineres ét sted. I et rigtigt projekt ville denne komme fra en miljøvariabel (f.eks. en .env-fil).
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
+
 function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
-  // Udvid state til at inkludere alle nye felter
+  // Udvid state til at inkludere alle nye adressefelter
   const [sagsData, setSagsData] = useState({
     alias: '',
     hovedansvarlige: '',
     adresse_vej: '',
+    adresse_husnr: '',
+    adresse_etage: '',
+    adresse_doer: '',
     adresse_post_nr: '',
     adresse_by: '',
     bolig_type: '',
     bolig_bfe: '',
     bolig_matrikel: '',
     bolig_anpart: '',
+    bolig_anvendelse_id: '',
     kommentar: '',
   });
 
+  const [bbrAnvendelser, setBbrAnvendelser] = useState([]);
   const erRedigering = sagTilRedigering != null;
 
   useEffect(() => {
@@ -27,6 +35,22 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
       });
     }
   }, [sagTilRedigering]);
+
+  // Hent BBR anvendelser når komponenten indlæses
+  useEffect(() => {
+    const fetchBbrAnvendelser = async () => {
+        try {
+            // Antager at dette endpoint returnerer en liste af anvendelseskoder
+            const response = await fetch(`${API_BASE_URL}/bbr-anvendelser/`);
+            if (!response.ok) throw new Error('Kunne ikke hente BBR-anvendelser');
+            const data = await response.json();
+            setBbrAnvendelser(data);
+        } catch (error) {
+            console.error('Fejl ved hentning af BBR-anvendelser:', error);
+        }
+    };
+    fetchBbrAnvendelser();
+  }, []);
 
   useEffect(() => {
     const handleEsc = (event) => { if (event.key === 'Escape') onCancel(); };
@@ -49,8 +73,8 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
       delete dataToSave.status;
     }
     
-    // ... (eksisterende logik til at sende data) ...
-    const url = erRedigering ? `http://127.0.0.1:8000/api/sager/${dataToSave.id}/` : 'http://127.0.0.1:8000/api/sager/';
+    // Logik til at sende data til backend
+    const url = erRedigering ? `${API_BASE_URL}/sager/${dataToSave.id}/` : `${API_BASE_URL}/sager/`;
     const method = erRedigering ? 'PUT' : 'POST';
     try {
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSave) });
@@ -80,10 +104,10 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
               </div>
             )}
             {/* Status vises kun ved redigering */}
-             {erRedigering && (
+             {erRedigering && sagsData.status && (
               <div>
                 <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                <input type="text" id="status" name="status" value={sagsData.status ? `${sagsData.status.status_nummer} - ${sagsData.status.beskrivelse}` : ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                <input type="text" id="status" name="status" value={`${sagsData.status.status_nummer} - ${sagsData.status.beskrivelse}`} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
               </div>
             )}
             <div>
@@ -100,16 +124,32 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
         {/* Adresse Information */}
         <div className="p-4 border rounded-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Adresse</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                    <label htmlFor="adresse_vej" className="block text-sm font-medium text-gray-700">Vejnavn og Nr.</label>
+            {/* Første række: Vej, Nr, Etage, Dør */}
+            <div className="grid grid-cols-12 gap-4 mb-4">
+                <div className="col-span-12 sm:col-span-6">
+                    <label htmlFor="adresse_vej" className="block text-sm font-medium text-gray-700">Vejnavn</label>
                     <input type="text" id="adresse_vej" name="adresse_vej" value={sagsData.adresse_vej || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
                 </div>
-                <div>
+                <div className="col-span-4 sm:col-span-2">
+                    <label htmlFor="adresse_husnr" className="block text-sm font-medium text-gray-700">Nr.</label>
+                    <input type="text" id="adresse_husnr" name="adresse_husnr" value={sagsData.adresse_husnr || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                </div>
+                <div className="col-span-4 sm:col-span-2">
+                    <label htmlFor="adresse_etage" className="block text-sm font-medium text-gray-700">Etage</label>
+                    <input type="text" id="adresse_etage" name="adresse_etage" value={sagsData.adresse_etage || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                </div>
+                <div className="col-span-4 sm:col-span-2">
+                    <label htmlFor="adresse_doer" className="block text-sm font-medium text-gray-700">Dør</label>
+                    <input type="text" id="adresse_doer" name="adresse_doer" value={sagsData.adresse_doer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                </div>
+            </div>
+            {/* Anden række: Postnr, By */}
+            <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 sm:col-span-4">
                     <label htmlFor="adresse_post_nr" className="block text-sm font-medium text-gray-700">Postnr.</label>
                     <input type="text" id="adresse_post_nr" name="adresse_post_nr" value={sagsData.adresse_post_nr || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
                 </div>
-                <div className="md:col-span-3">
+                <div className="col-span-12 sm:col-span-8">
                     <label htmlFor="adresse_by" className="block text-sm font-medium text-gray-700">By</label>
                     <input type="text" id="adresse_by" name="adresse_by" value={sagsData.adresse_by || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
                 </div>
@@ -124,6 +164,23 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
                 <input type="text" name="bolig_bfe" placeholder="BFE" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
                 <input type="text" name="bolig_matrikel" placeholder="Matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
                 <input type="text" name="bolig_anpart" placeholder="Anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
+            </div>
+            <div className="mt-4">
+                <label htmlFor="bolig_anvendelse_id" className="block text-sm font-medium text-gray-700">BBR Anvendelse</label>
+                <select
+                    id="bolig_anvendelse_id"
+                    name="bolig_anvendelse_id"
+                    value={sagsData.bolig_anvendelse_id || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                >
+                    <option value="">Vælg anvendelse...</option>
+                    {bbrAnvendelser.map(anvendelse => (
+                        <option key={anvendelse.id} value={anvendelse.id}>
+                            {anvendelse.kode} - {anvendelse.beskrivelse}
+                        </option>
+                    ))}
+                </select>
             </div>
         </div>
 
@@ -145,3 +202,4 @@ function SagsForm({ onSave, onCancel, sagTilRedigering, alleStatusser }) {
 }
 
 export default SagsForm;
+
