@@ -1,10 +1,11 @@
-// src/components/SagsForm.jsx
+// --- Fil: src/components/SagsForm.jsx ---
+
+//@@ 2025-09-09 15:14 - Rettet logik til at hente bygningsdata fra en liste (bygninger)
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
-
+import AdresseSøgning from './AdresseSøgning';
 
 function SagsForm({ onSave, onCancel, sagTilRedigering }) {
-  // Udvid state til at inkludere alle nye adressefelter
   const [sagsData, setSagsData] = useState({
     alias: '',
     hovedansvarlige: '',
@@ -14,41 +15,42 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }) {
     adresse_doer: '',
     adresse_post_nr: '',
     adresse_by: '',
+    adresse_id_dawa: null,
+    adressebetegnelse: '',
     bolig_type: '',
     bolig_bfe: '',
     bolig_matrikel: '',
     bolig_anpart: '',
     bolig_anvendelse_id: '',
     kommentar: '',
+    // Nye felter til ekstra BBR-data
+    byggeaar: '',
+    boligareal: '',
   });
 
   const [bbrAnvendelser, setBbrAnvendelser] = useState([]);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const erRedigering = sagTilRedigering != null;
 
   useEffect(() => {
     if (erRedigering) {
-      // Hvis vi redigerer, fyld formularen med eksisterende data
       setSagsData({
           ...sagTilRedigering,
           status: sagTilRedigering.status ? sagTilRedigering.status.id : null,
-          // Problem 2: Sikrer at ID'et er en string, så det matcher <option value="...id..."> i dropdown'en.
-          // React sammenligner <select> value med <option> value med '==='.
           bolig_anvendelse_id: sagTilRedigering.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : (sagTilRedigering.bolig_anvendelse_id ? String(sagTilRedigering.bolig_anvendelse_id) : ''),
       });
     }
   }, [sagTilRedigering]);
 
-  // Hent BBR anvendelser når komponenten indlæses
   useEffect(() => {
     const fetchBbrAnvendelser = async () => {
         try {
-            // Antager at dette endpoint returnerer en liste af anvendelseskoder
             const response = await fetch(`${API_BASE_URL}/kerne/bbr-anvendelser/`);
-            if (!response.ok) throw new Error('Kunne ikke hente BBR-anvendelser');
+            if (!response.ok) throw new Error('Could not fetch BBR applications');
             const data = await response.json();
             setBbrAnvendelser(data);
         } catch (error) {
-            console.error('Fejl ved hentning af BBR-anvendelser:', error);
+            console.error('Error fetching BBR applications:', error);
         }
     };
     fetchBbrAnvendelser();
@@ -65,40 +67,98 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }) {
     setSagsData(prevData => ({ ...prevData, [name]: value }));
   };
 
+  const handleAdresseValgt = async (adresse) => {
+    setSagsData(prevData => ({
+      ...prevData,
+      adresse_id_dawa: adresse.id,
+      adressebetegnelse: adresse.adressebetegnelse,
+      adresse_vej: adresse.vejnavn,
+      adresse_husnr: adresse.husnr,
+      adresse_etage: adresse.etage || '',
+      adresse_doer: adresse.dør || '',
+      adresse_post_nr: adresse.postnr,
+      adresse_by: adresse.postnrnavn,
+      bolig_bfe: '',
+      bolig_matrikel: '',
+      bolig_anvendelse_id: '',
+      byggeaar: '',
+      boligareal: '',
+    }));
+    setIsFetchingDetails(true);
+
+    try {
+      const adresseResponse = await fetch(adresse.href);
+      const adresseDetaljer = await adresseResponse.json();
+      
+      const adgangsAdresseData = adresseDetaljer.adgangsadresse;
+
+      const matrikelnr = adgangsAdresseData?.jordstykke?.matrikelnr || '';
+      const bfeNummer = adgangsAdresseData?.bfe_nummer || '';
+      const bygningHref = adgangsAdresseData?.bygninger?.[0]?.href;
+      
+      let bbrKode = '';
+      let byggeaar = '';
+      let boligareal = '';
+
+      if (bygningHref) {
+        const bygningResponse = await fetch(bygningHref);
+        const bygningDetaljer = await bygningResponse.json();
+        bbrKode = bygningDetaljer.byg_anvendelse?.kode || '';
+        byggeaar = bygningDetaljer.opfoerelsesaar || ''; // Rettet feltnavn
+        boligareal = bygningDetaljer.samlet_bolig_areal || ''; // Rettet feltnavn
+      }
+      
+      const matchendeAnvendelse = bbrAnvendelser.find(a => String(a.kode) === String(bbrKode));
+      const anvendelseId = matchendeAnvendelse ? matchendeAnvendelse.id : '';
+
+      setSagsData(prevData => ({
+        ...prevData,
+        bolig_matrikel: matrikelnr,
+        bolig_bfe: bfeNummer,
+        bolig_anvendelse_id: anvendelseId,
+        byggeaar: byggeaar,
+        boligareal: boligareal,
+      }));
+
+    } catch (error) {
+      console.error("Error fetching additional address details:", error);
+    } finally {
+      setIsFetchingDetails(false);
+    }
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const dataToSave = { ...sagsData };
+    const dataToSave = { 
+      ...sagsData,
+      bolig_anvendelse_id: sagsData.bolig_anvendelse_id === '' ? null : sagsData.bolig_anvendelse_id
+    };
 
-    // Ved oprettelse skal vi ikke sende sags_nr eller status med. Backend håndterer det.
+    // Fjerner de nye BBR felter før lagring, da de ikke er i databasen endnu
+    delete dataToSave.byggeaar;
+    delete dataToSave.boligareal;
+
     if (!erRedigering) {
       delete dataToSave.sags_nr;
       delete dataToSave.status;
     }
 
-    // Problem 1: Omdøb 'bolig_anvendelse_id' til 'bolig_anvendelse', som backend-API'et forventer for en relation.
-    // Hvis værdien er en tom streng (fra "Vælg..."), sendes `null` i stedet.
-    // Dette er den korrekte måde at opdatere en foreign key på via et REST API.
-    dataToSave.bolig_anvendelse = sagsData.bolig_anvendelse_id || null;
-    delete dataToSave.bolig_anvendelse_id;
-
-    // Logik til at sende data til backend
     const url = erRedigering ? `${API_BASE_URL}/sager/${dataToSave.id}/` : `${API_BASE_URL}/sager/`;
     const method = erRedigering ? 'PUT' : 'POST';
+    
     try {
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSave) });
       if (!response.ok) {
-        // For at give bedre fejlfinding, kan vi logge hvad serveren svarer
-        const errorBody = await response.json().catch(() => ({ detail: 'Ukendt serverfejl.' }));
-        console.error('Fejl fra server:', errorBody);
-        throw new Error(`Netværks-svar var ikke ok: ${response.status}`);
+        const errorBody = await response.json().catch(() => ({ detail: 'Unknown server error.' }));
+        console.error('Server error:', errorBody);
+        throw new Error(`Network response was not ok: ${response.status}`);
       }
       onSave();
     } catch (error) {
-      console.error('Fejl ved lagring af sag:', error);
+      console.error('Error saving case:', error);
     }
   };
   
-  // Tjek om de påkrævede felter er udfyldt for at aktivere "Gem"-knappen
   const erFormularGyldig = sagsData.alias && sagsData.hovedansvarlige;
 
   return (
@@ -107,78 +167,89 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }) {
         {erRedigering ? `Rediger Sag: ${sagsData.alias}` : 'Opret Ny Sag'}
       </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Generel Information */}
+        {/* Generelt sektion - uændret */}
         <div className="p-4 border rounded-md">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Generelt</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* SagsNr vises kun ved redigering */}
-            {erRedigering && (
-              <div>
-                <label htmlFor="sags_nr" className="block text-sm font-medium text-gray-700">SagsNr</label>
-                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-              </div>
-            )}
-            {/* Status vises kun ved redigering */}
-             {erRedigering && sagsData.status && (
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                <input type="text" id="status" name="status" value={`${sagsData.status.status_nummer} - ${sagsData.status.beskrivelse}`} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-              </div>
-            )}
-            <div>
-              <label htmlFor="alias" className="block text-sm font-medium text-gray-700">Alias (Påkrævet)</label>
-              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Generelt</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {erRedigering && (
+                <div>
+                    <label htmlFor="sags_nr" className="block text-sm font-medium text-gray-700">SagsNr</label>
+                    <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
+                )}
+                {erRedigering && sagsData.status && (
+                <div>
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                    <input type="text" id="status" name="status" value={`${sagsData.status.status_nummer} - ${sagsData.status.beskrivelse}`} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
+                )}
+                <div>
+                <label htmlFor="alias" className="block text-sm font-medium text-gray-700">Alias (Påkrævet)</label>
+                <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                </div>
+                <div>
+                <label htmlFor="hovedansvarlige" className="block text-sm font-medium text-gray-700">Hovedansvarlig (Påkrævet)</label>
+                <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                </div>
             </div>
-             <div>
-              <label htmlFor="hovedansvarlige" className="block text-sm font-medium text-gray-700">Hovedansvarlig (Påkrævet)</label>
-              <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
-            </div>
-          </div>
         </div>
-
-        {/* Adresse Information */}
+        
+        {/* Adresse sektion - nu rettet */}
         <div className="p-4 border rounded-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Adresse</h3>
-            {/* Første række: Vej, Nr, Etage, Dør */}
-            <div className="grid grid-cols-12 gap-4 mb-4">
+            <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
+            {isFetchingDetails && <div className="mt-2 text-sm text-gray-500">Henter detaljer...</div>}
+            
+            <div className="grid grid-cols-12 gap-4 mt-4">
                 <div className="col-span-12 sm:col-span-6">
-                    <label htmlFor="adresse_vej" className="block text-sm font-medium text-gray-700">Vejnavn</label>
-                    <input type="text" id="adresse_vej" name="adresse_vej" value={sagsData.adresse_vej || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_vej_vis" className="block text-sm font-medium text-gray-700">Vejnavn</label>
+                    <input type="text" id="adresse_vej_vis" value={sagsData.adresse_vej || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
                 <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_husnr" className="block text-sm font-medium text-gray-700">Nr.</label>
-                    <input type="text" id="adresse_husnr" name="adresse_husnr" value={sagsData.adresse_husnr || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_husnr_vis" className="block text-sm font-medium text-gray-700">Nr.</label>
+                    <input type="text" id="adresse_husnr_vis" value={sagsData.adresse_husnr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
                 <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_etage" className="block text-sm font-medium text-gray-700">Etage</label>
-                    <input type="text" id="adresse_etage" name="adresse_etage" value={sagsData.adresse_etage || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_etage_vis" className="block text-sm font-medium text-gray-700">Etage</label>
+                    <input type="text" id="adresse_etage_vis" value={sagsData.adresse_etage || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
                 <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_doer" className="block text-sm font-medium text-gray-700">Dør</label>
-                    <input type="text" id="adresse_doer" name="adresse_doer" value={sagsData.adresse_doer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_doer_vis" className="block text-sm font-medium text-gray-700">Dør</label>
+                    <input type="text" id="adresse_doer_vis" value={sagsData.adresse_doer || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
             </div>
-            {/* Anden række: Postnr, By */}
-            <div className="grid grid-cols-12 gap-4">
+            <div className="grid grid-cols-12 gap-4 mt-4">
                 <div className="col-span-12 sm:col-span-4">
-                    <label htmlFor="adresse_post_nr" className="block text-sm font-medium text-gray-700">Postnr.</label>
-                    <input type="text" id="adresse_post_nr" name="adresse_post_nr" value={sagsData.adresse_post_nr || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_post_nr_vis" className="block text-sm font-medium text-gray-700">Postnr.</label>
+                    <input type="text" id="adresse_post_nr_vis" value={sagsData.adresse_post_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
                 <div className="col-span-12 sm:col-span-8">
-                    <label htmlFor="adresse_by" className="block text-sm font-medium text-gray-700">By</label>
-                    <input type="text" id="adresse_by" name="adresse_by" value={sagsData.adresse_by || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+                    <label htmlFor="adresse_by_vis" className="block text-sm font-medium text-gray-700">By</label>
+                    <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
                 </div>
             </div>
         </div>
-
-        {/* Bolig Information */}
+        
+        {/* Bolig sektion - opdateret med nye felter */}
         <div className="p-4 border rounded-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Bolig</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" name="bolig_type" placeholder="Type" value={sagsData.bolig_type || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
-                <input type="text" name="bolig_bfe" placeholder="BFE" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
-                <input type="text" name="bolig_matrikel" placeholder="Matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
-                <input type="text" name="bolig_anpart" placeholder="Anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} className="p-2 border border-gray-300 rounded-md sm:text-sm"/>
+                <div>
+                  <label htmlFor="bolig_bfe_vis" className="block text-sm font-medium text-gray-700">BFE</label>
+                  <input type="text" id="bolig_bfe_vis" value={sagsData.bolig_bfe || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
+                <div>
+                  <label htmlFor="bolig_matrikel_vis" className="block text-sm font-medium text-gray-700">Matrikel</label>
+                  <input type="text" id="bolig_matrikel_vis" value={sagsData.bolig_matrikel || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
+                <div>
+                  <label htmlFor="byggeaar" className="block text-sm font-medium text-gray-700">Byggeår</label>
+                  <input type="text" id="byggeaar" value={sagsData.byggeaar || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
+                <div>
+                  <label htmlFor="boligareal" className="block text-sm font-medium text-gray-700">Boligareal (m²)</label>
+                  <input type="text" id="boligareal" value={sagsData.boligareal || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+                </div>
             </div>
             <div className="mt-4">
                 <label htmlFor="bolig_anvendelse_id" className="block text-sm font-medium text-gray-700">BBR Anvendelse</label>
@@ -197,14 +268,25 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }) {
                     ))}
                 </select>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                  <label htmlFor="bolig_anpart" className="block text-sm font-medium text-gray-700">Anpart</label>
+                  <input type="text" id="bolig_anpart" name="bolig_anpart" placeholder="Indtast anpart manuelt" value={sagsData.bolig_anpart || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+              </div>
+              <div>
+                  <label htmlFor="bolig_type" className="block text-sm font-medium text-gray-700">Type</label>
+                  <input type="text" id="bolig_type" name="bolig_type" placeholder="Indtast type manuelt" value={sagsData.bolig_type || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+              </div>
+            </div>
         </div>
-
-        {/* Kommentar */}
+        
+        {/* Kommentar sektion - uændret */}
         <div>
-          <label htmlFor="kommentar" className="block text-sm font-medium text-gray-700">Kommentar</label>
-          <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows="4" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+            <label htmlFor="kommentar" className="block text-sm font-medium text-gray-700">Kommentar</label>
+            <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows="4" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
         </div>
 
+        {/* Knapper - uændret */}
         <div className="flex justify-end space-x-4 pt-4">
           <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Annuller (Esc)</button>
           <button type="submit" disabled={!erFormularGyldig} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
@@ -217,3 +299,4 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }) {
 }
 
 export default SagsForm;
+
