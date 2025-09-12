@@ -1,9 +1,11 @@
-// src/components/Layout.jsx
+// --- Fil: src/components/Layout.jsx ---
+// @ 2025-09-11 20:20 - Sat sidemenu til at være kollapset som standard.
 import React, { useState } from 'react';
 import { Menu, X, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut } from 'lucide-react';
 
 function Layout({ children, aktivSide, setAktivSide }) {
-  const [erMenuAaben, setErMenuAaben] = useState(true);
+  // @ 2025-09-11 20:20 - Ændret fra 'true' til 'false'
+  const [erMenuAaben, setErMenuAaben] = useState(false);
 
   const menuSektioner = [
     {
@@ -49,8 +51,14 @@ function Layout({ children, aktivSide, setAktivSide }) {
           </button>
         </div>
         <nav className="flex-grow overflow-y-auto">
-          {menuSektioner.map(sektion => (
-            <div key={sektion.titel} className="mt-4">
+          {/* //@ 2025-09-12 19:03 - Tilføjet dynamisk margin for at skabe gruppering i kollapset tilstand */}
+          {menuSektioner.map((sektion, index) => (
+            <div 
+              key={sektion.titel} 
+              // Når menuen er åben, har alle sektioner 'mt-4'.
+              // Når den er kollapset, får den første sektion 'mt-2', og de efterfølgende får 'mt-6' for at skabe afstand.
+              className={erMenuAaben ? 'mt-4' : (index > 0 ? 'mt-6' : 'mt-2')}
+            >
               {erMenuAaben && <h2 className="px-4 text-xs font-bold uppercase text-gray-400">{sektion.titel}</h2>}
               <ul>
                 {sektion.items.map(punkt => (
