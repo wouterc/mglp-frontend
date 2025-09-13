@@ -1,4 +1,5 @@
 // --- Fil: src/pages/AktivitetsskabelonerPage.jsx ---
+// @ 2025-09-13 12:32 - Tilpasset logik for 'aktiv'-filter og omdøbt kolonne.
 // @ 2025-09-12 22:59 - Justeret bredde på proces-filter for bedre visning af tekst
 // @ 2025-09-12 22:58 - Tilføjet dropdown til proces-filter for forbedret brugervenlighed
 // @ 2025-09-12 22:45 - Implementeret grupperede rækker med overskrifter i tabellen
@@ -26,17 +27,15 @@ function AktivitetsskabelonerPage() {
     aktivitet_nr: '',
     aktivitet: '',
   });
-
-  const [visInaktive, setVisInaktive] = useState(false);
+  
+  // @ 2025-09-13 12:32 - Fjernet state for 'visInaktive'.
   const [visUdgaaede, setVisUdgaaede] = useState(false);
   const debouncedFilters = useDebounce(filters, 500);
 
-  // Memoized liste over processer (formaal = 1) til filter-dropdown
   const procesList = useMemo(() => {
     return blokinfo.filter(b => b.formaal === 1);
   }, [blokinfo]);
 
-  // @ 2025-09-12 22:15 - Tilføjet memoized liste for grupper
   const gruppeList = useMemo(() => {
     return blokinfo.filter(b => b.formaal === 2);
   }, [blokinfo]);
@@ -48,11 +47,12 @@ function AktivitetsskabelonerPage() {
     if (filterObj.aktivitet_nr) params.append('aktivitet_nr', filterObj.aktivitet_nr);
     if (filterObj.aktivitet) params.append('aktivitet', filterObj.aktivitet);
     
-    params.append('aktiv', visInaktive ? 'false' : 'true');
+    // @ 2025-09-13 12:32 - Fjernet logik der tilføjer 'aktiv' parameter.
     params.append('udgaaet', visUdgaaede ? 'true' : 'false');
     
     return params.toString();
-  }, [visInaktive, visUdgaaede]);
+  // @ 2025-09-13 12:32 - Fjernet 'visInaktive' fra dependency array.
+  }, [visUdgaaede]);
 
   const hentData = useCallback(async (filterObj) => {
     setIsLoading(true);
@@ -68,6 +68,7 @@ function AktivitetsskabelonerPage() {
       if (!aktiviteterRes.ok || !blokinfoRes.ok) {
         throw new Error('Kunne ikke hente data fra serveren.');
       }
+      
       const aktiviteterData = await aktiviteterRes.json();
       const blokinfoData = await blokinfoRes.json();
       
@@ -83,9 +84,10 @@ function AktivitetsskabelonerPage() {
     }
   }, [buildQueryString]);
 
+  // @ 2025-09-13 12:32 - Fjernet 'visInaktive' fra dependency array.
   useEffect(() => {
     hentData(debouncedFilters);
-  }, [debouncedFilters, visInaktive, visUdgaaede, hentData]);
+  }, [debouncedFilters, visUdgaaede, hentData]);
 
   const handleHentFlere = async () => {
     if (!nextPageUrl || isLoadingMore) return;
@@ -110,7 +112,7 @@ function AktivitetsskabelonerPage() {
 
   const handleNulstilFiltre = () => {
     setFilters({ proces_nr: '', gruppe_nr: '', aktivitet_nr: '', aktivitet: '' });
-    setVisInaktive(false);
+    // @ 2025-09-13 12:32 - Fjernet nulstilling af 'visInaktive'.
     setVisUdgaaede(false);
   };
   
@@ -160,6 +162,7 @@ function AktivitetsskabelonerPage() {
           <PlusCircle size={20} />
         </button>
       </div>
+
       <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="flex space-x-2">
             <div className="w-[20%] flex">
@@ -171,7 +174,6 @@ function AktivitetsskabelonerPage() {
                     ))}
                 </select>
             </div>
-            {/* @ 2025-09-12 22:15 - Ændret gruppe-filter til kombineret input/select */}
             <div className="w-[20%] flex">
                 <input type="text" name="gruppe_nr" placeholder="Nr." value={filters.gruppe_nr} onChange={handleFilterChange} className="w-1/4 p-2 border border-gray-300 border-r-0 rounded-l-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/>
                 <select name="gruppe_nr" value={filters.gruppe_nr} onChange={handleFilterChange} className="w-3/4 p-2 border border-gray-300 rounded-r-md text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
@@ -182,20 +184,17 @@ function AktivitetsskabelonerPage() {
                 </select>
             </div>
             <div className="w-[10%]">
-                <input type="text" name="aktivitet_nr" placeholder="Aktiv. Nr..." value={filters.aktivitet_nr} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm"/>
+             <input type="text" name="aktivitet_nr" placeholder="Aktiv. Nr..." value={filters.aktivitet_nr} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm"/>
             </div>
             <div className="w-[35%]">
                 <input type="text" name="aktivitet" placeholder="Filtrer på aktivitet..." value={filters.aktivitet} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm"/>
             </div>
             <div className="w-[15%]"></div> 
-        </div>
+         </div>
 
         <div className="flex justify-between items-center mt-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={visInaktive} onChange={() => setVisInaktive(!visInaktive)} className="h-4 w-4 rounded border-gray-300"/>
-                    <span>Vis inaktive</span>
-                </label>
+                {/* @ 2025-09-13 12:32 - Fjernet checkbox for 'Vis inaktive'. */}
                 <label className="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" checked={visUdgaaede} onChange={() => setVisUdgaaede(!visUdgaaede)} className="h-4 w-4 rounded border-gray-300"/>
                     <span>Vis udgåede</span>
@@ -209,16 +208,17 @@ function AktivitetsskabelonerPage() {
 
       <div className="overflow-x-auto rounded-lg shadow-md">
         <table className="min-w-full bg-white table-fixed">
-          <thead className="bg-gray-800 text-white text-sm">
+           <thead className="bg-gray-800 text-white text-sm">
             <tr>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[15%]">Aktiv. Nr.</th>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[70%]">Aktivitet</th>
-              <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]">Aktiv</th>
+              {/* @ 2025-09-13 12:32 - Omdøbt kolonne og tilføjet linjeskift. */}
+              <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]">Standard<br/>aktiveret</th>
               <th className="text-center py-1 px-2 uppercase font-semibold w-[10%]"></th>
             </tr>
           </thead>
           <tbody className="text-gray-700 text-sm">
-            {isLoading && aktiviteter.length === 0 ? (
+           {isLoading && aktiviteter.length === 0 ? (
                 <tr><td colSpan="4" className="text-center py-4">Henter data...</td></tr>
             ) : (
               aktiviteter.map(a => {
@@ -229,23 +229,23 @@ function AktivitetsskabelonerPage() {
                 }
                 
                 return (
-                  <Fragment key={a.id}>
+                   <Fragment key={a.id}>
                     {showHeader && (
                       <tr className="bg-gray-200 sticky top-0">
                         <td colSpan="4" className="py-1 px-2 font-bold text-gray-700">
-                          {currentGroupHeader}
+                           {currentGroupHeader}
                         </td>
                       </tr>
                     )}
                     <tr className="border-b border-gray-200 hover:bg-gray-100">
-                      <td className="py-1 px-2">{a.aktivitet_nr}</td>
+                       <td className="py-1 px-2">{a.aktivitet_nr}</td>
                       <td className="py-1 px-2 break-words">{a.aktivitet}</td>
                       <td className="py-1 px-2 text-center">
                         <input type="checkbox" checked={a.aktiv || false} readOnly disabled className="h-4 w-4"/>
                       </td>
                       <td className="py-1 px-2 text-center">
                         <button onClick={() => handleRediger(a)} title="Rediger"><Edit size={16} className="text-blue-600 hover:text-blue-800" /></button>
-                      </td>
+                       </td>
                     </tr>
                   </Fragment>
                 );
@@ -258,13 +258,13 @@ function AktivitetsskabelonerPage() {
         </table>
       </div>
       {nextPageUrl && (
-        <div className="mt-4 text-center">
+         <div className="mt-4 text-center">
             <button
                 onClick={handleHentFlere}
                 disabled={isLoadingMore}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50 flex items-center justify-center mx-auto"
             >
-                {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Henter...</> : 'Hent Flere'}
+               {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Henter...</> : 'Hent Flere'}
             </button>
         </div>
       )}
@@ -273,4 +273,3 @@ function AktivitetsskabelonerPage() {
 }
 
 export default AktivitetsskabelonerPage;
-

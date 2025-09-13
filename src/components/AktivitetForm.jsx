@@ -1,4 +1,5 @@
 // --- Fil: src/components/AktivitetForm.jsx ---
+// @ 2025-09-13 12:43 - Flyttet 'Aktiv'/'Udgået' checkboxes og omdøbt 'Aktiv'.
 // @ 2025-09-12 22:25 - Opdateret til at håndtere 'proces' som en relation
 // @ 2025-09-11 21:05 - Rettet 400-fejl ved gem og tilføjet 'Esc' for at annullere.
 // @ 2025-09-11 21:15 - Sikret at tomme talfelter sendes som 'null' i stedet for tom streng.
@@ -133,8 +134,19 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
               <input type="text" name="aktivitet" value={formData.aktivitet} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md"/>
             </div>
           </div>
+
+{/* // @ 2025-09-13 12:43 - Flyttet checkboxes hertil og omdøbt label for 'Aktiv'. */}
+          <div className="flex items-center space-x-6 pt-2">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" name="aktiv" checked={formData.aktiv} onChange={handleChange} />
+              <span>Standard aktiveret</span>
+            </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" name="udgaaet" checked={formData.udgaaet} onChange={handleChange} />
+              <span>Udgået</span>
+            </label>
+          </div>
           
-          {/* Opdateret til at bruge select for Proces og Gruppe */}
           <div className="flex items-start space-x-4">
             <div className="w-1/2">
               <label htmlFor="proces" className="block text-sm font-medium">Proces</label>
@@ -164,15 +176,10 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
             </div>
             <div className="w-1/2">
               <label htmlFor="frist" className="block text-sm font-medium">Frist (dage)</label>
-              <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md"/>
+               <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md"/>
             </div>
           </div>
 
-          <div className="flex items-center space-x-6 pt-2">
-            <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" name="aktiv" checked={formData.aktiv} onChange={handleChange} /><span>Aktiv</span></label>
-            <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" name="udgaaet" checked={formData.udgaaet} onChange={handleChange} /><span>Udgået</span></label>
-          </div>
-          
           <div className="flex justify-end space-x-4 pt-4">
           </div>
         </form>
