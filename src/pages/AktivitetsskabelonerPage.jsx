@@ -1,4 +1,5 @@
 // --- Fil: src/pages/AktivitetsskabelonerPage.jsx ---
+// @ 2025-09-13 12:56 - Tilføjet "cascading" logik til filter-dropdowns.
 // @ 2025-09-13 12:32 - Tilpasset logik for 'aktiv'-filter og omdøbt kolonne.
 // @ 2025-09-12 22:59 - Justeret bredde på proces-filter for bedre visning af tekst
 // @ 2025-09-12 22:58 - Tilføjet dropdown til proces-filter for forbedret brugervenlighed
@@ -21,6 +22,11 @@ function AktivitetsskabelonerPage() {
   const [visForm, setVisForm] = useState(false);
   const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState(null);
 
+// @ 2025-09-13 12:56 - Tilføjet state for at håndtere filtrerede grupper i filtersektionen.
+  const [tilgaengeligeFilterGrupper, setTilgaengeligeFilterGrupper] = useState([]);
+  const [isFilterGrupperLoading, setIsFilterGrupperLoading] = useState(false);
+
+
   const [filters, setFilters] = useState({
     proces_nr: '',
     gruppe_nr: '',
@@ -28,7 +34,6 @@ function AktivitetsskabelonerPage() {
     aktivitet: '',
   });
   
-  // @ 2025-09-13 12:32 - Fjernet state for 'visInaktive'.
   const [visUdgaaede, setVisUdgaaede] = useState(false);
   const debouncedFilters = useDebounce(filters, 500);
 
@@ -46,12 +51,8 @@ function AktivitetsskabelonerPage() {
     if (filterObj.gruppe_nr) params.append('gruppe_nr', filterObj.gruppe_nr);
     if (filterObj.aktivitet_nr) params.append('aktivitet_nr', filterObj.aktivitet_nr);
     if (filterObj.aktivitet) params.append('aktivitet', filterObj.aktivitet);
-    
-    // @ 2025-09-13 12:32 - Fjernet logik der tilføjer 'aktiv' parameter.
     params.append('udgaaet', visUdgaaede ? 'true' : 'false');
-    
     return params.toString();
-  // @ 2025-09-13 12:32 - Fjernet 'visInaktive' fra dependency array.
   }, [visUdgaaede]);
 
   const hentData = useCallback(async (filterObj) => {
@@ -75,6 +76,8 @@ function AktivitetsskabelonerPage() {
       setAktiviteter(aktiviteterData.results || []);
       setNextPageUrl(aktiviteterData.next);
       setBlokinfo(blokinfoData || []);
+// @ 2025-09-13 12:56 - Initialiserer listen over tilgængelige filter-grupper med alle grupper.
+      setTilgaengeligeFilterGrupper(blokinfoData.filter(b => b.formaal === 2) || []);
 
     } catch (e) {
       setError('Fejl ved hentning af data. Sikr at backend-serveren kører.');
@@ -84,10 +87,35 @@ function AktivitetsskabelonerPage() {
     }
   }, [buildQueryString]);
 
-  // @ 2025-09-13 12:32 - Fjernet 'visInaktive' fra dependency array.
   useEffect(() => {
     hentData(debouncedFilters);
   }, [debouncedFilters, visUdgaaede, hentData]);
+
+// @ 2025-09-13 12:56 - Ny useEffect til at hente grupper, når proces-filteret ændres.
+  useEffect(() => {
+    const fetchGrupperForFilter = async () => {
+        if (filters.proces_nr) {
+            const selectedProces = procesList.find(p => p.nr.toString() === filters.proces_nr);
+            if (selectedProces) {
+                setIsFilterGrupperLoading(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/${selectedProces.id}/grupper/`);
+                    const data = await response.json();
+                    setTilgaengeligeFilterGrupper(data);
+                } catch (error) {
+                    console.error("Fejl ved hentning af grupper til filter:", error);
+                    setTilgaengeligeFilterGrupper([]);
+                } finally {
+                    setIsFilterGrupperLoading(false);
+                }
+            }
+        } else {
+            // Hvis intet procesfilter er valgt, vis alle grupper.
+            setTilgaengeligeFilterGrupper(gruppeList);
+        }
+    };
+    fetchGrupperForFilter();
+  }, [filters.proces_nr, procesList, gruppeList]);
 
   const handleHentFlere = async () => {
     if (!nextPageUrl || isLoadingMore) return;
@@ -105,14 +133,19 @@ function AktivitetsskabelonerPage() {
     }
   };
 
+// @ 2025-09-13 12:56 - Opdateret til at nulstille gruppe-filteret, når proces-filteret ændres.
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters(prev => ({
+        ...prev,
+        [name]: value,
+        // Hvis proces-filteret ændres, nulstil gruppe-filteret.
+        ...(name === 'proces_nr' && { gruppe_nr: '' })
+    }));
   };
 
   const handleNulstilFiltre = () => {
     setFilters({ proces_nr: '', gruppe_nr: '', aktivitet_nr: '', aktivitet: '' });
-    // @ 2025-09-13 12:32 - Fjernet nulstilling af 'visInaktive'.
     setVisUdgaaede(false);
   };
   
@@ -174,13 +207,26 @@ function AktivitetsskabelonerPage() {
                     ))}
                 </select>
             </div>
+{/* @ 2025-09-13 12:56 - Opdateret gruppe-filter til at bruge den dynamiske liste. */}
             <div className="w-[20%] flex">
                 <input type="text" name="gruppe_nr" placeholder="Nr." value={filters.gruppe_nr} onChange={handleFilterChange} className="w-1/4 p-2 border border-gray-300 border-r-0 rounded-l-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/>
-                <select name="gruppe_nr" value={filters.gruppe_nr} onChange={handleFilterChange} className="w-3/4 p-2 border border-gray-300 rounded-r-md text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <option value="">Vælg gruppe...</option>
-                    {gruppeList.map(g => (
-                        <option key={g.id} value={g.nr}>{g.nr} - {g.titel_kort}</option>
-                    ))}
+                <select 
+                    name="gruppe_nr" 
+                    value={filters.gruppe_nr} 
+                    onChange={handleFilterChange} 
+                    className="w-3/4 p-2 border border-gray-300 rounded-r-md text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={isFilterGrupperLoading}
+                >
+                    {isFilterGrupperLoading ? (
+                        <option>Henter...</option>
+                    ) : (
+                        <>
+                            <option value="">Vælg gruppe...</option>
+                            {tilgaengeligeFilterGrupper.map(g => 
+                                <option key={g.id} value={g.nr}>{g.nr} - {g.titel_kort}</option>
+                            )}
+                        </>
+                    )}
                 </select>
             </div>
             <div className="w-[10%]">
@@ -194,7 +240,6 @@ function AktivitetsskabelonerPage() {
 
         <div className="flex justify-between items-center mt-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
-                {/* @ 2025-09-13 12:32 - Fjernet checkbox for 'Vis inaktive'. */}
                 <label className="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" checked={visUdgaaede} onChange={() => setVisUdgaaede(!visUdgaaede)} className="h-4 w-4 rounded border-gray-300"/>
                     <span>Vis udgåede</span>
@@ -212,7 +257,6 @@ function AktivitetsskabelonerPage() {
             <tr>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[15%]">Aktiv. Nr.</th>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[70%]">Aktivitet</th>
-              {/* @ 2025-09-13 12:32 - Omdøbt kolonne og tilføjet linjeskift. */}
               <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]">Standard<br/>aktiveret</th>
               <th className="text-center py-1 px-2 uppercase font-semibold w-[10%]"></th>
             </tr>

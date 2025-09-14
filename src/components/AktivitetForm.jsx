@@ -1,4 +1,5 @@
 // --- Fil: src/components/AktivitetForm.jsx ---
+// @ 2025-09-13 12:49 - Implementeret "cascading dropdown" for Proces -> Gruppe.
 // @ 2025-09-13 12:43 - Flyttet 'Aktiv'/'Udgået' checkboxes og omdøbt 'Aktiv'.
 // @ 2025-09-12 22:25 - Opdateret til at håndtere 'proces' som en relation
 // @ 2025-09-11 21:05 - Rettet 400-fejl ved gem og tilføjet 'Esc' for at annullere.
@@ -10,7 +11,7 @@ import { Save, X } from 'lucide-react'; // Ikoner til knapper
 
 function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList }) {
   const [formData, setFormData] = useState({
-    proces: '', // Omdøbt fra proces_nr
+    proces: '',
     gruppe: '',
     aktivitet_nr: '',
     aktivitet: '',
@@ -21,16 +22,18 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
     frist: '',
   });
 
+// @ 2025-09-13 12:49 - Tilføjet state for at håndtere de afhængige grupper.
+  const [tilgaengeligeGrupper, setTilgaengeligeGrupper] = useState([]);
+  const [isGrupperLoading, setIsGrupperLoading] = useState(false);
   const erRedigering = aktivitetTilRedigering != null;
 
-  // Filtrer blokinfo listen til processer (formaal=1) og grupper (formaal=2)
   const procesList = useMemo(() => blokinfoList.filter(b => b.formaal === 1), [blokinfoList]);
-  const gruppeList = useMemo(() => blokinfoList.filter(b => b.formaal === 2), [blokinfoList]);
-
+  
+  // Fyld formularen ved redigering
   useEffect(() => {
     if (erRedigering) {
       setFormData({
-        proces: aktivitetTilRedigering.proces?.id || '', // Rettet til at bruge relationen
+        proces: aktivitetTilRedigering.proces?.id || '',
         gruppe: aktivitetTilRedigering.gruppe?.id || '',
         aktivitet_nr: aktivitetTilRedigering.aktivitet_nr || '',
         aktivitet: aktivitetTilRedigering.aktivitet || '',
@@ -42,6 +45,36 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
       });
     }
   }, [aktivitetTilRedigering]);
+
+// @ 2025-09-13 12:49 - Ny useEffect til at hente grupper, når en proces vælges.
+  useEffect(() => {
+    const fetchGrupperForProces = async () => {
+      if (formData.proces) {
+        setIsGrupperLoading(true);
+        // Bevar den valgte gruppe, hvis den er gyldig, ellers nulstil den
+        const nuvaerendeGruppeErGyldig = tilgaengeligeGrupper.some(g => g.id === formData.gruppe);
+        if (!nuvaerendeGruppeErGyldig) {
+            setFormData(prev => ({ ...prev, gruppe: '' }));
+        }
+        try {
+          const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/${formData.proces}/grupper/`);
+          if (!response.ok) throw new Error('Kunne ikke hente grupper.');
+          const data = await response.json();
+          setTilgaengeligeGrupper(data);
+        } catch (error) {
+          console.error("Fejl ved hentning af grupper for proces:", error);
+          setTilgaengeligeGrupper([]);
+        } finally {
+          setIsGrupperLoading(false);
+        }
+      } else {
+        setTilgaengeligeGrupper([]);
+        setFormData(prev => ({ ...prev, gruppe: '' }));
+      }
+    };
+    fetchGrupperForProces();
+  }, [formData.proces]);
+
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -69,25 +102,16 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
       ? `${API_BASE_URL}/skabeloner/aktiviteter/${aktivitetTilRedigering.id}/`
       : `${API_BASE_URL}/skabeloner/aktiviteter/`;
     const method = erRedigering ? 'PUT' : 'POST';
-
     const dataToSend = { ...formData };
-    // Fjerner proces_nr, da den ikke længere eksisterer som et simpelt talfelt
     const numericFields = ['aktivitet_nr', 'frist'];
     numericFields.forEach(field => {
       if (dataToSend[field] === '' || dataToSend[field] === undefined) {
         dataToSend[field] = null;
       }
     });
-
-    // Opretter payload med korrekte ID-felter til backend
-    const payload = {
-      ...dataToSend,
-      proces_id: dataToSend.proces || null,
-      gruppe_id: dataToSend.gruppe || null,
-    };
+    const payload = { ...dataToSend, proces_id: dataToSend.proces || null, gruppe_id: dataToSend.gruppe || null, };
     delete payload.proces;
     delete payload.gruppe;
-
     try {
       const response = await fetch(url, {
         method,
@@ -97,7 +121,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
       if (!response.ok) {
         const errorData = await response.json();
         console.error("API Error Response:", errorData);
-        throw new Error('Netværksrespons var ikke ok. Tjek konsollen for detaljer.');
+        throw new Error('Netværksrespons var ikke ok.');
       }
       onSave();
     } catch (error) {
@@ -135,7 +159,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
             </div>
           </div>
 
-{/* // @ 2025-09-13 12:43 - Flyttet checkboxes hertil og omdøbt label for 'Aktiv'. */}
           <div className="flex items-center space-x-6 pt-2">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input type="checkbox" name="aktiv" checked={formData.aktiv} onChange={handleChange} />
@@ -157,9 +180,26 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
             </div>
             <div className="w-1/2">
               <label htmlFor="gruppe" className="block text-sm font-medium">Gruppe</label>
-              <select name="gruppe" value={formData.gruppe} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md bg-white">
-                <option value="">Vælg gruppe...</option>
-                {gruppeList.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
+{/* @ 2025-09-13 12:49 - Opdateret select til at bruge den filtrerede liste. */}
+              <select 
+                name="gruppe" 
+                value={formData.gruppe} 
+                onChange={handleChange} 
+                className="mt-1 w-full p-2 border rounded-md bg-white"
+                disabled={!formData.proces || isGrupperLoading}
+              >
+                {isGrupperLoading ? (
+                    <option>Henter grupper...</option>
+                ) : !formData.proces ? (
+                    <option>Vælg en proces først</option>
+                ) : tilgaengeligeGrupper.length === 0 ? (
+                    <option>Ingen grupper fundet</option>
+                ) : (
+                    <>
+                        <option value="">Vælg gruppe...</option>
+                        {tilgaengeligeGrupper.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
+                    </>
+                )}
               </select>
             </div>
           </div>

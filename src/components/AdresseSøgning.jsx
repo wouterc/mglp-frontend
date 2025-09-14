@@ -65,7 +65,7 @@ function AdresseSøgning({ onAdresseValgt }) {
 
   return (
     <div className="relative">
-      <label htmlFor="adresse-soeg" className="block text-sm font-medium text-gray-700">Søg adresse eller BFE-nr</label>
+      <label htmlFor="adresse-soeg" className="block text-sm font-medium text-gray-700">Søg adresse</label>
       <input
         id="adresse-soeg"
         type="text"
