@@ -1,86 +1,124 @@
-// --- Fil: src/pages/AktiviteterPage.jsx ---
-// @ 2025-09-13 13:35 - Oprettet ny side til visning og redigering af sagsaktiviteter.
-import React, { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+// --- Fil: src/pages/AktiviteterPage.tsx ---
+// @# 2025-09-14 21:58 - Rettet den sidste typefejl ved at hente fuld sag før dispatch
+import React, { useState, useEffect, useCallback, useMemo, Fragment, ReactElement, KeyboardEvent } from 'react';
 import { API_BASE_URL } from '../config';
-// @ 2025-09-13 22:34 - Udskiftet ikoner for bedre visuel klarhed.
 import { PlusCircle, Edit, Search, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp } from 'lucide-react';
-// @ 2025-09-13 22:12 - Importeret useDebounce til søgefunktion
 import useDebounce from '../hooks/useDebounce';
+import { useAppState } from '../StateContext';
+import type { Status, Aktivitet, Sag } from '../types';
 
+// --- Type-definitioner (kun side-specifikke) ---
+interface AktiviteterPageProps {
+    sagId: number | null;
+}
 
-const InlineTextEditor = ({ value, onSave, type = "text" }) => {
+interface InlineEditorProps {
+    value: string | null;
+    onSave: (value: string) => void;
+    type?: string;
+}
+
+interface SøgeResultat {
+    id: number;
+    sags_nr: string;
+    alias: string;
+}
+
+// --- Sub-komponenter ---
+const InlineTextEditor = ({ value, onSave, type = "text" }: InlineEditorProps): ReactElement => {
     const [text, setText] = useState(value);
     const handleBlur = () => {
         if (text !== value) {
-            onSave(text);
+            onSave(text || '');
         }
     };
     return <input type={type} value={text || ''} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} className="w-full p-1 border rounded-md text-sm bg-white" />;
 };
-function AktiviteterPage({ sagId }) {
-    const [aktiviteter, setAktiviteter] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
 
-    const [aktivitetStatusser, setAktivitetStatusser] = useState([]);
+// --- Hovedkomponent ---
+function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
+    const { state, dispatch } = useAppState();
+    const { aktiviteter: gemteAktiviteter, valgtSag, isLoadingAktiviteter } = state;
 
-    const [valgtSag, setValgtSag] = useState(null);
-    const [søgning, setSøgning] = useState('');
-    const [søgeResultater, setSøgeResultater] = useState([]);
-    const [isSøger, setIsSøger] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(-1);
-    const [udvidedeGrupper, setUdvidedeGrupper] = useState({});
+    // Lokal state kun til sidens UI
+    const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
+    const [søgning, setSøgning] = useState<string>('');
+    const [søgeResultater, setSøgeResultater] = useState<SøgeResultat[]>([]);
+    const [activeIndex, setActiveIndex] = useState<number>(-1);
+    const [udvidedeGrupper, setUdvidedeGrupper] = useState<{ [key: string]: boolean }>({});
     const debouncedSøgning = useDebounce(søgning, 300);
 
-// @ 2025-09-14 15:50 - Beregner totaler for hele sagen
-    const totalCounts = useMemo(() => {
-        const aktive = aktiviteter.filter(a => a.aktiv).length;
-        const faerdige = aktiviteter.filter(a => a.aktiv && a.status?.status_kategori === 1).length;
-        return { aktive, faerdige };
-    }, [aktiviteter]);
+    const nuvaerendeAktiviteter = valgtSag ? gemteAktiviteter[valgtSag.id] || [] : [];
 
-// @ 2025-09-14 15:50 - Beregner totaler for hver enkelt gruppe
-    const gruppeCounts = useMemo(() => {
-        const counts = {};
-        aktiviteter.forEach(a => {
-            const header = `${a.proces?.nr || ''}.${a.gruppe?.nr || ''} - ${a.proces?.titel_kort || ''} / ${a.gruppe?.titel_kort || ''}`;
-            if (!counts[header]) {
-                counts[header] = { aktive: 0, faerdige: 0 };
-            }
-            if (a.aktiv) {
-                counts[header].aktive++;
-                if (a.status?.status_kategori === 1) {
-                    counts[header].faerdige++;
-                }
-            }
-        });
-        return counts;
-    }, [aktiviteter]);
+    const hentAktiviteter = useCallback(async (currentSag: Sag) => {
+        if (gemteAktiviteter[currentSag.id]) return;
+
+        dispatch({ type: 'SET_LOADING_AKTIVITETER', payload: true });
+        try {
+            const res = await fetch(`${API_BASE_URL}/aktiviteter/?sag=${currentSag.id}`);
+            if (!res.ok) throw new Error('Kunne ikke hente aktiviteter.');
+            const data = await res.json();
+     
+            const aktivitetsliste: Aktivitet[] = data.results || data;
+
+            dispatch({
+                type: 'SET_AKTIVITETER',
+                payload: { sagId: currentSag.id, aktiviteter: aktivitetsliste },
+            });
+        } catch (e: any) {
+            console.error("Fejl ved hentning af aktiviteter:", e.message);
+        } finally {
+            dispatch({ type: 'SET_LOADING_AKTIVITETER', payload: false });
+        }
+    }, [dispatch, gemteAktiviteter]);
 
     useEffect(() => {
         const fetchInitialSag = async () => {
-            if (sagId) {
-                setIsLoading(true);
+            if (sagId && (!valgtSag || valgtSag.id !== sagId)) {
                 try {
                     const sagRes = await fetch(`${API_BASE_URL}/sager/${sagId}/`);
                     if (!sagRes.ok) throw new Error('Kunne ikke hente den valgte sag.');
-                    const sagData = await sagRes.json();
-                    setValgtSag(sagData);
-                } catch (e) {
-                    setError(e.message);
-                } finally {
-                    setIsLoading(false);
+                    const sagData: Sag = await sagRes.json();
+                    dispatch({ type: 'SET_VALGT_SAG', payload: sagData });
+                } catch (e: any) {
+                   console.error(e.message);
                 }
             }
         };
         fetchInitialSag();
-    }, [sagId]);
+    }, [sagId, valgtSag, dispatch]);
+
+    useEffect(() => {
+        if (valgtSag) {
+            hentAktiviteter(valgtSag);
+        }
+    }, [valgtSag, hentAktiviteter]);
+
+    useEffect(() => {
+        const searchSager = async () => {
+            const trimmedSearch = debouncedSøgning.trim();
+            const erTal = !isNaN(trimmedSearch as any) && trimmedSearch !== '';
+            if (!trimmedSearch || (!erTal && trimmedSearch.length < 2)) {
+                setSøgeResultater([]);
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE_URL}/sager/search/?q=${trimmedSearch}`);
+                if (!res.ok) throw new Error('Søgefejl');
+                const data: SøgeResultat[] = await res.json();
+                setSøgeResultater(data);
+                setActiveIndex(-1);
+            } catch (error) {
+                console.error("Fejl ved søgning af sager:", error);
+            }
+        };
+        searchSager();
+    }, [debouncedSøgning]);
 
     useEffect(() => {
         const fetchAktivitetStatusser = async () => {
             try {
                 const response = await fetch(`${API_BASE_URL}/kerne/status/?formaal=2`);
-                if (!response.ok) throw new Error('Kunne ikke hente statusser for aktiviteter');
                 const data = await response.json();
                 setAktivitetStatusser(data.results || data);
             } catch (error) {
@@ -90,88 +128,22 @@ function AktiviteterPage({ sagId }) {
         fetchAktivitetStatusser();
     }, []);
 
-
-    const hentAktiviteter = useCallback(async () => {
-        if (!valgtSag) {
-            setAktiviteter([]);
-            return;
-        }
-        setIsLoading(true);
+// @# 2025-09-14 21:58 - Henter det fulde Sag-objekt, før det sendes til state, for at løse type-fejl.
+    const handleSelectSag = async (sagSøgning: SøgeResultat) => {
         try {
-            const aktiviteterRes = await fetch(`${API_BASE_URL}/aktiviteter/?sag=${valgtSag.id}`);
-            if (!aktiviteterRes.ok) throw new Error('Kunne ikke hente data.');
-            const aktiviteterData = await aktiviteterRes.json();
-            const aktivitetsliste = Array.isArray(aktiviteterData.results) ? aktiviteterData.results : Array.isArray(aktiviteterData) ? aktiviteterData : [];
-            setAktiviteter(aktivitetsliste);
-
-            const gruppeStatus = {};
-            aktivitetsliste.forEach(a => {
-                const header = `${a.proces?.nr || ''}.${a.gruppe?.nr || ''} - ${a.proces?.titel_kort || ''} / ${a.gruppe?.titel_kort || ''}`;
-                if (gruppeStatus[header] === undefined) {
-                    gruppeStatus[header] = false;
-                }
-            });
-            setUdvidedeGrupper(gruppeStatus);
-
-        } catch (e) {
-            setError(e.message);
-        } finally {
-            setIsLoading(false);
+            const sagRes = await fetch(`${API_BASE_URL}/sager/${sagSøgning.id}/`);
+            if (!sagRes.ok) throw new Error('Kunne ikke hente den valgte sag.');
+            const fuldSag: Sag = await sagRes.json();
+            dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
+        } catch(e: any) {
+            console.error(e.message);
         }
-    }, [valgtSag]);
-
-    useEffect(() => {
-        hentAktiviteter();
-    }, [hentAktiviteter]);
-
-    useEffect(() => {
-        const searchSager = async () => {
-            const trimmedSearch = debouncedSøgning.trim();
-            const erTal = !isNaN(trimmedSearch) && trimmedSearch !== '';
-            if (!trimmedSearch || (!erTal && trimmedSearch.length < 2)) {
-                setSøgeResultater([]);
-                return;
-            }
-            setIsSøger(true);
-            try {
-                const res = await fetch(`${API_BASE_URL}/sager/search/?q=${trimmedSearch}`);
-                if (!res.ok) throw new Error('Søgefejl');
-                const data = await res.json();
-                setSøgeResultater(data);
-                setActiveIndex(-1);
-            } catch (error) {
-                console.error("Fejl ved søgning af sager:", error);
-            } finally {
-                setIsSøger(false);
-            }
-        };
-        searchSager();
-    }, [debouncedSøgning]);
-
-    const handleSelectSag = (sag) => {
-        setValgtSag(sag);
         setSøgning('');
         setSøgeResultater([]);
     };
     
-    const handleToggleGruppe = (gruppeHeader) => {
-        setUdvidedeGrupper(prev => ({
-            ...prev,
-            [gruppeHeader]: !prev[gruppeHeader],
-        }));
-    };
-
-    const toggleAlleGrupper = (udvid) => {
-        const nyStatus = {};
-        Object.keys(udvidedeGrupper).forEach(key => {
-            nyStatus[key] = udvid;
-        });
-        setUdvidedeGrupper(nyStatus);
-    };
-
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         if (søgeResultater.length === 0) return;
-
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             setActiveIndex(prevIndex => (prevIndex < søgeResultater.length - 1 ? prevIndex + 1 : prevIndex));
@@ -189,7 +161,17 @@ function AktiviteterPage({ sagId }) {
         }
     };
 
-    const handleInlineSave = async (aktivitetId, field, value) => {
+    const handleToggleGruppe = (gruppeHeader: string) => {
+        setUdvidedeGrupper(prev => ({ ...prev, [gruppeHeader]: !prev[gruppeHeader] }));
+    };
+
+    const toggleAlleGrupper = (udvid: boolean) => {
+        const nyStatus: { [key: string]: boolean } = {};
+        Object.keys(gruppeCounts).forEach(key => { nyStatus[key] = udvid; });
+        setUdvidedeGrupper(nyStatus);
+    };
+
+    const handleInlineSave = async (aktivitetId: number, field: string, value: string | boolean) => {
         const fieldName = field === 'status' ? 'status_id' : field;
         const finalValue = (field === 'dato_intern' || field === 'dato_ekstern') && value === '' ? null : value;
         try {
@@ -200,27 +182,47 @@ function AktiviteterPage({ sagId }) {
             });
             if (!response.ok) throw new Error('Kunne ikke gemme ændring.');
             
-            const opdateretAktivitet = await response.json();
-
-            setAktiviteter(prevAktiviteter => 
-                prevAktiviteter.map(a => 
+            const opdateretAktivitet: Aktivitet = await response.json();
+            if(valgtSag) {
+                const opdateredeAktiviteter = nuvaerendeAktiviteter.map(a => 
                     a.id === aktivitetId ? opdateretAktivitet : a
-                )
-            );
+                );
+                dispatch({ type: 'SET_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: opdateredeAktiviteter } });
+            }
+
         } catch (e) {
             console.error("Fejl ved inline save:", e);
-            alert("Kunne ikke gemme ændringen. Genindlæser data for at rette op.");
-            hentAktiviteter();
+            alert("Kunne ikke gemme ændringen.");
+            if (valgtSag) hentAktiviteter(valgtSag);
         }
     };
-    let lastGroupHeader = null;
 
-    if (error) return <div className="text-red-500 p-4">{error}</div>;
-    
+    const totalCounts = useMemo(() => {
+        const aktive = nuvaerendeAktiviteter.filter(a => a.aktiv).length;
+        const faerdige = nuvaerendeAktiviteter.filter(a => a.aktiv && a.status?.status_kategori === 1).length;
+        return { aktive, faerdige };
+    }, [nuvaerendeAktiviteter]);
+
+    const gruppeCounts = useMemo(() => {
+        const counts: { [key: string]: { aktive: number; faerdige: number } } = {};
+        nuvaerendeAktiviteter.forEach(a => {
+            const header = `${a.proces?.nr || ''}.${a.gruppe?.nr || ''} - ${a.proces?.titel_kort || ''} / ${a.gruppe?.titel_kort || ''}`;
+            if (!counts[header]) {
+                counts[header] = { aktive: 0, faerdige: 0 };
+            }
+            if (a.aktiv) {
+                counts[header].aktive++;
+                if (a.status?.status_kategori === 1) {
+                    counts[header].faerdige++;
+                }
+            }
+        });
+        return counts;
+    }, [nuvaerendeAktiviteter]);
+
     return (
         <div className="p-4 sm:p-6 lg:p-8">
-            <div className="flex justify-between items-center mb-2">
-{/* @ 2025-09-14 15:50 - Tilføjet totaltæller til sidetitlen */}
+             <div className="flex justify-between items-center mb-2">
                 <h2 className="text-2xl font-bold text-gray-800">
                     Aktiviteter {valgtSag ? `for Sag #${valgtSag.sags_nr} (${valgtSag.alias})` : ''}
                     {valgtSag && <span className="text-lg font-normal ml-2 text-gray-500">({totalCounts.faerdige}/{totalCounts.aktive})</span>}
@@ -234,7 +236,7 @@ function AktiviteterPage({ sagId }) {
                 </div>
             </div>
             <div className="mb-4 relative">
-                <label htmlFor="sag-soeg" className="block text-sm font-medium text-gray-700">Søg efter sag (sagsnr eller alias)</label>
+                <label htmlFor="sag-soeg" className="block text-sm font-medium text-gray-700">Skift til en anden sag (sagsnr eller alias)</label>
                 <div className="relative mt-1">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search className="h-5 w-5 text-gray-400" /></div>
                     <input id="sag-soeg" type="text" value={søgning} onChange={(e) => setSøgning(e.target.value)} onKeyDown={handleKeyDown} placeholder="Start med at skrive..." className="w-full p-2 pl-10 border rounded-md" autoComplete="off" />
@@ -249,11 +251,10 @@ function AktiviteterPage({ sagId }) {
                     </ul>
                 )}
             </div>
-
-            <div className="overflow-x-auto rounded-lg shadow-md">
+             <div className="overflow-x-auto rounded-lg shadow-md">
                 <table className="min-w-full bg-white table-fixed">
                     <thead className="bg-gray-800 text-white text-sm">
-                         <tr>
+                        <tr>
                             <th className="py-1 px-2 w-[5%]">Aktiv</th>
                             <th className="py-1 px-2 w-[5%]">Aktiv. Nr.</th>
                             <th className="py-1 px-2 w-[30%]">Aktivitet</th>
@@ -266,23 +267,22 @@ function AktiviteterPage({ sagId }) {
                          </tr>
                     </thead>
                     <tbody>
-                        {isLoading ? (
-                            <tr><td colSpan="9" className="text-center p-4">Henter aktiviteter...</td></tr>
-                        ) : aktiviteter.length === 0 ? (
-                            <tr><td colSpan="9" className="text-center p-4">{valgtSag ? 'Ingen aktiviteter fundet for denne sag.' : 'Vælg en sag for at se aktiviteter.'}</td></tr>
+                        {isLoadingAktiviteter ? (
+                            <tr><td colSpan={9} className="text-center p-4">Henter aktiviteter...</td></tr>
+                        ) : nuvaerendeAktiviteter.length === 0 ? (
+                            <tr><td colSpan={9} className="text-center p-4">{valgtSag ? 'Ingen aktiviteter fundet for denne sag.' : 'Vælg en sag for at se aktiviteter.'}</td></tr>
                         ) : (
-                            Object.keys(gruppeCounts).map(header => (
+                            Object.keys(gruppeCounts).sort().map(header => (
                                 <Fragment key={header}>
                                     <tr className="bg-gray-200 sticky top-0 hover:bg-gray-300 cursor-pointer border-t-2 border-white" onClick={() => handleToggleGruppe(header)}>
-{/* @ 2025-09-14 15:50 - Tilføjet gruppetæller til overskriftsrækken */}
-                                        <td colSpan="9" className="py-1 px-2 font-bold text-gray-700">
+                                        <td colSpan={9} className="py-1 px-2 font-bold text-gray-700">
                                             {udvidedeGrupper[header] ? <ChevronUp size={16} className="inline-block mr-2" /> : <ChevronDown size={16} className="inline-block mr-2" />}
                                             {header}
                                             <span className="font-normal ml-2 text-gray-500">({gruppeCounts[header].faerdige}/{gruppeCounts[header].aktive})</span>
                                         </td>
                                     </tr>
                                     {udvidedeGrupper[header] && (
-                                        aktiviteter.filter(a => `${a.proces?.nr || ''}.${a.gruppe?.nr || ''} - ${a.proces?.titel_kort || ''} / ${a.gruppe?.titel_kort || ''}` === header)
+                                        nuvaerendeAktiviteter.filter(a => `${a.proces?.nr || ''}.${a.gruppe?.nr || ''} - ${a.proces?.titel_kort || ''} / ${a.gruppe?.titel_kort || ''}` === header)
                                         .map(a => (
                                             <tr key={a.id} className="border-b border-gray-200 hover:bg-gray-100">
                                                 <td className="py-1 px-2 text-center"><input type="checkbox" checked={!!a.aktiv} onChange={(e) => handleInlineSave(a.id, 'aktiv', e.target.checked)} /></td>

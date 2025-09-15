@@ -1,11 +1,10 @@
-// --- Fil: src/hooks/useDebounce.js ---
-
+// --- Fil: src/hooks/useDebounce.ts ---
 import { useState, useEffect } from 'react';
 
 // Denne custom hook tager en værdi og en forsinkelse.
 // Den returnerer kun den nye værdi, når der ikke er tastet i 'delay' millisekunder.
-function useDebounce(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
     const handler = setTimeout(() => {

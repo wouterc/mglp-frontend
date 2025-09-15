@@ -1,20 +1,41 @@
-// --- Fil: src/components/AdresseSøgning.jsx ---
+// --- Fil: src/components/AdresseSøgning.tsx ---
 
 //@@ 2025-09-09 15:00 - Deaktiveret browser autocomplete for at tillade keyboard-navigation
-import React, { useState, useEffect } from 'react';
-import useDebounce from '../hooks/useDebounce';
+import React, { useState, useEffect, ReactElement, KeyboardEvent } from 'react';
+import useDebounce from '../hooks/useDebounce.js';
 
-function AdresseSøgning({ onAdresseValgt }) {
-  const [søgning, setSøgning] = useState('');
-  const [resultater, setResultater] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1); // Til at spore det valgte element
+// --- Type-definitioner ---
+interface DawaAdresse {
+  id: string;
+  adressebetegnelse: string;
+  vejnavn: string;
+  husnr: string;
+  etage: string | null;
+  dør: string | null;
+  postnr: string;
+  postnrnavn: string;
+  href: string;
+}
+
+interface DawaAutocompleteResult {
+  tekst: string;
+  adresse: DawaAdresse;
+}
+
+interface AdresseSøgningProps {
+  onAdresseValgt: (adresse: DawaAdresse) => void;
+}
+
+function AdresseSøgning({ onAdresseValgt }: AdresseSøgningProps): ReactElement {
+  const [søgning, setSøgning] = useState<string>('');
+  const [resultater, setResultater] = useState<DawaAutocompleteResult[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
 
   const debouncedSøgning = useDebounce(søgning, 300);
 
   useEffect(() => {
     const fetchAdresser = async () => {
-      // Sikrer at søgningen er en streng og har tilstrækkelig længde
       if (typeof debouncedSøgning !== 'string' || debouncedSøgning.length < 3) {
         setResultater([]);
         return;
@@ -22,13 +43,12 @@ function AdresseSøgning({ onAdresseValgt }) {
       setIsLoading(true);
       try {
         const response = await fetch(`https://api.dataforsyningen.dk/adresser/autocomplete?q=${debouncedSøgning}`);
-        const data = await response.json();
-        // Sikrer at resultatet altid er et array
+        const data: DawaAutocompleteResult[] = await response.json();
         setResultater(Array.isArray(data) ? data : []);
-        setActiveIndex(-1); // Nulstil valg når resultater ændres
+        setActiveIndex(-1);
       } catch (error) {
         console.error("Fejl ved hentning af adresser fra DAWA:", error);
-        setResultater([]); // Ryd resultater ved fejl
+        setResultater([]);
       } finally {
         setIsLoading(false);
       }
@@ -37,16 +57,14 @@ function AdresseSøgning({ onAdresseValgt }) {
     fetchAdresser();
   }, [debouncedSøgning]);
 
-  const handleSelectAdresse = (adresse) => {
+  const handleSelectAdresse = (adresse: DawaAdresse) => {
     onAdresseValgt(adresse);
-    // Tilføjer et fallback til en tom streng for at undgå 'undefined'
     setSøgning(adresse.adressebetegnelse || '');
     setResultater([]);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (resultater.length === 0) return;
-
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex(prevIndex => (prevIndex < resultater.length - 1 ? prevIndex + 1 : prevIndex));
@@ -71,8 +89,8 @@ function AdresseSøgning({ onAdresseValgt }) {
         type="text"
         value={søgning}
         onChange={(e) => setSøgning(e.target.value)}
-        onKeyDown={handleKeyDown} // Tilføjet event handler
-        autoComplete="off" // Forhindrer browserens egen autoudfyldning
+        onKeyDown={handleKeyDown}
+        autoComplete="off"
         placeholder="Start med at skrive en adresse..."
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
       />
@@ -83,7 +101,7 @@ function AdresseSøgning({ onAdresseValgt }) {
             <li
               key={res.adresse.id}
               onClick={() => handleSelectAdresse(res.adresse)}
-              onMouseEnter={() => setActiveIndex(index)} // Synkroniser med musen
+              onMouseEnter={() => setActiveIndex(index)}
               className={`p-2 cursor-pointer ${index === activeIndex ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
             >
               {res.tekst}

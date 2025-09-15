@@ -1,9 +1,7 @@
-// @ 2025-09-13 19:55 - Tilføjet state management for at navigere til sider med et specifikt sags-ID.
-// src/App.jsx
+// --- Fil: src/App.tsx ---
+// @# 2025-09-14 23:05 - Refaktoreret til at bruge global context for valgtSag
 import React, { useState } from 'react';
 import Layout from './components/Layout';
-
-// Importer alle dine sider
 import SagsoversigtPage from './pages/SagsoversigtPage';
 import SagsdetaljerPage from './pages/SagsdetaljerPage';
 import AktiviteterPage from './pages/AktiviteterPage';
@@ -14,54 +12,56 @@ import BlokInfoSkabelonerPage from './pages/BlokInfoSkabelonerPage';
 import AktivitetsskabelonerPage from './pages/AktivitetsskabelonerPage';
 import DokumentskabelonerPage from './pages/DokumentskabelonerPage';
 import MinKontoPage from './pages/MinKontoPage';
+import type { Sag } from './types';
+// @# 2025-09-14 23:05 - Importeret useAppState hook
+import { useAppState } from './StateContext';
 
 function App() {
   const [aktivSide, setAktivSide] = useState('sagsoversigt');
-  // Ny state til at holde ID'et på den valgte sag
-  const [aktivSagId, setAktivSagId] = useState(null);
+// @# 2025-09-14 23:05 - Bruger valgtSag og dispatch fra global context
+  const { state, dispatch } = useAppState();
+  const { valgtSag } = state;
 
-  // Ny funktion, der kan håndtere navigation med og uden et sags-ID
-  const navigateTo = (side, sagId = null) => {
+  const navigateTo = (side: string, sag: Sag | null) => {
     setAktivSide(side);
-    setAktivSagId(sagId);
+    if (sag) {
+// @# 2025-09-14 23:05 - Opdaterer valgtSag i global context
+      dispatch({ type: 'SET_VALGT_SAG', payload: sag });
+    }
   };
 
   const renderSide = () => {
     switch (aktivSide) {
-      case 'sagsoversigt': 
-        // Vi giver navigateTo-funktionen videre til SagsoversigtPage
+      case 'sagsoversigt':
         return <SagsoversigtPage navigateTo={navigateTo} />;
-      case 'sagsdetaljer': 
-        return <SagsdetaljerPage sagId={aktivSagId} />;
-      case 'aktiviteter': 
-        // Vi giver det gemte sags-ID videre til AktiviteterPage
-        return <AktiviteterPage sagId={aktivSagId} />;
-      case 'dokumenter': 
-        return <DokumenterPage sagId={aktivSagId} />;
-      case 'virksomheder': 
+      case 'sagsdetaljer':
+        return <SagsdetaljerPage sagId={valgtSag?.id ?? null} />;
+      case 'aktiviteter':
+        return <AktiviteterPage sagId={valgtSag?.id ?? null} />;
+      case 'dokumenter':
+        return <DokumenterPage sagId={valgtSag?.id ?? null} />;
+      case 'virksomheder':
         return <VirksomhederPage />;
-      case 'kontakter': 
+      case 'kontakter':
         return <KontakterPage />;
-      case 'blokinfo_skabeloner': 
+      case 'blokinfo_skabeloner':
         return <BlokInfoSkabelonerPage />;
-      case 'aktivitetsskabeloner': 
+      case 'aktivitetsskabeloner':
         return <AktivitetsskabelonerPage />;
-      case 'dokumentskabeloner': 
+      case 'dokumentskabeloner':
         return <DokumentskabelonerPage />;
-      case 'min_konto': 
+      case 'min_konto':
         return <MinKontoPage />;
-      default: 
+      default:
         return <SagsoversigtPage navigateTo={navigateTo} />;
     }
   };
 
   return (
-    // Vi bruger nu den nye navigateTo-funktion i Layout for at kunne navigere tilbage til oversigten
-    <Layout aktivSide={aktivSide} setAktivSide={navigateTo}>
+    <Layout aktivSide={aktivSide} setAktivSide={setAktivSide}>
       {renderSide()}
     </Layout>
   );
 }
 
 export default App;
-

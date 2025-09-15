@@ -1,16 +1,31 @@
-// --- Fil: src/components/AktivitetForm.jsx ---
-// @ 2025-09-13 12:49 - Implementeret "cascading dropdown" for Proces -> Gruppe.
-// @ 2025-09-13 12:43 - Flyttet 'Aktiv'/'Udgået' checkboxes og omdøbt 'Aktiv'.
-// @ 2025-09-12 22:25 - Opdateret til at håndtere 'proces' som en relation
-// @ 2025-09-11 21:05 - Rettet 400-fejl ved gem og tilføjet 'Esc' for at annullere.
-// @ 2025-09-11 21:15 - Sikret at tomme talfelter sendes som 'null' i stedet for tom streng.
-// @ 2025-09-11 21:42 - Ændret form-layout og flyttet Gem/Annuller knapper til toppen med ikoner.
-import React, { useState, useEffect, useMemo } from 'react';
-import { API_BASE_URL } from '../config';
-import { Save, X } from 'lucide-react'; // Ikoner til knapper
+// --- Fil: src/components/AktivitetForm.tsx ---
+import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent, ReactElement } from 'react';
+import { API_BASE_URL } from '../config.ts';
+import { Save, X } from 'lucide-react';
+import type { Blokinfo, AktivitetTilRedigering } from '../types.ts'; // IMPORTER CENTRALE TYPER
 
-function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList }) {
-  const [formData, setFormData] = useState({
+// --- Type-definitioner (kun komponent-specifikke) ---
+interface AktivitetFormProps {
+  onSave: () => void;
+  onCancel: () => void;
+  aktivitetTilRedigering: AktivitetTilRedigering;
+  blokinfoList: Blokinfo[];
+}
+
+interface FormDataState {
+  proces: string;
+  gruppe: string;
+  aktivitet_nr: string;
+  aktivitet: string;
+  aktiv: boolean;
+  udgaaet: boolean;
+  note: string;
+  ansvarlig: string;
+  frist: string;
+}
+
+function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList }: AktivitetFormProps): ReactElement {
+  const [formData, setFormData] = useState<FormDataState>({
     proces: '',
     gruppe: '',
     aktivitet_nr: '',
@@ -22,44 +37,41 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
     frist: '',
   });
 
-// @ 2025-09-13 12:49 - Tilføjet state for at håndtere de afhængige grupper.
-  const [tilgaengeligeGrupper, setTilgaengeligeGrupper] = useState([]);
-  const [isGrupperLoading, setIsGrupperLoading] = useState(false);
+  const [tilgaengeligeGrupper, setTilgaengeligeGrupper] = useState<Blokinfo[]>([]);
+  const [isGrupperLoading, setIsGrupperLoading] = useState<boolean>(false);
   const erRedigering = aktivitetTilRedigering != null;
-
-  const procesList = useMemo(() => blokinfoList.filter(b => b.formaal === 1), [blokinfoList]);
   
-  // Fyld formularen ved redigering
+  const procesList = useMemo(() => blokinfoList.filter(b => b.formaal === 1), [blokinfoList]);
+
   useEffect(() => {
-    if (erRedigering) {
+    if (erRedigering && aktivitetTilRedigering) {
       setFormData({
-        proces: aktivitetTilRedigering.proces?.id || '',
-        gruppe: aktivitetTilRedigering.gruppe?.id || '',
-        aktivitet_nr: aktivitetTilRedigering.aktivitet_nr || '',
+        proces: aktivitetTilRedigering.proces?.id.toString() || '',
+        gruppe: aktivitetTilRedigering.gruppe?.id.toString() || '',
+        aktivitet_nr: aktivitetTilRedigering.aktivitet_nr?.toString() || '',
         aktivitet: aktivitetTilRedigering.aktivitet || '',
         aktiv: aktivitetTilRedigering.aktiv === null ? true : aktivitetTilRedigering.aktiv,
         udgaaet: aktivitetTilRedigering.udgaaet || false,
         note: aktivitetTilRedigering.note || '',
         ansvarlig: aktivitetTilRedigering.ansvarlig || '',
-        frist: aktivitetTilRedigering.frist || '',
+        frist: aktivitetTilRedigering.frist?.toString() || '',
       });
     }
-  }, [aktivitetTilRedigering]);
+  }, [aktivitetTilRedigering, erRedigering]);
 
-// @ 2025-09-13 12:49 - Ny useEffect til at hente grupper, når en proces vælges.
   useEffect(() => {
     const fetchGrupperForProces = async () => {
       if (formData.proces) {
         setIsGrupperLoading(true);
-        // Bevar den valgte gruppe, hvis den er gyldig, ellers nulstil den
-        const nuvaerendeGruppeErGyldig = tilgaengeligeGrupper.some(g => g.id === formData.gruppe);
+        const nuvaerendeGruppeErGyldig = tilgaengeligeGrupper.some(g => g.id.toString() === formData.gruppe);
         if (!nuvaerendeGruppeErGyldig) {
             setFormData(prev => ({ ...prev, gruppe: '' }));
         }
+  
         try {
           const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/${formData.proces}/grupper/`);
           if (!response.ok) throw new Error('Kunne ikke hente grupper.');
-          const data = await response.json();
+          const data: Blokinfo[] = await response.json();
           setTilgaengeligeGrupper(data);
         } catch (error) {
           console.error("Fejl ved hentning af grupper for proces:", error);
@@ -75,9 +87,8 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
     fetchGrupperForProces();
   }, [formData.proces]);
 
-
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onCancel();
       }
@@ -88,30 +99,38 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
     };
   }, [onCancel]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const url = erRedigering
-      ? `${API_BASE_URL}/skabeloner/aktiviteter/${aktivitetTilRedigering.id}/`
+      ? `${API_BASE_URL}/skabeloner/aktiviteter/${aktivitetTilRedigering?.id}/`
       : `${API_BASE_URL}/skabeloner/aktiviteter/`;
     const method = erRedigering ? 'PUT' : 'POST';
-    const dataToSend = { ...formData };
+    
+    const dataToSend: any = { ...formData };
     const numericFields = ['aktivitet_nr', 'frist'];
     numericFields.forEach(field => {
       if (dataToSend[field] === '' || dataToSend[field] === undefined) {
         dataToSend[field] = null;
       }
     });
-    const payload = { ...dataToSend, proces_id: dataToSend.proces || null, gruppe_id: dataToSend.gruppe || null, };
+    
+    const payload = { 
+        ...dataToSend, 
+        proces_id: dataToSend.proces || null, 
+        gruppe_id: dataToSend.gruppe || null, 
+    };
     delete payload.proces;
     delete payload.gruppe;
+
     try {
       const response = await fetch(url, {
         method,
@@ -180,7 +199,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
             </div>
             <div className="w-1/2">
               <label htmlFor="gruppe" className="block text-sm font-medium">Gruppe</label>
-{/* @ 2025-09-13 12:49 - Opdateret select til at bruge den filtrerede liste. */}
               <select 
                 name="gruppe" 
                 value={formData.gruppe} 
@@ -188,13 +206,13 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
                 className="mt-1 w-full p-2 border rounded-md bg-white"
                 disabled={!formData.proces || isGrupperLoading}
               >
-                {isGrupperLoading ? (
-                    <option>Henter grupper...</option>
-                ) : !formData.proces ? (
-                    <option>Vælg en proces først</option>
-                ) : tilgaengeligeGrupper.length === 0 ? (
-                    <option>Ingen grupper fundet</option>
-                ) : (
+                {isGrupperLoading 
+                  ? <option>Henter grupper...</option>
+                  : !formData.proces 
+                  ? <option>Vælg en proces først</option>
+                  : tilgaengeligeGrupper.length === 0 
+                  ? <option>Ingen grupper fundet</option>
+                  : (
                     <>
                         <option value="">Vælg gruppe...</option>
                         {tilgaengeligeGrupper.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
@@ -206,7 +224,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
           
           <div>
             <label htmlFor="note" className="block text-sm font-medium">Note</label>
-            <textarea name="note" value={formData.note} onChange={handleChange} rows="3" className="mt-1 w-full p-2 border rounded-md"></textarea>
+            <textarea name="note" value={formData.note} onChange={handleChange} rows={3} className="mt-1 w-full p-2 border rounded-md"></textarea>
           </div>
           
           <div className="flex items-start space-x-4">
@@ -220,8 +238,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4 pt-4">
-          </div>
         </form>
       </div>
     </div>
