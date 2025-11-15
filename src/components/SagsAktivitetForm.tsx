@@ -1,21 +1,15 @@
 // --- Fil: src/components/SagsAktivitetForm.tsx ---
-// @ 2025-09-13 13:35 - Oprettet ny formular til redigering af sags-specifikke aktiviteter.
+// @# 2025-09-15 15:01 - Opdateret til at bruge korrekt 'Aktivitet'-type uden 'any'-hacks.
+// @# 2025-09-15 15:58 - Tilføjet funktionalitet til at lukke med 'Escape'-tasten.
 import React, { useState, useEffect, ReactElement, ChangeEvent, FormEvent } from 'react';
 import { API_BASE_URL } from '../config.ts';
 import { Save, X } from 'lucide-react';
-
-// Type-definitioner
-type AktivitetTilRedigering = {
-    id: number;
-    aktivitet: string | null;
-    kommentar: string | null;
-    sag_id: number;
-} | null;
+import type { Aktivitet } from '../types';
 
 interface SagsAktivitetFormProps {
     onSave: () => void;
     onCancel: () => void;
-    aktivitet: AktivitetTilRedigering;
+    aktivitet: Aktivitet | null;
     sagId: number | null;
 }
 
@@ -31,7 +25,6 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
         kommentar: '',
         sag_id: sagId,
     });
-
     const erRedigering = aktivitet != null;
 
     useEffect(() => {
@@ -39,10 +32,26 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
             setFormData({
                 aktivitet: aktivitet.aktivitet || '',
                 kommentar: aktivitet.kommentar || '',
-                sag_id: aktivitet.sag_id,
+                sag_id: sagId,
             });
-         }
-    }, [aktivitet, erRedigering]);
+        }
+    }, [aktivitet, erRedigering, sagId]);
+
+    // @# Denne blok håndterer 'Escape'-tasten
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                onCancel();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        // Rydder op i event listener, når komponenten forsvinder
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onCancel]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -51,10 +60,8 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const url = erRedigering
-            ? `${API_BASE_URL}/aktiviteter/${aktivitet?.id}/`
-            : `${API_BASE_URL}/aktiviteter/`;
-        const method = erRedigering ? 'PATCH' : 'POST';
+        const url = `${API_BASE_URL}/aktiviteter/${aktivitet?.id}/`;
+        const method = 'PATCH';
 
         try {
             const response = await fetch(url, {
@@ -74,10 +81,11 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
             <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold">{erRedigering ? 'Rediger Aktivitet' : 'Opret Ny Aktivitet'}</h2>
+                         <h2 className="text-xl font-bold">Rediger Aktivitet</h2>
                         <div>
-                            <button type="button" onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200"><X size={20}/></button>
-                            <button type="submit" className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 ml-2"><Save size={20}/></button>
+                            {/* @# Denne knap håndterer klik på 'X' */}
+                            <button type="button" onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200" title="Annuller (Esc)"><X size={20}/></button>
+                             <button type="submit" className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 ml-2" title="Gem"><Save size={20}/></button>
                         </div>
                     </div>
                     <div>

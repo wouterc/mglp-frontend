@@ -6,8 +6,18 @@
 import React, { useState, useEffect, useMemo, Fragment, ChangeEvent, ReactElement, useCallback } from 'react';
 import { API_BASE_URL } from '../config.ts';
 import { PlusCircle, AlertCircle, Edit, Save, XCircle } from 'lucide-react';
-import type { BlokinfoSkabelon } from '../types.ts';
+// @# 2025-09-15 08:45 - Rettet import til at bruge den korrekte type 'Blokinfo'
+import type { Blokinfo } from '../types.ts';
 import { useAppState } from '../StateContext.js';
+
+// @# 2025-09-15 08:45 - Fjernet den lokale, overflødige type-definition. Vi bruger den fra types.ts.
+
+interface FilterState {
+  formaal: string;
+  nr: string;
+  titel_kort: string;
+  beskrivelse: string;
+}
 
 const formaalBeskrivelser: { [key: number]: string } = {
   1: '1: Procesoversigt (for aktiviteter)',
@@ -28,7 +38,8 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   // Lokal state for UI-interaktioner (redigering og oprettelse)
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editedData, setEditedData] = useState<Partial<BlokinfoSkabelon>>({});
+  // @# 2025-09-15 08:45 - Rettet type til 'Blokinfo'
+  const [editedData, setEditedData] = useState<Partial<Blokinfo>>({});
   const [visOpretForm, setVisOpretForm] = useState<boolean>(false);
   const [nySkabelonData, setNySkabelonData] = useState({
     formaal: '',
@@ -47,7 +58,8 @@ function BlokInfoSkabelonerPage(): ReactElement {
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      const data: BlokinfoSkabelon[] = await response.json();
+      // @# 2025-09-15 08:45 - Rettet type til 'Blokinfo'
+      const data: Blokinfo[] = await response.json();
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: data, erBlokinfoSkabelonerHentet: true } });
     } catch (e) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: 'Kunne ikke hente data. Sikr at backend-serveren kører og API-endpointet er korrekt.' } });
@@ -84,7 +96,8 @@ function BlokInfoSkabelonerPage(): ReactElement {
     });
   }, [skabeloner, filters]);
 
-  const handleEditClick = (skabelon: BlokinfoSkabelon) => {
+  // @# 2025-09-15 08:45 - Rettet type til 'Blokinfo'
+  const handleEditClick = (skabelon: Blokinfo) => {
     setEditingId(skabelon.id);
     setEditedData({ ...skabelon });
   };

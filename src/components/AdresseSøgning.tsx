@@ -1,21 +1,14 @@
 // --- Fil: src/components/AdresseSøgning.tsx ---
 
 //@@ 2025-09-09 15:00 - Deaktiveret browser autocomplete for at tillade keyboard-navigation
+// @# 2025-11-10 18:40 - Opdateret til at bruge global DawaAdresse type.
 import React, { useState, useEffect, ReactElement, KeyboardEvent } from 'react';
 import useDebounce from '../hooks/useDebounce.js';
+// @# 2025-11-10 18:40 - Importeret global type
+import type { DawaAdresse } from '../types';
 
 // --- Type-definitioner ---
-interface DawaAdresse {
-  id: string;
-  adressebetegnelse: string;
-  vejnavn: string;
-  husnr: string;
-  etage: string | null;
-  dør: string | null;
-  postnr: string;
-  postnrnavn: string;
-  href: string;
-}
+// @# 2025-11-10 18:40 - Fjernet lokal definition af DawaAdresse
 
 interface DawaAutocompleteResult {
   tekst: string;
@@ -65,6 +58,7 @@ function AdresseSøgning({ onAdresseValgt }: AdresseSøgningProps): ReactElement
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (resultater.length === 0) return;
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex(prevIndex => (prevIndex < resultater.length - 1 ? prevIndex + 1 : prevIndex));

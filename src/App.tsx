@@ -1,10 +1,14 @@
 // --- Fil: src/App.tsx ---
-// @# 2025-09-14 23:05 - Refaktoreret til at bruge global context for valgtSag
-import React, { useState } from 'react';
+// @# 2025-09-15 18:05 - Opdateret til at vise den nye filter-sidebar på relevante sider.
+// @# 2025-11-03 18:05 - Tilføjet manglende imports
+// @# 2025-11-09 18:30 - Giver 'navigateTo' prop til SagsdetaljerPage.
+import React, { useState, ReactNode } from 'react';
 import Layout from './components/Layout';
 import SagsoversigtPage from './pages/SagsoversigtPage';
 import SagsdetaljerPage from './pages/SagsdetaljerPage';
 import AktiviteterPage from './pages/AktiviteterPage';
+import AktiviteterFilter from './components/AktiviteterFilter';
+// Importer filter-komponenten
 import DokumenterPage from './pages/DokumenterPage';
 import VirksomhederPage from './pages/VirksomhederPage';
 import KontakterPage from './pages/KontakterPage';
@@ -13,53 +17,62 @@ import AktivitetsskabelonerPage from './pages/AktivitetsskabelonerPage';
 import DokumentskabelonerPage from './pages/DokumentskabelonerPage';
 import MinKontoPage from './pages/MinKontoPage';
 import type { Sag } from './types';
-// @# 2025-09-14 23:05 - Importeret useAppState hook
 import { useAppState } from './StateContext';
 
 function App() {
   const [aktivSide, setAktivSide] = useState('sagsoversigt');
-// @# 2025-09-14 23:05 - Bruger valgtSag og dispatch fra global context
   const { state, dispatch } = useAppState();
   const { valgtSag } = state;
-
   const navigateTo = (side: string, sag: Sag | null) => {
     setAktivSide(side);
     if (sag) {
-// @# 2025-09-14 23:05 - Opdaterer valgtSag i global context
       dispatch({ type: 'SET_VALGT_SAG', payload: sag });
     }
   };
-
-  const renderSide = () => {
-    switch (aktivSide) {
-      case 'sagsoversigt':
-        return <SagsoversigtPage navigateTo={navigateTo} />;
-      case 'sagsdetaljer':
-        return <SagsdetaljerPage sagId={valgtSag?.id ?? null} />;
-      case 'aktiviteter':
-        return <AktiviteterPage sagId={valgtSag?.id ?? null} />;
-      case 'dokumenter':
-        return <DokumenterPage sagId={valgtSag?.id ?? null} />;
-      case 'virksomheder':
-        return <VirksomhederPage />;
-      case 'kontakter':
-        return <KontakterPage />;
-      case 'blokinfo_skabeloner':
-        return <BlokInfoSkabelonerPage />;
-      case 'aktivitetsskabeloner':
-        return <AktivitetsskabelonerPage />;
-      case 'dokumentskabeloner':
-        return <DokumentskabelonerPage />;
-      case 'min_konto':
-        return <MinKontoPage />;
-      default:
-        return <SagsoversigtPage navigateTo={navigateTo} />;
-    }
-  };
-
+  let pageComponent: ReactNode = null;
+  let filterSidebarComponent: ReactNode = null;
+  switch (aktivSide) {
+    case 'sagsoversigt':
+      pageComponent = <SagsoversigtPage navigateTo={navigateTo} />;
+      // filterSidebarComponent = <SagsoversigtFilter />; // Klar til fremtidig brug
+      break;
+    case 'aktiviteter':
+      pageComponent = <AktiviteterPage sagId={valgtSag?.id ?? null} />;
+      filterSidebarComponent = <AktiviteterFilter />;
+      break;
+    case 'sagsdetaljer':
+        // @# 2025-11-09 18:30 - Tilføjet navigateTo prop
+        pageComponent = <SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />;
+        break;
+    case 'dokumenter':
+        pageComponent = <DokumenterPage sagId={valgtSag?.id ?? null} />;
+        break;
+    // @# 2025-11-03 18:05 - Tilføjet alle manglende sidetilfælde til switch-statement
+    case 'virksomheder':
+        pageComponent = <VirksomhederPage />;
+        break;
+    case 'kontakter':
+        pageComponent = <KontakterPage />;
+        break;
+    case 'blokinfo_skabeloner':
+        pageComponent = <BlokInfoSkabelonerPage />;
+        break;
+    case 'aktivitetsskabeloner':
+        pageComponent = <AktivitetsskabelonerPage />;
+        break;
+    case 'dokumentskabeloner':
+        pageComponent = <DokumentskabelonerPage />;
+        break;
+    case 'min_konto':
+        pageComponent = <MinKontoPage />;
+        break;
+    default:
+      pageComponent = <SagsoversigtPage navigateTo={navigateTo} />;
+  }
+  // Sørg for at alle dine sider er dækket i switch-statementet.
   return (
-    <Layout aktivSide={aktivSide} setAktivSide={setAktivSide}>
-      {renderSide()}
+    <Layout aktivSide={aktivSide} setAktivSide={setAktivSide} filterSidebar={filterSidebarComponent}>
+      {pageComponent}
     </Layout>
   );
 }
