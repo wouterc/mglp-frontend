@@ -8,7 +8,9 @@ import type {
   AktiviteterFilterState, Blokinfo, SkabAktivitet, BlokinfoSkabelonerFilterState, 
   AktivitetsskabelonerFilterState, AktivitetGruppeSummary,
   // @# 2025-11-06 18:25 - Importer de nye typer
-  Virksomhed, Kontakt 
+  Virksomhed, Kontakt,
+  // @# <2025-11-17 21:05> - Importeret nye filtertyper
+  VirksomhedFilterState, KontaktFilterState
 } from './types';
 
 // --- 1. Definer formen på din globale state ---
@@ -54,12 +56,16 @@ interface AppState {
 
   // @# 2025-11-06 18:25 - State for VirksomhederPage
   virksomheder: Virksomhed[];
+  // @# <2025-11-17 21:05> - Tilføjet filtre
+  virksomhederFilters: VirksomhedFilterState;
   virksomhederIsLoading: boolean;
   virksomhederError: string | null;
   erVirksomhederHentet: boolean;
 
   // @# 2025-11-06 18:25 - State for KontakterPage
   kontakter: Kontakt[];
+  // @# <2025-11-17 21:05> - Tilføjet filtre
+  kontakterFilters: KontaktFilterState;
   kontakterIsLoading: boolean;
   kontakterError: string | null;
   erKontakterHentet: boolean;
@@ -82,6 +88,14 @@ type AppAction =
   // @# 2025-11-06 18:25 - Nye actions for Virksomheder og Kontakter
   | { type: 'SET_VIRKSOMHEDER_STATE'; payload: Partial<AppState> }
   | { type: 'SET_KONTAKTER_STATE'; payload: Partial<AppState> };
+
+// @# <2025-11-17 21:05> - Oprettet genbrugelige init-states til filtre
+const initialVirksomhedFilters: VirksomhedFilterState = {
+    navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
+};
+const initialKontaktFilters: KontaktFilterState = {
+    navn: '', rolle: '', virksomhed: '', telefon: '', email: ''
+};
 
 // --- 3. Initial state ---
 const initialState: AppState = {
@@ -126,12 +140,16 @@ const initialState: AppState = {
 
   // @# 2025-11-06 18:25 - Initial state for Virksomheder
   virksomheder: [],
+  // @# <2025-11-17 21:05> - Tilføjet filtre
+  virksomhederFilters: initialVirksomhedFilters,
   virksomhederIsLoading: true,
   virksomhederError: null,
   erVirksomhederHentet: false,
 
   // @# 2025-11-06 18:25 - Initial state for Kontakter
   kontakter: [],
+  // @# <2025-11-17 21:05> - Tilføjet filtre
+  kontakterFilters: initialKontaktFilters,
   kontakterIsLoading: true,
   kontakterError: null,
   erKontakterHentet: false,
@@ -188,13 +206,11 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
             ...state,
             erFilterMenuAaben: !state.erFilterMenuAaben,
         };
-    
     // @# 2025-11-06 18:25 - Nye reducers for Virksomheder og Kontakter
     case 'SET_VIRKSOMHEDER_STATE':
         return { ...state, ...action.payload };
     case 'SET_KONTAKTER_STATE':
         return { ...state, ...action.payload };
-        
     default:
       return state;
   }
@@ -204,11 +220,17 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
 interface AppContextType {
   state: AppState;
   dispatch: Dispatch<AppAction>;
+  // @# <2025-11-17 21:05> - Eksporterer filter-init states for nulstilling
+  initialVirksomhedFilters: VirksomhedFilterState;
+  initialKontaktFilters: KontaktFilterState;
 }
 
 export const StateContext = createContext<AppContextType>({
   state: initialState,
   dispatch: () => null,
+  // @# <2025-11-17 21:05> - Tilføjet
+  initialVirksomhedFilters: initialVirksomhedFilters,
+  initialKontaktFilters: initialKontaktFilters,
 });
 
 // --- 6. Provider-komponenten, der "pakker" din app ---
@@ -219,7 +241,13 @@ interface StateProviderProps {
 export const StateProvider = ({ children }: StateProviderProps) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
   return (
-    <StateContext.Provider value={{ state, dispatch }}>
+    <StateContext.Provider value={{ 
+        state, 
+        dispatch,
+        // @# <2025-11-17 21:05> - Tilføjet
+        initialVirksomhedFilters,
+        initialKontaktFilters
+    }}>
       {children}
     </StateContext.Provider>
   );

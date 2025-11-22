@@ -1,11 +1,15 @@
 // --- Fil: src/components/Layout.tsx ---
 // @# 2025-09-15 18:20 - Justeret bredden på den lukkede venstre sidebar fra w-20 til w-16.
+// @# 2025-11-17 21:55 - Importeret 'Link' og erstattet <button> med <Link> for navigation.
 import React, { useState, ReactNode } from 'react';
+// @# 2025-11-17 21:55 - Importeret 'Link'
+import { Link } from 'react-router-dom';
 import { Menu, X, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
   aktivSide: string;
+  // @# 2025-11-17 21:55 - setAktivSide bruges nu kun til 'Log ud' (via navigateTo)
   setAktivSide: (side: string) => void;
   filterSidebar?: ReactNode;
 }
@@ -62,20 +66,31 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
               <ul>
                 {sektion.items.map(punkt => (
                   <li key={punkt.id}>
-                    <button 
-                      onClick={() => {
-                        if (punkt.id === 'log_ud') {
-                          alert('Logger ud...');
-                        } else {
-                          setAktivSide(punkt.id);
-                        }
-                      }}
-                      className={`flex items-center justify-center sm:justify-start w-full p-4 text-left hover:bg-gray-700 ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
-                      title={punkt.navn}
-                    >
-                      <punkt.ikon size={20} />
-                      {erMenuAaben && <span className="ml-4">{punkt.navn}</span>}
-                    </button>
+                    {/* @# 2025-11-17 21:55 - START: Betinget rendering for <Link> vs <button> */}
+                    {punkt.id === 'log_ud' ? (
+                      <button 
+                        onClick={() => {
+                          // 'setAktivSide' (som nu er 'navigateTo') kaldes kun for 'log_ud'
+                          setAktivSide(punkt.id); 
+                        }}
+                        className={`flex items-center justify-center sm:justify-start w-full p-4 text-left hover:bg-gray-700`}
+                        title={punkt.navn}
+                      >
+                        <punkt.ikon size={20} />
+                        {erMenuAaben && <span className="ml-4">{punkt.navn}</span>}
+                      </button>
+                    ) : (
+                      <Link
+                        // @# 2025-11-17 21:55 - Tilføjet 'to' prop
+                        to={`/${punkt.id}`}
+                        className={`flex items-center justify-center sm:justify-start w-full p-4 text-left hover:bg-gray-700 ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
+                        title={punkt.navn}
+                      >
+                        <punkt.ikon size={20} />
+                        {erMenuAaben && <span className="ml-4">{punkt.navn}</span>}
+                      </Link>
+                    )}
+                    {/* @# 2025-11-17 21:55 - SLUT */}
                   </li>
                 ))}
               </ul>

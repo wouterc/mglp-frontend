@@ -1,16 +1,18 @@
 // --- Fil: src/main.tsx ---
+// @# 2025-11-17 22:55 - Rettet til korrekt startpunkt med BrowserRouter
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App.tsx';
+import { StateProvider } from './StateContext.tsx';
 import './index.css';
-// @# 2025-09-14 20:29 - Importer StateProvider for at wrappe App'en
-import { StateProvider } from './StateContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {/* @# 2025-09-14 20:29 - Wrapper App med StateProvider for global state */}
-    <StateProvider>
-      <App />
-    </StateProvider>
+    <BrowserRouter>
+      <StateProvider>
+        <App />
+      </StateProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );
