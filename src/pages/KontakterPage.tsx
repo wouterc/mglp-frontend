@@ -1,35 +1,16 @@
 // --- Fil: src/pages/KontakterPage.tsx ---
-// @# 2025-11-06 18:25 - Opdateret til fuld CRUD-funktionalitet for Kontakter.
-// @# 2025-11-06 19:14 - Reduceret padding (py-2 til py-1) i tabel for øget informationstæthed.
-// @# 2025-11-06 19:27 - Implementeret 'Rolle'-filter, 'x'-ikoner og ændret filter-rækkefølge.
-// @# 2025-11-06 20:45 - Rettet crash (blank skærm) ved forkert håndtering af paginerede data.
-// @# 2025-11-06 20:52 - Tilføjet 'Kopier Email' og 'Kommentar-indikator' med tooltip.
-// @# 2025-11-06 21:04 - Ændret kommentar-ikonets farve til grøn for bedre synlighed.
-// @# 2025-11-06 21:15 - Tilføjet 'udfolde-række' funktionalitet for at vise detaljer.
-// @# 2025-11-06 22:15 - Tilføjet 'mailto:' link, 'Kopier Email' og 'Kopier Adresse' funktioner.
-// @# 2025-11-06 22:08 - Flyttet 'Kopier Adresse'-ikon til foran titlen.
-// @# 2025-11-08 12:55 - Justeret kolonnebredder og placering af "Kopier Email"-ikon.
-// @# 2025-11-08 12:58 - Justeret filter-bredder til at matche tabelkolonner.
-// @# 2025-11-08 13:07 - Rettet tastefejl (rolle -> roller) i filter-dropdown.
-// @# 2025-11-08 13:11 - Rettet filter-justering ved at flytte padding ind i div'sne.
-// @# 2025-11-08 13:17 - Justeret container-padding (p-4 til py-4 px-2) for at flugte med tabel.
-// @# 2025-11-08 14:02 - Splittet Telefon/Email, justeret layout og filter til 5 kolonner.
-// @# 2025-11-08 14:10 - Rettet fejl med tom rolle-filter (adskilt datahentning). Omdøbt 'Privatadresse'.
-// @# 2025-11-08 14:25 - Opdateret 'Virksomhed'-visning til at inkludere afdeling.
-// @# 2025-11-10 17:40 - Opdateret filterlogik og visning til at håndtere M2M 'roller'.
-// @# <2025-11-17 21:12> - Refaktoreret til global state og navigation
+// @# 2025-11-22 21:00 - Tilføjet Import/Export funktionalitet (CSV) ligesom på VirksomhederPage.
 import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, MouseEvent, Fragment } from 'react';
 import { API_BASE_URL } from '../config';
-// @# <2025-11-17 21:12> - Importeret Building og FunnelX
-import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Building, FunnelX } from 'lucide-react';
-// @# <2025-11-17 21:12> - Importeret Sag for navigateTo prop
-import { Kontakt, Rolle, Virksomhed, Sag } from '../types';
+import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Building, FunnelX, UploadCloud, Download } from 'lucide-react';
+import { Kontakt, Rolle, Virksomhed } from '../types';
 import { useAppState } from '../StateContext';
 import KontaktForm from '../components/KontaktForm';
 import useDebounce from '../hooks/useDebounce';
 import Tooltip from '../components/Tooltip';
+import CsvImportModal from '../components/CsvImportModal';
+import Papa from 'papaparse';
 
-// @# <2025-11-17 21:12> - Tilføjet navigateTo prop interface
 interface KontakterPageProps {
   navigateTo: (side: string, context?: any) => void;
 }
@@ -46,18 +27,15 @@ const VisAdresse = ({ vej, postnr, by }: { vej?: string | null, postnr?: string 
     );
 };
 
-// @# 2025-11-08 14:25 - Ny hjælpefunktion til at formatere virksomhedsnavn
 const formatVirksomhedsnavn = (v: Virksomhed | null | undefined): string => {
     if (!v) return '';
     return v.afdeling ? `${v.navn} - ${v.afdeling}` : v.navn;
 };
 
-// @# <2025-11-17 21:12> - Modtaget navigateTo prop
 function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const { state, dispatch } = useAppState();
     const {
         kontakter,
-        // @# <2025-11-17 21:12> - Hentet globalt filter
         kontakterFilters,
         kontakterIsLoading: isLoading,
         kontakterError: error,
@@ -65,13 +43,14 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     } = state;
 
     const [visForm, setVisForm] = useState<boolean>(false);
-    const [kontaktTilRedigering, setKontaktTilRedigering] = useState<Kontakt | null>(null);
     
-    const [udfoldetKontaktId, setUdfoldetKontaktId] = useState<number | null>(null);
-    
-    // @# <2025-11-17 21:12> - Fjernet lokal filter-state (filterNavn, filterRolle etc.)
+    // State til Import/Export
+    const [visImportModal, setVisImportModal] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
-    // @# <2025-11-17 21:12> - Opdateret debouncere til at lytte på global state
+    const [kontaktTilRedigering, setKontaktTilRedigering] = useState<Kontakt | null>(null);
+    const [udfoldetKontaktId, setUdfoldetKontaktId] = useState<number | null>(null);
+
     const debouncedNavn = useDebounce(kontakterFilters.navn, 300);
     const debouncedRolle = useDebounce(kontakterFilters.rolle, 300);
     const debouncedVirksomhed = useDebounce(kontakterFilters.virksomhed, 300);
@@ -82,16 +61,15 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const [copiedEmailId, setCopiedEmailId] = useState<number | null>(null);
     const [copiedAddressId, setCopiedAddressId] = useState<number | null>(null);
 
-    // @# 2025-11-08 13:56 - Forenklet: Henter kun kontakter til global state.
     const hentKontakter = useCallback(async () => {
-        if (erKontakterHentet) return;
+        // Tvungen opdatering hvis kaldt manuelt (f.eks. efter import), ellers tjek cache
+        if (erKontakterHentet && !visImportModal) return;
+
         dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterIsLoading: true, kontakterError: null } });
         try {
-            const kontakterRes = await fetch(`${API_BASE_URL}/register/kontakter/`);
-            
+            // Hent med høj limit for at sikre alt data (kan optimeres senere)
+            const kontakterRes = await fetch(`${API_BASE_URL}/register/kontakter/?limit=2000`);
             if (!kontakterRes.ok) throw new Error('Kunne ikke hente kontakter.');
-          
-   
             const kontakterData = await kontakterRes.json();
             const kontakterListe = Array.isArray(kontakterData) ? kontakterData : kontakterData.results;
             
@@ -102,26 +80,22 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         } finally {
             dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterIsLoading: false } });
         }
-    }, [dispatch, erKontakterHentet]);
+    }, [dispatch, erKontakterHentet, visImportModal]);
 
-    // @# 2025-11-08 13:56 - Ny: Henter roller lokalt til filteret, uanset global state.
     useEffect(() => {
         const fetchRoller = async () => {
             try {
                 const rollerRes = await fetch(`${API_BASE_URL}/register/roller/`);
                 if (!rollerRes.ok) throw new Error('Kunne ikke hente roller.');
                 const rollerData = await rollerRes.json();
-        
                 const rollerListe = Array.isArray(rollerData) ? rollerData : rollerData.results;
                 setRoller(rollerListe || []);
             } catch (e) {
                 console.error("Fejl ved hentning af roller til filter:", e);
             }
         };
- 
         fetchRoller();
- 
-    }, []); // Kør kun én gang
+    }, []);
 
     useEffect(() => {
         hentKontakter();
@@ -132,22 +106,16 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         
         return kontakter.filter(k => 
             k.fulde_navn.toLowerCase().includes(debouncedNavn.toLowerCase()) &&
-            // @# 2025-11-10 17:40 - Opdateret filterlogik til M2M
             (debouncedRolle === '' || k.roller.some(r => r.id.toString() === debouncedRolle)) &&
-           
-             // @# 2025-11-08 14:25 - Opdateret filterlogik til at søge i formateret navn
             formatVirksomhedsnavn(k.virksomhed).toLowerCase().includes(debouncedVirksomhed.toLowerCase()) &&
             (k.telefon || '').toLowerCase().includes(debouncedTelefon.toLowerCase()) &&
             (k.email || '').toLowerCase().includes(debouncedEmail.toLowerCase())
         );
     }, [kontakter, debouncedNavn, debouncedRolle, debouncedVirksomhed, debouncedTelefon, debouncedEmail]);
 
-    // @# <2025-11-17 21:12> - Ny navigations-handler
     const handleNavToVirksomhed = (e: MouseEvent, virksomhed: Virksomhed | null) => {
-        e.stopPropagation(); // Stop række-klik
+        e.stopPropagation();
         if (!virksomhed) return;
-        
-        // Sæt filteret på Virksomhed-siden og skift
         navigateTo('virksomheder', { 
             filter: { navn: virksomhed.navn } 
         });
@@ -167,9 +135,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const handleSave = () => {
         setVisForm(false);
         setKontaktTilRedigering(null);
-        // Genhent både kontakter OG virksomheder (hvis en kontakt blev tilknyttet en ny)
         dispatch({ type: 'SET_KONTAKTER_STATE', payload: { erKontakterHentet: false } });
+        // Vi genhenter også virksomheder, da tællere kan have ændret sig
         dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { erVirksomhederHentet: false } });
+        hentKontakter();
     };
 
     const handleCancel = () => {
@@ -187,9 +156,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             navigator.clipboard.writeText(email).then(() => {
                 setCopiedEmailId(kontaktId);
                 setTimeout(() => setCopiedEmailId(null), 2000);
-            }).catch(err => {
-                console.error('Kunne ikke kopiere email:', err);
-            });
+            }).catch(err => { console.error(err); });
         }
     };
 
@@ -203,13 +170,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             navigator.clipboard.writeText(addressString).then(() => {
                 setCopiedAddressId(kontakt.id);
                 setTimeout(() => setCopiedAddressId(null), 2000);
-            }).catch(err => {
-                console.error('Kunne ikke kopiere adresse:', err);
-            });
+            }).catch(err => { console.error(err); });
         }
     };
     
-    // @# <2025-11-17 21:12> - Ny handler til at opdatere global filter state
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         dispatch({
@@ -218,7 +182,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         });
     };
     
-    // @# <2025-11-17 21:12> - Ny handler til at nulstille global filter state
     const handleNulstilFiltre = () => {
         dispatch({
             type: 'SET_KONTAKTER_STATE',
@@ -226,6 +189,56 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         });
     };
 
+    // <--- EKSPORT FUNKTION --->
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            // 1. Hent ALT data
+            const res = await fetch(`${API_BASE_URL}/register/kontakter/?limit=10000`);
+            if (!res.ok) throw new Error("Kunne ikke hente kontakter til eksport");
+            
+            const data = await res.json();
+            const fullList: Kontakt[] = Array.isArray(data) ? data : data.results;
+
+            // 2. Flad struktur til CSV
+            const csvData = fullList.map(k => ({
+                id: k.id,
+                fornavn: k.fornavn,
+                efternavn: k.efternavn,
+                fulde_navn: k.fulde_navn,
+                // Vi eksporterer virksomhed_id, så importen kan genskabe linket
+                virksomhed_id: k.virksomhed?.id, 
+                virksomhed_navn: k.virksomhed ? formatVirksomhedsnavn(k.virksomhed) : '',
+                telefon: k.telefon,
+                email: k.email,
+                adresse_vej: k.adresse_vej,
+                adresse_postnr: k.adresse_postnr,
+                adresse_by: k.adresse_by,
+                kommentar: k.kommentar,
+                // Bemærk: Roller (M2M) er svære at importere via simpel CSV, så vi viser dem kun for info
+                roller: k.roller.map(r => r.navn).join(', ')
+            }));
+
+            // 3. Generer CSV
+            const csv = Papa.unparse(csvData, { delimiter: ";" });
+
+            // 4. Download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `kontakter_export_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+        } catch (e) {
+            console.error("Eksport fejl:", e);
+            alert("Der skete en fejl under eksport.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     if (isLoading && !erKontakterHentet) return (
         <div className="p-8 flex justify-center items-center"><Loader2 className="h-12 w-12 animate-spin text-blue-600" /></div>
@@ -249,22 +262,55 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 />
             )}
 
+            {/* <--- IMPORT MODAL ---> */}
+            <CsvImportModal 
+                isOpen={visImportModal}
+                onClose={() => setVisImportModal(false)}
+                onImportComplete={() => {
+                    setVisImportModal(false);
+                    dispatch({ type: 'SET_KONTAKTER_STATE', payload: { erKontakterHentet: false } });
+                    hentKontakter(); 
+                }}
+                title="Importer Kontakter (CSV)"
+                type="kontakt"
+            />
+
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Kontakter</h2>
-                <button onClick={handleOpret} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Kontakt">
-                    <PlusCircle size={20} />
-                </button>
+                <div className="flex space-x-2">
+                    {/* <--- EKSPORT KNAP ---> */}
+                    <button 
+                        onClick={handleExport} 
+                        disabled={isExporting}
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" 
+                        title="Eksporter til CSV"
+                    >
+                        {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                    </button>
+
+                    {/* <--- IMPORT KNAP ---> */}
+                    <button 
+                        onClick={() => setVisImportModal(true)} 
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" 
+                        title="Importer fra CSV"
+                    >
+                        <UploadCloud size={20} />
+                    </button>
+
+                    <button onClick={handleOpret} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Kontakt">
+                        <PlusCircle size={20} />
+                    </button>
+                </div>
             </div>
 
-            {/* @# <2025-11-17 21:12> - Inputs læser nu fra global 'kontakterFilters' og kalder 'handleFilterChange' */}
             <div className="mb-4 py-4 px-2 bg-gray-50 rounded-lg border border-gray-200 flex">
                 <div className="relative w-[25%] pr-4">
                     <input 
                         type="text" 
-                        name="navn" // Tilføjet name
+                        name="navn" 
                         placeholder="Filtrer på navn..." 
-                        value={kontakterFilters.navn} // Læser fra global state
-                        onChange={handleFilterChange} // Opdaterer global state
+                        value={kontakterFilters.navn} 
+                        onChange={handleFilterChange} 
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.navn && (
@@ -276,9 +322,9 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 
                 <div className="relative w-[10%] pr-4">
                     <select
-                        name="rolle" // Tilføjet name
-                        value={kontakterFilters.rolle} // Læser fra global state
-                        onChange={handleFilterChange} // Opdaterer global state
+                        name="rolle" 
+                        value={kontakterFilters.rolle} 
+                        onChange={handleFilterChange} 
                         className="w-full p-2 border rounded-md text-sm bg-white"
                     >
                         <option value="">Alle roller...</option>
@@ -291,10 +337,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 <div className="relative w-[20%] pr-4">
                     <input 
                         type="text" 
-                        name="virksomhed" // Tilføjet name
+                        name="virksomhed" 
                         placeholder="Filtrer på virksomhed..." 
-                        value={kontakterFilters.virksomhed} // Læser fra global state
-                        onChange={handleFilterChange} // Opdaterer global state
+                        value={kontakterFilters.virksomhed} 
+                        onChange={handleFilterChange} 
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.virksomhed && (
@@ -307,10 +353,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 <div className="relative w-[10%] pr-4">
                     <input 
                         type="text" 
-                        name="telefon" // Tilføjet name
+                        name="telefon" 
                         placeholder="Filtrer på telefon..." 
-                        value={kontakterFilters.telefon} // Læser fra global state
-                        onChange={handleFilterChange} // Opdaterer global state
+                        value={kontakterFilters.telefon} 
+                        onChange={handleFilterChange} 
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.telefon && (
@@ -320,14 +366,13 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     )}
                 </div>
 
-                {/* @# <2025-11-17 21:12> - Justeret bredde fra 35% til 30% */}
                 <div className="relative w-[30%] pr-2">
                     <input 
                         type="text" 
-                        name="email" // Tilføjet name
+                        name="email" 
                         placeholder="Filtrer på email..." 
-                        value={kontakterFilters.email} // Læser fra global state
-                        onChange={handleFilterChange} // Opdaterer global state
+                        value={kontakterFilters.email} 
+                        onChange={handleFilterChange} 
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.email && (
@@ -337,7 +382,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     )}
                 </div>
                 
-                {/* @# <2025-11-17 21:12> - Tilføjet Nulstil-knap */}
                 <div className="relative w-[5%]">
                     <button onClick={handleNulstilFiltre} className="p-2 text-gray-600 rounded-full hover:bg-gray-200" title="Nulstil Alle Filtre">
                         <FunnelX size={18} />
@@ -353,9 +397,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[10%]">Rolle(r)</th>
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[20%]">Virksomhed</th>
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[10%]">Telefon</th>
-                            {/* @# <2025-11-17 21:12> - Justeret bredde fra 35% til 30% */}
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[30%]">Email</th>
-                            {/* @# <2025-11-17 21:12> - Justeret bredde fra 50px til 5% */}
                             <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]"></th>
                         </tr>
                     </thead>
@@ -376,11 +418,9 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                             )}
                                         </div>
                                     </td>
-                                    {/* @# 2025-11-10 17:40 - Opdateret til at vise liste af roller */}
                                     <td className="py-1 px-2 truncate">
                                         {k.roller.map(r => r.navn).join(', ')}
                                     </td>
-                                    {/* @# <2025-11-17 21:12> - START: Opdateret Virksomhed-celle med ikon og klik */}
                                     <td className="py-1 px-2">
                                         {k.virksomhed && (
                                             <button 
@@ -393,8 +433,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                             </button>
                                         )}
                                     </td>
-                                    {/* @# <2025-11-17 21:12> - SLUT */}
-                                    {/* @# 2025-11-08 14:02 - Opdelt celle */}
                                     <td className="py-1 px-2">{k.telefon}</td>
                                     <td className="py-1 px-2">
                                         {k.email && (
@@ -429,9 +467,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                 </tr>
                                 {udfoldetKontaktId === k.id && (
                                     <tr className="bg-gray-50 border-b border-gray-300">
-                                        {/* @# 2025-11-08 14:02 - Opdateret colSpan til 6 */}
                                         <td colSpan={6} className="p-4">
-                                            {/* @# 2025-11-08 13:43 - Ændret grid-layout */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
                                                 <div>
                                                     <div className="flex items-center">
@@ -446,7 +482,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                                                 <Copy size={16} className="text-blue-500 hover:text-blue-700" />
                                                             )}
                                                         </button>
-                                                        {/* @# 2025-11-08 14:02 - Omdøbt "Privatadresse" */}
                                                         <h4 className="font-bold text-gray-700">Adresse</h4>
                                                     </div>
                                                     <VisAdresse vej={k.adresse_vej} postnr={k.adresse_postnr} by={k.adresse_by} />
@@ -462,7 +497,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                             </Fragment>
                         ))}
                         {filtreredeKontakter.length === 0 && !isLoading && (
-                            // @# 2025-11-08 14:02 - Opdateret colSpan til 6
                             <tr><td colSpan={6} className="text-center py-4">Ingen kontakter matcher dit filter.</td></tr>
                         )}
                     </tbody>

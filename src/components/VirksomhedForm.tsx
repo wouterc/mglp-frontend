@@ -1,27 +1,26 @@
 // --- Fil: src/components/VirksomhedForm.tsx ---
-// @# 2025-11-22 10:15 - Tilføjet håndtering af kommunekode.
-// @# 2025-11-22 14:00 - Opdateret CVR-hentning.
-// @# 2025-11-22 14:45 - Tilføjet dublet-tjek før CVR-opslag og bedre fejlhåndtering ved gem.
+// @# 2025-11-23 13:30 - Tilføjet 'onSaveNyVirksomhed' til interfacet.
 import React, { useState, useEffect, ChangeEvent, FormEvent, ReactElement } from 'react';
 import { API_BASE_URL } from '../config';
-import { Save, X, Search, Loader2, AlertTriangle } from 'lucide-react'; // Tilføjet AlertTriangle
+import { Save, X, Search, Loader2, AlertTriangle } from 'lucide-react';
 import { Virksomhed, VirksomhedGruppe, DawaAdresse } from '../types';
 import AdresseSøgning from './AdresseSøgning';
-import Button from './ui/Button'; // Genbrug vores knap
+import Button from './ui/Button';
 
 interface VirksomhedFormProps {
   onSave: () => void;
   onCancel: () => void;
   virksomhedTilRedigering: Virksomhed | null;
+  // @# VIGTIGT: Denne linje skal være her for at RådgiverStyring virker
+  onSaveNyVirksomhed?: (nyVirksomhed: Virksomhed) => void;
 }
 
-// Vi skal fjerne 'kommunekode' fra base-typen, før vi genindfører den som string
 type FormDataState = Partial<Omit<Virksomhed, 'id' | 'gruppe' | 'kommunekode'>> & {
     gruppe_id: string;
     kommunekode: string;
 };
 
-function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: VirksomhedFormProps): ReactElement {
+function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVirksomhed }: VirksomhedFormProps): ReactElement {
   const [formData, setFormData] = useState<FormDataState>({
     navn: '',
     cvr_nr: '',
@@ -40,7 +39,6 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
   const [isLoading, setIsLoading] = useState(false);
   const [isCvrLoading, setIsCvrLoading] = useState(false);
   const [cvrError, setCvrError] = useState<string | null>(null);
-  // @# 2025-11-22 14:45 - Ny state til generelle fejlbeskeder ved gem
   const [formError, setFormError] = useState<string | null>(null); 
   const [isFetchingAddressDetails, setIsFetchingAddressDetails] = useState(false);
   
@@ -93,7 +91,6 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
     if (name === 'cvr_nr') {
         setCvrError(null);
     }
-    // Ryd generel fejl ved ændring
     setFormError(null);
   };
 
@@ -132,7 +129,7 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormError(null); // Nulstil fejl
+    setFormError(null);
 
     const url = erRedigering
       ? `${API_BASE_URL}/register/virksomheder/${virksomhedTilRedigering?.id}/`
@@ -155,17 +152,21 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
       
       if (!response.ok) {
         const errorData = await response.json();
-        
-        // @# 2025-11-22 14:45 - Håndter "Unique constraint" fejl pænt
         if (errorData.cvr_nr) {
             setFormError(`Dette CVR-nummer findes allerede i systemet.`);
             return;
         }
-        
         console.error("API Error Response:", errorData);
         throw new Error('Der opstod en fejl ved gemning.');
       }
-      onSave();
+      
+      if (!erRedigering && onSaveNyVirksomhed) {
+          const nyVirksomhed = await response.json();
+          onSaveNyVirksomhed(nyVirksomhed);
+      } else {
+          onSave();
+      }
+
     } catch (error: any) {
       console.error('Fejl ved lagring af virksomhed:', error);
       if (!formError) setFormError(error.message);
@@ -182,28 +183,21 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
     setCvrError(null);
     
     try {
-        // @# 2025-11-22 14:45 - TRIN 1: Tjek om virksomheden findes LOKALT først
-        // Vi bruger vores eksisterende filter-endpoint
         const localCheckResponse = await fetch(`${API_BASE_URL}/register/virksomheder/?cvr_nr=${formData.cvr_nr}`);
         const localData = await localCheckResponse.json();
         const eksisterende = Array.isArray(localData) ? localData : localData.results;
 
-        // Hvis vi finder en virksomhed med dette CVR-nr, og vi IKKE er ved at redigere netop den
         if (eksisterende && eksisterende.length > 0) {
             const fundetVirksomhed = eksisterende[0];
-            
-            // Hvis vi redigerer, og ID'et er det samme, er det fint (vi opdaterer os selv)
             if (erRedigering && virksomhedTilRedigering?.id === fundetVirksomhed.id) {
-                // Fortsæt til CVR opslag...
+                // Det er den samme, fortsæt...
             } else {
-                // Stop og advar brugeren
                 setCvrError(`Dette CVR-nummer findes allerede: ${fundetVirksomhed.navn}`);
                 setIsCvrLoading(false);
-                return; // VIGTIGT: Stop her, slå ikke op i CVR
+                return;
             }
         }
 
-        // @# 2025-11-22 14:45 - TRIN 2: Slå op i CVR (Virk)
         const response = await fetch(`${API_BASE_URL}/register/cvr_opslag/${formData.cvr_nr}/`);
         if (!response.ok) {
             const errorData = await response.json();
@@ -224,7 +218,6 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
         }));
     } catch (error: any) {
         setCvrError(error.message);
-        // Hvis CVR fejler, rydder vi felterne for at undgå forvirring
         setFormData(prev => ({
             ...prev,
             navn: '',
@@ -259,7 +252,6 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering }: Virksomhe
             </div>
           </div>
 
-          {/* @# 2025-11-22 14:45 - Vis generelle fejlbeskeder her */}
           {formError && (
               <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-center">
                   <AlertTriangle size={20} className="mr-2" />
