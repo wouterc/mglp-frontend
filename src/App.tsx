@@ -2,19 +2,20 @@
 // @# 2025-09-15 18:05 - Opdateret til at vise den nye filter-sidebar på relevante sider.
 // @# 2025-11-03 18:05 - Tilføjet manglende imports
 // @# 2025-11-09 18:30 - Giver 'navigateTo' prop til SagsdetaljerPage.
-// @# <2025-11-17 21:10> - Opdateret navigateTo og tilføjet StateContext import
+// @# 2025-11-17 21:10 - Opdateret navigateTo og tilføjet StateContext import
 // @# 2025-11-17 21:50 - Importeret react-router-dom og fjernet 'useState'
 // @# 2025-11-17 22:40 - Endelig rettelse af import-sti og prop-typer
-import React, { ReactNode, useContext } from 'react';
-// @# 2025-11-17 21:50 - Importeret Routes, Route, useNavigate og useLocation
+// @# 2025-11-23 20:00 - Tilføjet useEffect til at hente Current User ved start.
+import React, { ReactNode, useContext, useEffect, useState } from 'react'; // @# Tilføj useEffect
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-// @# 2025-11-17 22:40 - Rettet sti til 'components/Layout' (uden 'ui/')
+import { API_BASE_URL } from './config'; // @# Tilføj import
+
 import Layout from './components/Layout';
+import ConfirmModal from './components/ui/ConfirmModal';
 import SagsoversigtPage from './pages/SagsoversigtPage';
 import SagsdetaljerPage from './pages/SagsdetaljerPage';
 import AktiviteterPage from './pages/AktiviteterPage';
 import AktiviteterFilter from './components/AktiviteterFilter';
-// Importer filter-komponenten
 import DokumenterPage from './pages/DokumenterPage';
 import VirksomhederPage from './pages/VirksomhederPage';
 import KontakterPage from './pages/KontakterPage';
@@ -22,72 +23,130 @@ import BlokInfoSkabelonerPage from './pages/BlokInfoSkabelonerPage';
 import AktivitetsskabelonerPage from './pages/AktivitetsskabelonerPage';
 import DokumentskabelonerPage from './pages/DokumentskabelonerPage';
 import MinKontoPage from './pages/MinKontoPage';
+import LoginPage from './pages/LoginPage';
+import GlemtAdgangskodePage from './pages/GlemtAdgangskodePage';
+import NulstilAdgangskodePage from './pages/NulstilAdgangskodePage';
+import LandingPage from './pages/LandingPage';
+import UserListPage from './pages/admin/UserListPage';
+import MedarbejderePage from './pages/MedarbejderePage'; // @# Import
+import EmailsPage from './pages/EmailsPage';
 import type { Sag } from './types';
 import { useAppState, StateContext } from './StateContext';
 
 function App() {
-  // @# 2025-11-17 21:50 - Fjernet 'aktivSide' state, tilføjet router-hooks
   const navigate = useNavigate();
   const location = useLocation();
-  
-  const { state, dispatch } = useAppState();
-  // @# <2025-11-17 21:10> - Hentet filter-init states fra context
-  const { initialVirksomhedFilters, initialKontaktFilters } = useContext(StateContext);
-  const { valgtSag } = state;
 
-  // @# 2025-11-17 21:50 - Opdateret navigateTo til at bruge routerens 'navigate'
-  // @# 2025-11-17 22:40 - Sikret typer på parametre
+  const { state, dispatch } = useAppState();
+  const { initialVirksomhedFilters, initialKontaktFilters } = useContext(StateContext);
+  const { valgtSag, currentUser } = state; // @# Hent currentUser
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // @# 2025-11-23 20:00 - Hent bruger ved start
+  useEffect(() => {
+    if (!currentUser) {
+      const fetchMe = async () => {
+        try {
+          // VIGTIGT: Tilføjet credentials: 'include' for at sende session-cookie med
+          const res = await fetch(`${API_BASE_URL}/kerne/me/`, { credentials: 'include' });
+
+          if (res.ok) {
+            const user = await res.json();
+            dispatch({ type: 'SET_CURRENT_USER', payload: user });
+          } else {
+            // Hvis vi får 403, betyder det bare at brugeren ikke er logget ind endnu.
+            console.log("Ikke logget ind (403)");
+          }
+        } catch (e) {
+          console.error("Kunne ikke hente brugerinfo:", e);
+        } finally {
+          dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
+        }
+      };
+      fetchMe();
+    }
+  }, [currentUser, dispatch]);
+
+
+  const handleLogout = async () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const performLogout = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/kerne/logout/`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (e) {
+      console.error("Logout fejl:", e);
+    }
+    dispatch({ type: 'SET_CURRENT_USER', payload: null });
+    // Reload to clear valid session cookie/state completely
+    window.location.href = '/login';
+  };
+
   const navigateTo = (side: string, context: any) => {
-    
+    if (side === 'log_ud') {
+      handleLogout();
+      return;
+    }
+
     // Håndter specifik navigationslogik (f.eks. sæt filtre)
     if (side === 'sagsdetaljer' && context && (context as Sag).sags_nr) {
       dispatch({ type: 'SET_VALGT_SAG', payload: context as Sag });
     }
     else if (side === 'sagsoversigt' && context?.filter) {
-        // Fremtidig brug: Sæt sagsfiltre her
+      // Fremtidig brug: Sæt sagsfiltre her
     }
     else if (side === 'kontakter' && context?.filter) {
-        // Nulstil først, og sæt derefter det specifikke filter
-        dispatch({ 
-            type: 'SET_KONTAKTER_STATE', 
-            payload: { kontakterFilters: { ...initialKontaktFilters, ...context.filter } }
-         });
+      // Nulstil først, og sæt derefter det specifikke filter
+      dispatch({
+        type: 'SET_KONTAKTER_STATE',
+        payload: { kontakterFilters: { ...initialKontaktFilters, ...context.filter } }
+      });
     }
     else if (side === 'virksomheder' && context?.filter) {
-        // Nulstil først, og sæt derefter det specifikke filter
-        dispatch({ 
-            type: 'SET_VIRKSOMHEDER_STATE', 
-            payload: { virksomhederFilters: { ...initialVirksomhedFilters, ...context.filter } }
-        });
+      // Nulstil først, og sæt derefter det specifikke filter
+      dispatch({
+        type: 'SET_VIRKSOMHEDER_STATE',
+        payload: { virksomhederFilters: { ...initialVirksomhedFilters, ...context.filter } }
+      });
     }
-    
-    // @# 2025-11-17 21:50 - Erstatter setAktivSide(side) med navigate
+
     const path = side.startsWith('/') ? side : `/${side}`;
     navigate(path);
   };
 
-  // @# 2025-11-17 21:50 - Bestemmer filter-sidebar baseret på den aktuelle URL
   let filterSidebarComponent: ReactNode = null;
   if (location.pathname === '/aktiviteter') {
     filterSidebarComponent = <AktiviteterFilter />;
   }
-  
-  // @# 2025-11-17 21:50 - Finder den aktive side ud fra URL, til brug i Layout (highlight)
+
   const aktivSideForLayout = location.pathname.substring(1) || 'sagsoversigt';
 
+  // @# Auth Guard
+  if (state.isAuthChecking) {
+    return <div className="flex items-center justify-center h-screen bg-gray-100 text-gray-500">Indlæser system...</div>;
+  }
+
+  const isPublic =
+    location.pathname === '/login' ||
+    location.pathname === '/glemt-adgangskode' ||
+    location.pathname.startsWith('/reset-password/');
+
+  if (!currentUser && !isPublic) {
+    return <LandingPage />;
+  }
+
   return (
-    // @# 2025-11-17 21:50 - Opdateret Layout til at bruge den URL-baserede 'aktivSide'
-    // @# 2025-11-17 22:40 - 'setAktivSide' er nu en wrapper, der kalder navigateTo med null-kontekst
-    <Layout 
-      aktivSide={aktivSideForLayout} 
-      setAktivSide={(side: string) => navigateTo(side, null)} 
+    <Layout
+      aktivSide={aktivSideForLayout}
+      setAktivSide={(side: string) => navigateTo(side, null)}
       filterSidebar={filterSidebarComponent}
     >
-      
-      {/* @# 2025-11-17 21:50 - Udskiftet det gamle 'switch'-statement med 'Routes' */}
       <Routes>
         <Route path="/" element={<SagsoversigtPage navigateTo={navigateTo} />} />
-        
         <Route path="/sagsoversigt" element={<SagsoversigtPage navigateTo={navigateTo} />} />
         <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />
         <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
@@ -97,11 +156,28 @@ function App() {
         <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />
         <Route path="/aktivitetsskabeloner" element={<AktivitetsskabelonerPage />} />
         <Route path="/dokumentskabeloner" element={<DokumentskabelonerPage />} />
+        <Route path="/medarbejdere" element={<MedarbejderePage />} />
         <Route path="/min_konto" element={<MinKontoPage />} />
-        
-        {/* Fallback rute */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/glemt-adgangskode" element={<GlemtAdgangskodePage />} />
+        <Route path="/reset-password/:uid/:token" element={<NulstilAdgangskodePage />} />
+
+        {/* @# Admin Routes */}
+        <Route path="/admin/users" element={<UserListPage />} />
+
+        <Route path="/emails" element={<EmailsPage />} />
         <Route path="*" element={<SagsoversigtPage navigateTo={navigateTo} />} />
       </Routes>
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={performLogout}
+        title="Log ud"
+        message="Er du sikker på, at du vil logge ud?"
+        confirmText="Log ud"
+        cancelText="Annuller"
+        isDestructive={true}
+      />
     </Layout>
   );
 }

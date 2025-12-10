@@ -1,14 +1,16 @@
 // --- Fil: src/components/AktivitetForm.tsx ---
+// @# 2025-11-23 19:50 - Forenklet logik: Bruger lokal filtrering af grupper i stedet for API-kald.
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent, ReactElement } from 'react';
 import { API_BASE_URL } from '../config.ts';
 import { Save, X } from 'lucide-react';
-import type { Blokinfo, AktivitetTilRedigering } from '../types.ts'; // IMPORTER CENTRALE TYPER
+import type { Blokinfo, SkabAktivitet } from '../types.ts'; 
 
-// --- Type-definitioner (kun komponent-specifikke) ---
+type AktivitetTilRedigering = SkabAktivitet; 
+
 interface AktivitetFormProps {
   onSave: () => void;
   onCancel: () => void;
-  aktivitetTilRedigering: AktivitetTilRedigering;
+  aktivitetTilRedigering: AktivitetTilRedigering | null;
   blokinfoList: Blokinfo[];
 }
 
@@ -36,13 +38,14 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
     ansvarlig: '',
     frist: '',
   });
-
-  const [tilgaengeligeGrupper, setTilgaengeligeGrupper] = useState<Blokinfo[]>([]);
-  const [isGrupperLoading, setIsGrupperLoading] = useState<boolean>(false);
+  
   const erRedigering = aktivitetTilRedigering != null;
   
+  // Filtrer listerne direkte fra props - ingen ventetid!
   const procesList = useMemo(() => blokinfoList.filter(b => b.formaal === 1), [blokinfoList]);
+  const gruppeList = useMemo(() => blokinfoList.filter(b => b.formaal === 2), [blokinfoList]);
 
+  // Initialiser formular data
   useEffect(() => {
     if (erRedigering && aktivitetTilRedigering) {
       setFormData({
@@ -60,34 +63,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
   }, [aktivitetTilRedigering, erRedigering]);
 
   useEffect(() => {
-    const fetchGrupperForProces = async () => {
-      if (formData.proces) {
-        setIsGrupperLoading(true);
-        const nuvaerendeGruppeErGyldig = tilgaengeligeGrupper.some(g => g.id.toString() === formData.gruppe);
-        if (!nuvaerendeGruppeErGyldig) {
-            setFormData(prev => ({ ...prev, gruppe: '' }));
-        }
-  
-        try {
-          const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/${formData.proces}/grupper/`);
-          if (!response.ok) throw new Error('Kunne ikke hente grupper.');
-          const data: Blokinfo[] = await response.json();
-          setTilgaengeligeGrupper(data);
-        } catch (error) {
-          console.error("Fejl ved hentning af grupper for proces:", error);
-          setTilgaengeligeGrupper([]);
-        } finally {
-          setIsGrupperLoading(false);
-        }
-      } else {
-        setTilgaengeligeGrupper([]);
-        setFormData(prev => ({ ...prev, gruppe: '' }));
-      }
-    };
-    fetchGrupperForProces();
-  }, [formData.proces]);
-
-  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onCancel();
@@ -102,9 +77,10 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
+    
     setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -122,7 +98,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
         dataToSend[field] = null;
       }
     });
-    
+
     const payload = { 
         ...dataToSend, 
         proces_id: dataToSend.proces || null, 
@@ -204,20 +180,11 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList 
                 value={formData.gruppe} 
                 onChange={handleChange} 
                 className="mt-1 w-full p-2 border rounded-md bg-white"
-                disabled={!formData.proces || isGrupperLoading}
               >
-                {isGrupperLoading 
-                  ? <option>Henter grupper...</option>
-                  : !formData.proces 
-                  ? <option>Vælg en proces først</option>
-                  : tilgaengeligeGrupper.length === 0 
-                  ? <option>Ingen grupper fundet</option>
-                  : (
-                    <>
-                        <option value="">Vælg gruppe...</option>
-                        {tilgaengeligeGrupper.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
-                    </>
-                )}
+                <option value="">Vælg gruppe...</option>
+                {gruppeList.map(g => (
+                    <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>
+                ))}
               </select>
             </div>
           </div>

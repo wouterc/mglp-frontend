@@ -10,17 +10,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string; // Tillad 'className' prop
 }
 
-function Button({ 
-  children, 
-  variant = 'secondary', 
-  ikon: Ikon, 
+function Button({
+  children,
+  variant = 'secondary',
+  ikon: Ikon,
   className = '', // Sæt default til tom streng
-  ...props 
+  ...props
 }: ButtonProps): React.ReactElement {
-  
+
   // Definer styles ét sted
-  const baseStyle = "px-4 py-2 rounded-md flex items-center justify-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed";
-  
+  const baseStyle = "px-4 py-2 rounded-md flex items-center justify-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap";
+
   const variantStyles = {
     primary: "bg-blue-600 text-white hover:bg-blue-700",
     secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300",
@@ -29,8 +29,8 @@ function Button({
 
   // Kombiner styles. Ekstern 'className' kan overskrive standard-styles.
   return (
-    <button 
-      className={`${baseStyle} ${variantStyles[variant]} ${className}`} 
+    <button
+      className={`${baseStyle} ${variantStyles[variant]} ${className}`}
       {...props}
     >
       {Ikon && <Ikon size={18} className="flex-shrink-0" />}

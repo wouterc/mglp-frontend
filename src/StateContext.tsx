@@ -1,13 +1,14 @@
 // --- Fil: src/StateContext.tsx ---
-// @# 2025-11-22 17:00 - Tilføjet 'sagsIdListe' til at styre Næste/Forrige navigation.
-// @# 2025-11-23 14:00 - Tilføjet 'statusser' til global state for at undgå at de forsvinder ved navigation.
+// @# ... (Behold tidligere historik) ...
+// @# 2025-11-23 20:00 - Tilføjet 'currentUser' til global state.
 import React, { createContext, useReducer, Dispatch, ReactNode, useContext } from 'react';
-import type { 
-  Aktivitet, Sag, SagsoversigtFilterState, SagsoversigtSortConfig, Status, 
-  AktiviteterFilterState, Blokinfo, SkabAktivitet, BlokinfoSkabelonerFilterState, 
+import type {
+  Aktivitet, Sag, SagsoversigtFilterState, SagsoversigtSortConfig, Status,
+  AktiviteterFilterState, Blokinfo, SkabAktivitet, BlokinfoSkabelonerFilterState,
   AktivitetsskabelonerFilterState, AktivitetGruppeSummary,
   Virksomhed, Kontakt,
-  VirksomhedFilterState, KontaktFilterState
+  VirksomhedFilterState, KontaktFilterState,
+  User // @# Husk at importere User
 } from './types';
 
 // --- 1. Definer formen på din globale state ---
@@ -15,8 +16,14 @@ interface AppState {
   valgtSag: Sag | null;
   erFilterMenuAaben: boolean;
 
+  // @# Ny: Den indloggede bruger
+  currentUser: User | null;
+
+  // @# Ny: Ser om vi er ved at tjekke login
+  isAuthChecking: boolean;
+
   // Globale lister
-  statusser: Status[]; // @# Ny global liste
+  statusser: Status[];
 
   // State for AktiviteterPage
   aktivitetsGrupper: { [sagId: number]: AktivitetGruppeSummary[] };
@@ -26,10 +33,10 @@ interface AppState {
   aktiviteterError: string | null;
   aktiviteterFilters: AktiviteterFilterState;
   aktiviteterUdvidedeGrupper: { [key: number]: { [key: string]: boolean } };
-  
+
   // State for SagsoversigtPage
   sager: Sag[];
-  sagsIdListe: number[]; 
+  sagsIdListe: number[];
   sagsoversigtFilters: SagsoversigtFilterState;
   sagsoversigtSortConfig: SagsoversigtSortConfig;
   sagsoversigtVisLukkede: boolean;
@@ -72,7 +79,10 @@ interface AppState {
 // --- 2. Definer de handlinger (actions) du kan udføre ---
 type AppAction =
   | { type: 'SET_VALGT_SAG'; payload: Sag | null }
-  | { type: 'SET_STATUSSER'; payload: Status[] } // @# Ny action
+  | { type: 'SET_STATUSSER'; payload: Status[] }
+  // @# Ny action til bruger
+  | { type: 'SET_CURRENT_USER'; payload: User | null }
+  | { type: 'SET_AUTH_CHECKING'; payload: boolean }
   | { type: 'SET_SAGER_STATE'; payload: Partial<AppState> }
   | { type: 'SET_SAGS_ID_LISTE'; payload: number[] }
   | { type: 'SET_AKTIVITETER_STATE'; payload: Partial<AppState> }
@@ -87,17 +97,19 @@ type AppAction =
   | { type: 'SET_KONTAKTER_STATE'; payload: Partial<AppState> };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
-    navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
+  navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
 };
 const initialKontaktFilters: KontaktFilterState = {
-    navn: '', rolle: '', virksomhed: '', telefon: '', email: ''
+  navn: '', rolle: '', virksomhed: '', telefon: '', email: ''
 };
 
 // --- 3. Initial state ---
 const initialState: AppState = {
   valgtSag: null,
   erFilterMenuAaben: true,
-  statusser: [], // @# Init
+  currentUser: null, // @# Init til null
+  isAuthChecking: true, // @# Starter som true
+  statusser: [],
 
   // Aktiviteter
   aktivitetsGrupper: {},
@@ -107,7 +119,7 @@ const initialState: AppState = {
   aktiviteterError: null,
   aktiviteterFilters: { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false },
   aktiviteterUdvidedeGrupper: {},
-  
+
   // Sagsoversigt
   sager: [],
   sagsIdListe: [],
@@ -155,8 +167,12 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
   switch (action.type) {
     case 'SET_VALGT_SAG':
       return { ...state, valgtSag: action.payload };
-    case 'SET_STATUSSER': // @# Ny case
+    case 'SET_STATUSSER':
       return { ...state, statusser: action.payload };
+    case 'SET_CURRENT_USER': // @# Håndter opdatering af bruger
+      return { ...state, currentUser: action.payload };
+    case 'SET_AUTH_CHECKING':
+      return { ...state, isAuthChecking: action.payload };
     case 'SET_SAGER_STATE':
       return { ...state, ...action.payload };
     case 'SET_SAGS_ID_LISTE':
@@ -176,37 +192,37 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         },
       };
     case 'SET_SAG_GRUPPE_SUMMARIES':
-        return {
-            ...state,
-            aktivitetsGrupper: {
-                ...state.aktivitetsGrupper,
-                [action.payload.sagId]: action.payload.summaries,
-            }
-        };
+      return {
+        ...state,
+        aktivitetsGrupper: {
+          ...state.aktivitetsGrupper,
+          [action.payload.sagId]: action.payload.summaries,
+        }
+      };
     case 'NULSTIL_HENTEDE_AKTIVITETER':
-        return {
-            ...state,
-            hentedeAktiviteter: {},
-            gruppeLoadingStatus: {},
-            aktiviteterUdvidedeGrupper: {},
-        };
+      return {
+        ...state,
+        hentedeAktiviteter: {},
+        gruppeLoadingStatus: {},
+        aktiviteterUdvidedeGrupper: {},
+      };
     case 'SET_GRUPPE_LOADING':
-        return {
-            ...state,
-            gruppeLoadingStatus: {
-                ...state.gruppeLoadingStatus,
-                [action.payload.gruppeId]: action.payload.isLoading,
-            }
-        };
+      return {
+        ...state,
+        gruppeLoadingStatus: {
+          ...state.gruppeLoadingStatus,
+          [action.payload.gruppeId]: action.payload.isLoading,
+        }
+      };
     case 'TOGGLE_FILTER_MENU':
-        return {
-            ...state,
-            erFilterMenuAaben: !state.erFilterMenuAaben,
-        };
+      return {
+        ...state,
+        erFilterMenuAaben: !state.erFilterMenuAaben,
+      };
     case 'SET_VIRKSOMHEDER_STATE':
-        return { ...state, ...action.payload };
+      return { ...state, ...action.payload };
     case 'SET_KONTAKTER_STATE':
-        return { ...state, ...action.payload };
+      return { ...state, ...action.payload };
     default:
       return state;
   }
@@ -235,11 +251,11 @@ interface StateProviderProps {
 export const StateProvider = ({ children }: StateProviderProps) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
   return (
-    <StateContext.Provider value={{ 
-        state, 
-        dispatch,
-        initialVirksomhedFilters,
-        initialKontaktFilters
+    <StateContext.Provider value={{
+      state,
+      dispatch,
+      initialVirksomhedFilters,
+      initialKontaktFilters
     }}>
       {children}
     </StateContext.Provider>

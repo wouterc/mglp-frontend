@@ -8,8 +8,9 @@ import VirksomhedForm from '../components/VirksomhedForm';
 import CsvImportModal from '../components/CsvImportModal';
 import useDebounce from '../hooks/useDebounce';
 import Tooltip from '../components/Tooltip';
-import Papa from 'papaparse'; 
+import * as XLSX from 'xlsx'; // Bruges til Excel eksport
 
+// HER ER DEN MANGLENDE INTERFACE DEFINITION
 interface VirksomhederPageProps {
   navigateTo: (side: string, context?: any) => void;
 }
@@ -62,7 +63,6 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
         if (erVirksomhederHentet && !visImportModal) return;
         dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { virksomhederIsLoading: true, virksomhederError: null } });
         try {
-            // Hent med høj limit for at sikre vi ser alt i listen (kan optimeres senere med server-side paging)
             const virksomhederRes = await fetch(`${API_BASE_URL}/register/virksomheder/?limit=2000`);
             if (!virksomhederRes.ok) throw new Error('Kunne ikke hente virksomheder.');
             
@@ -182,17 +182,21 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
         });
     };
 
-    const handleExport = async () => {
+    // <--- EKSPORT TIL EXCEL (.XLSX) --->
+    const handleExport = () => {
         setIsExporting(true);
         try {
-            // Hent ALT data (uden pagination limit, eller meget høj)
-            const res = await fetch(`${API_BASE_URL}/register/virksomheder/?limit=10000`); 
-            if (!res.ok) throw new Error("Kunne ikke hente data til eksport");
-            
-            const data = await res.json();
-            const fullList: Virksomhed[] = Array.isArray(data) ? data : data.results;
+            // Vi bruger den filtrerede liste direkte fra skærmen
+            const dataToExport = filtreredeVirksomheder;
 
-            const csvData = fullList.map(v => ({
+            if (dataToExport.length === 0) {
+                alert("Der er ingen data at eksportere med de valgte filtre.");
+                setIsExporting(false);
+                return;
+            }
+
+            // 1. Forbered data
+            const excelData = dataToExport.map(v => ({
                 id: v.id,
                 navn: v.navn,
                 cvr_nr: v.cvr_nr,
@@ -209,16 +213,13 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                 kommunekode: v.kommunekode
             }));
 
-            const csv = Papa.unparse(csvData, { delimiter: ";" }); 
+            // 2. Opret Workbook og Sheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Virksomheder");
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `virksomheder_export_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // 3. Download filen
+            XLSX.writeFile(workbook, `virksomheder_export_${new Date().toISOString().slice(0,10)}.xlsx`);
 
         } catch (e) {
             console.error("Eksport fejl:", e);
@@ -258,7 +259,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                     dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { erVirksomhederHentet: false } });
                     hentVirksomheder(); 
                 }}
-                title="Importer Virksomheder (CSV)"
+                title="Importer Virksomheder (Excel)"
                 type="virksomhed"
             />
 
@@ -269,7 +270,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                         onClick={handleExport} 
                         disabled={isExporting}
                         className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" 
-                        title="Eksporter til CSV"
+                        title="Eksporter til Excel"
                     >
                         {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                     </button>
@@ -277,7 +278,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                     <button 
                         onClick={() => setVisImportModal(true)} 
                         className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" 
-                        title="Importer fra CSV"
+                        title="Importer fra Excel"
                     >
                         <UploadCloud size={20} />
                     </button>

@@ -1,15 +1,14 @@
 // --- Fil: src/pages/KontakterPage.tsx ---
-// @# 2025-11-22 21:00 - Tilføjet Import/Export funktionalitet (CSV) ligesom på VirksomhederPage.
 import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, MouseEvent, Fragment } from 'react';
 import { API_BASE_URL } from '../config';
 import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Building, FunnelX, UploadCloud, Download } from 'lucide-react';
 import { Kontakt, Rolle, Virksomhed } from '../types';
 import { useAppState } from '../StateContext';
 import KontaktForm from '../components/KontaktForm';
+import CsvImportModal from '../components/CsvImportModal';
 import useDebounce from '../hooks/useDebounce';
 import Tooltip from '../components/Tooltip';
-import CsvImportModal from '../components/CsvImportModal';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx'; // <--- Bruges til Excel eksport
 
 interface KontakterPageProps {
   navigateTo: (side: string, context?: any) => void;
@@ -62,7 +61,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const [copiedAddressId, setCopiedAddressId] = useState<number | null>(null);
 
     const hentKontakter = useCallback(async () => {
-        // Tvungen opdatering hvis kaldt manuelt (f.eks. efter import), ellers tjek cache
         if (erKontakterHentet && !visImportModal) return;
 
         dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterIsLoading: true, kontakterError: null } });
@@ -189,19 +187,21 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         });
     };
 
-    // <--- EKSPORT FUNKTION --->
-    const handleExport = async () => {
+    // <--- EKSPORT TIL EXCEL (.XLSX) --->
+    const handleExport = () => {
         setIsExporting(true);
         try {
-            // 1. Hent ALT data
-            const res = await fetch(`${API_BASE_URL}/register/kontakter/?limit=10000`);
-            if (!res.ok) throw new Error("Kunne ikke hente kontakter til eksport");
-            
-            const data = await res.json();
-            const fullList: Kontakt[] = Array.isArray(data) ? data : data.results;
+            // Vi bruger den filtrerede liste direkte fra skærmen
+            const dataToExport = filtreredeKontakter;
 
-            // 2. Flad struktur til CSV
-            const csvData = fullList.map(k => ({
+            if (dataToExport.length === 0) {
+                alert("Der er ingen data at eksportere med de valgte filtre.");
+                setIsExporting(false);
+                return;
+            }
+
+            // 1. Forbered data
+            const excelData = dataToExport.map(k => ({
                 id: k.id,
                 fornavn: k.fornavn,
                 efternavn: k.efternavn,
@@ -215,22 +215,17 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 adresse_postnr: k.adresse_postnr,
                 adresse_by: k.adresse_by,
                 kommentar: k.kommentar,
-                // Bemærk: Roller (M2M) er svære at importere via simpel CSV, så vi viser dem kun for info
+                // Vi lister roller som en tekststreng for læsbarhed
                 roller: k.roller.map(r => r.navn).join(', ')
             }));
 
-            // 3. Generer CSV
-            const csv = Papa.unparse(csvData, { delimiter: ";" });
+            // 2. Opret Workbook og Sheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Kontakter");
 
-            // 4. Download
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `kontakter_export_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // 3. Download filen
+            XLSX.writeFile(workbook, `kontakter_export_${new Date().toISOString().slice(0,10)}.xlsx`);
 
         } catch (e) {
             console.error("Eksport fejl:", e);
@@ -271,7 +266,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     dispatch({ type: 'SET_KONTAKTER_STATE', payload: { erKontakterHentet: false } });
                     hentKontakter(); 
                 }}
-                title="Importer Kontakter (CSV)"
+                title="Importer Kontakter (Excel)"
                 type="kontakt"
             />
 
@@ -283,7 +278,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                         onClick={handleExport} 
                         disabled={isExporting}
                         className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" 
-                        title="Eksporter til CSV"
+                        title="Eksporter til Excel"
                     >
                         {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                     </button>
@@ -292,7 +287,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     <button 
                         onClick={() => setVisImportModal(true)} 
                         className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" 
-                        title="Importer fra CSV"
+                        title="Importer fra Excel"
                     >
                         <UploadCloud size={20} />
                     </button>
