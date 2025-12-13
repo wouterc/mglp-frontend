@@ -25,6 +25,9 @@ export default function EmailsPage() {
     const [error, setError] = useState<string | null>(null);
     const [needsLogin, setNeedsLogin] = useState(false);
 
+    // Ny state til logget ind konto
+    const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+
     // State til "Gem på sag" dialog
     const [savingEmail, setSavingEmail] = useState<EmailMessage | null>(null);
     const [sagsNrInput, setSagsNrInput] = useState('');
@@ -42,6 +45,7 @@ export default function EmailsPage() {
             if (res.status === 404) {
                 // 404 betyder her: "Ingen token fundet i DB" -> Vi skal logge ind
                 setNeedsLogin(true);
+                setConnectedEmail(null);
                 setIsLoading(false);
                 return;
             }
@@ -52,9 +56,14 @@ export default function EmailsPage() {
             }
 
             const data = await res.json();
-            // Håndter både rå liste (som du ser nu) og { value: [] } formatet fra Graph
-            const emailList = Array.isArray(data) ? data : (data.value || []);
+
+            // Backend returnerer nu { connected_email: "...", messages: [...] }
+            // eller bare en liste, hvis vi ikke har ændret det hele 100% korrekt (bagudkompatibilitet)
+            const emailList = Array.isArray(data) ? data : (data.messages || data.value || []);
+            const userEmail = !Array.isArray(data) && data.connected_email ? data.connected_email : null;
+
             setEmails(emailList);
+            setConnectedEmail(userEmail);
 
         } catch (e: any) {
             console.error(e);
@@ -65,12 +74,33 @@ export default function EmailsPage() {
     };
 
     useEffect(() => {
+        // Tjek om vi kommer tilbage fra en redirect med fejl
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlError = urlParams.get('error');
+        if (urlError) {
+            setError(decodeURIComponent(urlError));
+            // Fjern error parameteren fra URL'en så den ikke bliver stående ved reload
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         fetchEmails();
     }, []);
 
     const handleLogin = () => {
         // Sender brugeren til vores backend login-endpoint
         window.location.href = `${API_BASE_URL}/emails/login/`;
+    };
+
+    const handleLogout = async () => {
+        try {
+            await fetch(`${API_BASE_URL}/emails/logout/`, { method: 'POST' });
+            // Når logget ud lokalt, genindlæs state (vil vise 'Forbind Outlook')
+            setConnectedEmail(null);
+            setEmails([]);
+            fetchEmails();
+        } catch (e) {
+            console.error("Logout fejl", e);
+        }
     };
 
     const formatDate = (isoString: string) => {
@@ -128,19 +158,37 @@ export default function EmailsPage() {
     return (
         <div className="p-6 max-w-5xl mx-auto">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <Mail className="mr-3" /> Indbakke (Test)
-                </h1>
-                {!needsLogin && (
-                    <Button onClick={fetchEmails} variant="secondary">
-                        <RefreshCw size={18} /> Opdater
-                    </Button>
-                )}
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+                        <Mail className="mr-3" /> Indbakke
+                    </h1>
+                    {connectedEmail && (
+                        <p className="text-sm text-gray-500 mt-1 ml-9">
+                            Logget ind som: <span className="font-medium text-gray-700">{connectedEmail}</span>
+                        </p>
+                    )}
+                </div>
+
+                <div className="flex gap-2">
+                    {!needsLogin && (
+                        <>
+                            <Button onClick={fetchEmails} variant="secondary">
+                                <RefreshCw size={18} /> Opdater
+                            </Button>
+                            <Button onClick={handleLogout} variant="secondary" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                                Log ud
+                            </Button>
+                        </>
+                    )}
+                </div>
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md flex items-center">
-                    <AlertCircle className="mr-2" /> {error}
+                <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-md flex items-center justify-between">
+                    <div className="flex items-center">
+                        <AlertCircle className="mr-2" /> {error}
+                    </div>
+                    <button onClick={() => setError(null)} className="text-red-500 hover:text-red-800"><X size={16} /></button>
                 </div>
             )}
 
