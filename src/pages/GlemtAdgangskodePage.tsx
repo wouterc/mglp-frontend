@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import Button from '../components/ui/Button';
 
@@ -16,23 +16,7 @@ const GlemtAdgangskodePage: React.FC = () => {
         setError(null);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/kerne/password_reset/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email }),
-            });
-
-            if (!res.ok) {
-                // Vi viser ikke specifikke fejl for at undgå email enumeration
-                // Men hvis det er en 400 'Ugyldig email', kan vi sige "Tjek venligst emailen".
-                // Backend sender altid 200 hvis form er valid, men 400 hvis email mangler.
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                throw new Error("Kunne ikke sende anmodning.");
-            }
-
+            await api.post('/kerne/password_reset/', { email });
             setIsSuccess(true);
         } catch (err: any) {
             console.error(err);

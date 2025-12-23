@@ -3,7 +3,7 @@
 // @# 2025-11-23 11:30 - Opdateret layout: Stakket vertikalt, ikoner altid synlige, redigerings-popup tilføjet.
 import React, { useState, useEffect, useMemo, MouseEvent } from 'react';
 import { Droplet, Flame, Waves, Phone, Mail, Home, Copy, Check, Loader2, Edit } from 'lucide-react';
-import { API_BASE_URL } from '../../../config';
+import { api } from '../../../api';
 import { Sag, Virksomhed } from '../../../types';
 import SearchableSelect, { SearchableOption } from '../../SearchableSelect';
 import VirksomhedForm from '../../VirksomhedForm';
@@ -32,11 +32,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
         const fetchForsyninger = async () => {
             setIsLoading(true);
             try {
-                const res = await fetch(`${API_BASE_URL}/register/virksomheder/?er_forsyning=true`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setAlleForsyninger(Array.isArray(data) ? data : data.results);
-                }
+                const data = await api.get<any>('/register/virksomheder/?er_forsyning=true');
+                setAlleForsyninger(Array.isArray(data) ? data : data.results);
             } catch (error) {
                 console.error("Fejl ved hentning af forsyning:", error);
             } finally {
@@ -49,14 +46,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/sager/${sag.id}/`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(opdatering),
-            });
-            if (res.ok) {
-                onUpdate();
-            }
+            await api.patch(`/sager/${sag.id}/`, opdatering);
+            onUpdate();
         } catch (e) {
             console.error(e);
         } finally {
@@ -101,7 +92,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
         const options: SearchableOption[] = relevante.map(v => {
             const virkKommuneKode = v.kommunekode ? Number(v.kommunekode) : null;
             const isMatch = sagKommuneKode !== null && virkKommuneKode !== null && sagKommuneKode === virkKommuneKode;
-            
+
             let extraInfo = [];
             if (formatVirksomhedsnavn(v) !== v.navn) extraInfo.push(v.afdeling || '');
             if (virkKommuneKode) extraInfo.push(`Kommune: ${virkKommuneKode}`);
@@ -129,7 +120,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                 <Phone size={14} className="text-gray-400 flex-shrink-0" />
                 <span>{virksomhed.telefon || "-"}</span>
             </div>
-            
+
             {/* Email */}
             <div className="flex items-center space-x-2 text-sm">
                 <Mail size={14} className="text-gray-400 flex-shrink-0" />
@@ -137,7 +128,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                     <>
                         <a href={`mailto:${virksomhed.email}`} className="text-blue-600 hover:underline truncate">{virksomhed.email}</a>
                         <button onClick={(e) => handleCopy(virksomhed.email!, `${typePrefix}-email`, e)} className="p-0.5 rounded hover:bg-gray-200 text-blue-500 hover:text-blue-700 flex-shrink-0">
-                            {copiedId === `${typePrefix}-email` ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
+                            {copiedId === `${typePrefix}-email` ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                         </button>
                     </>
                 ) : <span className="text-gray-400">-</span>}
@@ -145,13 +136,13 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
 
             {/* Adresse */}
             <div className="flex items-start space-x-3 text-sm text-gray-600">
-                <button 
-                    onClick={(e) => handleCopy(`${virksomhed.adresse_vej}\n${virksomhed.adresse_postnr} ${virksomhed.adresse_by}`, `${typePrefix}-adr`, e)} 
+                <button
+                    onClick={(e) => handleCopy(`${virksomhed.adresse_vej}\n${virksomhed.adresse_postnr} ${virksomhed.adresse_by}`, `${typePrefix}-adr`, e)}
                     className="mt-0.5 text-gray-400 hover:text-blue-700 flex-shrink-0"
                     title="Kopier adresse"
                     disabled={!virksomhed.adresse_vej && !virksomhed.adresse_postnr}
                 >
-                    {copiedId === `${typePrefix}-adr` ? <Check size={14} className="text-green-500"/> : <Home size={14}/>}
+                    {copiedId === `${typePrefix}-adr` ? <Check size={14} className="text-green-500" /> : <Home size={14} />}
                 </button>
                 <div>
                     {(virksomhed.adresse_vej || virksomhed.adresse_postnr) ? (
@@ -169,9 +160,9 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
         <>
             {/* Ændret grid til 1 kolonne for at stable dem */}
             <div className="grid grid-cols-1 gap-6 max-w-2xl">
-                
+
                 {/* VAND */}
-                <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-blue-600">
                             <Droplet size={24} className="mr-2" />
@@ -184,8 +175,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                             </button>
                         )}
                     </div>
-                    
-                    <SearchableSelect 
+
+                    <SearchableSelect
                         options={getOptions('vand')}
                         value={sag.vand_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'vand')}
@@ -197,7 +188,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                 </div>
 
                 {/* VARME */}
-                <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-red-600">
                             <Flame size={24} className="mr-2" />
@@ -209,7 +200,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                             </button>
                         )}
                     </div>
-                    <SearchableSelect 
+                    <SearchableSelect
                         options={getOptions('varme')}
                         value={sag.varme_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'varme')}
@@ -221,7 +212,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                 </div>
 
                 {/* SPILDEVAND */}
-                <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-green-700">
                             <Waves size={24} className="mr-2" />
@@ -233,7 +224,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                             </button>
                         )}
                     </div>
-                    <SearchableSelect 
+                    <SearchableSelect
                         options={getOptions('spildevand')}
                         value={sag.spildevand_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'spildevand')}
@@ -247,7 +238,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
 
             {/* Popup Form */}
             {visVirksomhedForm && (
-                <VirksomhedForm 
+                <VirksomhedForm
                     virksomhedTilRedigering={virksomhedTilRedigering}
                     onSave={handleFormSave}
                     onCancel={() => setVisVirksomhedForm(false)}

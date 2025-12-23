@@ -15,14 +15,14 @@
 // @# 2025-11-10 22:15 - Flyttet "Primær" status/knap til navnelinjen (jf. billede).
 // @# 2025-11-15 12:30 - Opdateret til at bruge genbrugelig Button-komponent
 import React, { useState, useEffect, useCallback, MouseEvent, useMemo } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { Kontakt, Rolle, Sag } from '../types';
 import useDebounce from '../hooks/useDebounce';
 // @# 2025-11-10 21:30 - Importeret Star
 import { X, UserPlus, Loader2, Search, User, Edit, Copy, Check, Mail, Phone, Home, Star } from 'lucide-react';
 import KontaktForm from './KontaktForm';
 // @# 2025-11-10 18:55 - Importeret Modal
-import Modal from './Modal'; 
+import Modal from './Modal';
 import Button from './ui/Button'; // Importer den nye knap
 
 interface SaelgerStyringProps {
@@ -70,13 +70,12 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     // @# 2025-11-10 21:55 - Opdater lokal state når props ændres
     setLokalPrimaerId(primaerSaelgerId);
   }, [initialSaelgere, primaerSaelgerId]);
-  
+
   // 1. Find ID'et for "Sælger"-rollen ved indlæsning
   useEffect(() => {
     const fetchSaelgerRolleId = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/register/roller/?er_saelger=true`);
-        const data: Rolle[] = await res.json();
+        const data = await api.get<Rolle[]>('/register/roller/?er_saelger=true');
         if (data.length > 0) {
           setSaelgerRolleId(data[0].id);
         } else {
@@ -88,7 +87,7 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     };
     fetchSaelgerRolleId();
   }, []);
-  
+
   // 2. Søg efter kontakter, når brugeren taster
   useEffect(() => {
     const searchKontakter = async () => {
@@ -100,12 +99,11 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
       try {
         const params = new URLSearchParams({
           search: debouncedSoegning,
-          er_saelger: 'true' 
+          er_saelger: 'true'
         });
-        const res = await fetch(`${API_BASE_URL}/register/kontakter/?${params.toString()}`);
-        const data = await res.json();
+        const data = await api.get<any>(`/register/kontakter/?${params.toString()}`);
         const liste: Kontakt[] = Array.isArray(data) ? data : data.results;
-        
+
         const saelgerIds = saelgere.map(s => s.id);
         const filtreredeResultater = liste.filter(k => !saelgerIds.includes(k.id));
         setSoegeresultater(filtreredeResultater);
@@ -118,19 +116,14 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     };
     searchKontakter();
   }, [debouncedSoegning, saelgere]);
-  
+
   // @# 2025-11-10 21:30 - START: Omdøbt og generaliseret patch-funktion
   // 3. Gem opdateringer til Sagen
   const patchSagData = async (payload: { [key: string]: any }, refreshParent: boolean = true) => {
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/sager/${sagId}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Kunne ikke opdatere sag");
-      
+      await api.patch(`/sager/${sagId}/`, payload);
+
       // @# 2025-11-10 21:55 - Kald kun onSaelgerOpdateret når det er nødvendigt
       if (refreshParent) {
         onSaelgerOpdateret();
@@ -148,14 +141,14 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
   const handleTilfoejSaelger = (kontakt: Kontakt) => {
     const nyeSaelgerIds = [...saelgere.map(s => s.id), kontakt.id];
     const payload: { saelgere_ids: number[]; primaer_saelger_id?: number } = {
-        saelgere_ids: nyeSaelgerIds
+      saelgere_ids: nyeSaelgerIds
     };
-    
+
     // Hvis dette er den FØRSTE sælger, sæt som primær.
     if (saelgere.length === 0) {
-        payload.primaer_saelger_id = kontakt.id;
+      payload.primaer_saelger_id = kontakt.id;
     }
-    
+
     patchSagData(payload, true); // Refresh parent
     setSoegning('');
     // Nulstil søgefelt
@@ -168,7 +161,7 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     // @# 2025-11-10 18:55 - I stedet for window.confirm, åbner vi modalen
     setKontaktTilSletning(kontakt);
   };
-  
+
   // @# 2025-11-10 18:55 - START: Nye funktioner til slette-modal
   const handleLukSletModal = () => {
     setKontaktTilSletning(null);
@@ -178,17 +171,17 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
   const handleBekræftSlet = () => {
     if (!kontaktTilSletning) return;
     const nyeSaelgerIds = saelgere.map(s => s.id).filter(id => id !== kontaktTilSletning.id);
-    
+
     const payload: { saelgere_ids: number[]; primaer_saelger_id?: number | null } = {
-        saelgere_ids: nyeSaelgerIds
+      saelgere_ids: nyeSaelgerIds
     };
-    
+
     // Hvis vi sletter den primære sælger
     if (kontaktTilSletning.id === lokalPrimaerId) {
-        // Sæt primær til den nye første i listen, eller null hvis listen er tom
-        const nyPrimaerId = nyeSaelgerIds.length > 0 ? nyeSaelgerIds[0] : null;
-        payload.primaer_saelger_id = nyPrimaerId;
-        setLokalPrimaerId(nyPrimaerId); // Opdater lokalt
+      // Sæt primær til den nye første i listen, eller null hvis listen er tom
+      const nyPrimaerId = nyeSaelgerIds.length > 0 ? nyeSaelgerIds[0] : null;
+      payload.primaer_saelger_id = nyPrimaerId;
+      setLokalPrimaerId(nyPrimaerId); // Opdater lokalt
     }
 
     patchSagData(payload, true);
@@ -199,15 +192,15 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
 
   // @# 2025-11-10 20:20 - START: Ny funktion til at kopiere email
   const handleCopyEmail = (email: string, kontaktId: number, e: MouseEvent) => {
-      e.stopPropagation();
-      if (navigator.clipboard) {
-          navigator.clipboard.writeText(email).then(() => {
-              setCopiedEmailId(kontaktId);
-              setTimeout(() => setCopiedEmailId(null), 2000);
-          }).catch(err => {
-              console.error('Kunne ikke kopiere email:', err);
-          });
-      }
+    e.stopPropagation();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(email).then(() => {
+        setCopiedEmailId(kontaktId);
+        setTimeout(() => setCopiedEmailId(null), 2000);
+      }).catch(err => {
+        console.error('Kunne ikke kopiere email:', err);
+      });
+    }
   };
   // @# 2025-11-10 20:20 - SLUT
 
@@ -218,7 +211,7 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
       kontakt.adresse_vej,
       `${kontakt.adresse_postnr || ''} ${kontakt.adresse_by || ''}`.trim()
     ].filter(Boolean).join('\n');
-    
+
     if (addressString && navigator.clipboard) {
       navigator.clipboard.writeText(addressString).then(() => {
         setCopiedAddressId(kontakt.id);
@@ -234,20 +227,20 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     const emails = saelgere
       .map(s => s.email) // Få alle email-strenge (eller null)
       .filter(Boolean) as string[]; // Filtrer null/tomme strenge fra
-      
+
     if (emails.length === 0) return;
     const emailString = emails.join(', ');
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(emailString).then(() => {
-            setIsCopiedAll(true);
-            setTimeout(() => setIsCopiedAll(false), 2000);
-        }).catch(err => {
-            console.error('Kunne ikke kopiere alle emails:', err);
-        });
+      navigator.clipboard.writeText(emailString).then(() => {
+        setIsCopiedAll(true);
+        setTimeout(() => setIsCopiedAll(false), 2000);
+      }).catch(err => {
+        console.error('Kunne ikke kopiere alle emails:', err);
+      });
     }
   };
   // @# 2025-11-10 20:40 - SLUT
-  
+
   // @# 2025-11-10 21:55 - START: Opdateret 'setPrimær' (Request 2)
   // Funktion til at sætte primær sælger
   const handleSetPrimaer = (kontaktId: number) => {
@@ -266,17 +259,13 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     setKontaktTilRedigering(null); // Sørg for at den er nulstillet
     setVisKontaktForm(true);
   };
-  
+
   // @# 2025-11-10 20:35 - START: Opdateret handleRedigerSaelger
   // 7. Håndter REDIGER (henter fuld data først)
   const handleRedigerSaelger = async (kontakt: Kontakt) => {
     setLoadingKontaktId(kontakt.id); // Vis spinner på denne knap
     try {
-      const response = await fetch(`${API_BASE_URL}/register/kontakter/${kontakt.id}/`);
-      if (!response.ok) {
-        throw new Error("Kunne ikke hente fulde kontakt-data.");
-      }
-      const fuldKontakt: Kontakt = await response.json();
+      const fuldKontakt = await api.get<Kontakt>(`/register/kontakter/${kontakt.id}/`);
       setKontaktTilRedigering(fuldKontakt);
       setVisKontaktForm(true);
     } catch (error) {
@@ -287,7 +276,7 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
     }
   };
   // @# 2025-11-10 20:35 - SLUT
-  
+
   // 8. Fælles funktion til at lukke formen
   const handleFormLuk = () => {
     setVisKontaktForm(false);
@@ -302,22 +291,22 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
       if (b.id === primaerSaelgerId) return 1;
       // Hvis ingen er primær, eller de begge ikke er, sorter alfabetisk
       return (a.fulde_navn || '').localeCompare(b.fulde_navn || '');
-    
+
     });
   }, [saelgere, primaerSaelgerId]); // Lytter kun på prop, ikke lokal state
   // @# 2025-11-10 21:55 - SLUT
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-      
+
       {/* KontaktForm (Opret/Rediger) */}
       {visKontaktForm && (
         <KontaktForm
           onCancel={handleFormLuk}
           kontaktTilRedigering={kontaktTilRedigering}
-          
-       
-           onSave={() => {
+
+
+          onSave={() => {
             handleFormLuk();
             onSaelgerOpdateret(); // Fortæl parent at den skal gen-hente sagen
           }}
@@ -325,8 +314,8 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
             handleFormLuk();
             handleTilfoejSaelger(nyKontakt); // Tilføj den nye sælger
           }}
-  
-          
+
+
           defaultRolleIds={saelgerRolleId ? [saelgerRolleId] : []}
         />
       )}
@@ -338,15 +327,15 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
         title="Bekræft fjernelse"
       >
         <p>
-  
-          Er du sikker på, at du vil fjerne 
-          <strong className="font-bold"> {kontaktTilSletning?.fulde_navn} </strong> 
+
+          Er du sikker på, at du vil fjerne
+          <strong className="font-bold"> {kontaktTilSletning?.fulde_navn} </strong>
           som sælger fra denne sag?
         </p>
         <p className="text-sm text-gray-600 mt-2">
           Dette sletter ikke kontakten fra systemet, kun tilknytningen til sagen.
         </p>
-        
+
         {/* Footer med knapper. */}
         {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}
         <div className="flex justify-end space-x-3 mt-6">
@@ -373,87 +362,87 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
           <User size={20} className="mr-3 text-gray-500" />
           Sælgere
         </h2>
-        
+
         <button
-            type="button"
-            onClick={handleCopyAllEmails}
-            title="Kopier alle sælger-emails"
-            className="p-1 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={saelgere.filter(s => s.email).length === 0}
+          type="button"
+          onClick={handleCopyAllEmails}
+          title="Kopier alle sælger-emails"
+          className="p-1 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={saelgere.filter(s => s.email).length === 0}
         >
-            {isCopiedAll ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+          {isCopiedAll ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
         </button>
       </div>
       {/* @# 2025-11-10 20:40 - SLUT */}
-      
+
       {/* Liste over tilknyttede sælgere */}
       <div className="space-y-2 mb-4">
         {isSaving && <Loader2 size={16} className="animate-spin" />}
         {saelgere.length === 0 && (
           <p className="text-sm text-gray-500 italic">Ingen sælgere tilknyttet.</p>
-  
-       )}
-         {/* @# 2025-11-10 21:55 - Mapper 'sorteredeSaelgere' */}
-         {sorteredeSaelgere.map(saelger => (
+
+        )}
+        {/* @# 2025-11-10 21:55 - Mapper 'sorteredeSaelgere' */}
+        {sorteredeSaelgere.map(saelger => (
           <div key={saelger.id} className="p-2 bg-gray-100 rounded-md">
-            
+
             {/* @# 2025-11-10 22:15 - START: Top-række (Navn, Primær Status/Knap, Rediger/Slet) */}
             <div className="flex justify-between items-center">
-   
-             {/* Venstre side: Navn + Primær status/knap */}
+
+              {/* Venstre side: Navn + Primær status/knap */}
               <div className="flex items-center space-x-2">
                 <div className="font-medium text-gray-800">{saelger.fulde_navn}</div>
-                
+
                 {saelger.id === lokalPrimaerId ?
- (
-                  // Vises HVIS de ER primær
-                  <div 
+                  (
+                    // Vises HVIS de ER primær
+                    <div
                       className="flex items-center space-x-1 text-xs text-yellow-600 italic"
                       title="Primær sælger"
-        
-                  >
+
+                    >
                       <Star size={14} className="fill-yellow-500" />
                       <span>primær kontakt</span>
-                  </div>
-                ) : (
-      
-                  // Vises HVIS de IKKE er primær
-                  <button
-                    onClick={() => handleSetPrimaer(saelger.id)}
-                    title="Sæt som primær"
-                    
-                    className="p-1"
-                    disabled={isSaving}
-                  >
-                    <Star size={14} className="text-gray-400 hover:text-yellow-500" />
-                  </button>
-                )}
-    
+                    </div>
+                  ) : (
+
+                    // Vises HVIS de IKKE er primær
+                    <button
+                      onClick={() => handleSetPrimaer(saelger.id)}
+                      title="Sæt som primær"
+
+                      className="p-1"
+                      disabled={isSaving}
+                    >
+                      <Star size={14} className="text-gray-400 hover:text-yellow-500" />
+                    </button>
+                  )}
+
               </div>
 
               {/* Højre side: Rediger/Slet knapper */}
               <div className="flex items-center space-x-2 flex-shrink-0">
                 <button
                   onClick={() => handleRedigerSaelger(saelger)}
-                 
+
                   className="p-1 text-blue-600 hover:text-blue-800"
                   title="Rediger kontakt"
                   disabled={loadingKontaktId !== null}
                 >
                   {loadingKontaktId === saelger.id ?
- (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Edit size={18} />
-                  )}
+                    (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Edit size={18} />
+                    )}
                 </button>
- 
+
                 <button
                   onClick={() => handleFjernSaelger(saelger)}
                   className="p-1 text-red-500 hover:text-red-700"
                   title="Fjern sælger"
                   disabled={loadingKontaktId !== null}
-      
+
                 >
                   <X size={18} />
                 </button>
@@ -461,8 +450,8 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
             </div>
             {/* @# 2025-11-10 22:15 - SLUT */}
 
-          
-   {/* @# 2025-11-10 22:15 - START: Bund-sektion (Tlf, Email, Adr) */}
+
+            {/* @# 2025-11-10 22:15 - START: Bund-sektion (Tlf, Email, Adr) */}
             <div className="mt-1 space-y-1">
               {/* Tlf/Email Række (text-xs) */}
               <div className="grid grid-cols-2 gap-x-4 text-xs text-gray-600">
@@ -474,53 +463,53 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
                     <span>{saelger.telefon}</span>
                   )}
                 </div>
-                
-     
-                 {/* Email Kolonne */}
+
+
+                {/* Email Kolonne */}
                 <div className="flex items-center space-x-2">
                   {saelger.email && (
                     <>
                       <button
-     
-                         onClick={(e) => handleCopyEmail(saelger.email!, saelger.id, e)}
+
+                        onClick={(e) => handleCopyEmail(saelger.email!, saelger.id, e)}
                         title="Kopier email"
                         className="p-0.5 rounded-md hover:bg-gray-200"
                       >
-    
-                         {copiedEmailId === saelger.id ? (
+
+                        {copiedEmailId === saelger.id ? (
                           <Check size={14} className="text-green-500" />
                         ) : (
-                     
-                           <Copy size={14} className="text-blue-500 hover:text-blue-700" />
+
+                          <Copy size={14} className="text-blue-500 hover:text-blue-700" />
                         )}
                       </button>
                       <a href={`mailto:${saelger.email}`} className="text-blue-600 hover:underline truncate">
-                   
-                         {saelger.email}
+
+                        {saelger.email}
                       </a>
                     </>
                   )}
                 </div>
               </div>
 
-     
-             {/* Adresse Række */}
+
+              {/* Adresse Række */}
               <div className="flex items-center space-x-2 text-xs text-gray-500 pt-1">
                 <button
                   onClick={(e) => handleCopyAddress(saelger, e)}
                   title="Kopier adresse"
-            
-                   className="p-0.5 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+
+                  className="p-0.5 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!saelger.adresse_vej && !saelger.adresse_postnr}
                 >
                   {copiedAddressId === saelger.id ?
- (
-                    <Check size={14} className="text-green-500" />
-                  ) : (
-                    <Home size={14} className={ (saelger.adresse_vej || saelger.adresse_postnr) ? "text-gray-500 hover:text-blue-700" : "text-gray-400" } />
-                  )}
-       
-                 </button>
+                    (
+                      <Check size={14} className="text-green-500" />
+                    ) : (
+                      <Home size={14} className={(saelger.adresse_vej || saelger.adresse_postnr) ? "text-gray-500 hover:text-blue-700" : "text-gray-400"} />
+                    )}
+
+                </button>
                 <span>{formatAdresse(saelger)}</span>
               </div>
             </div>
@@ -531,37 +520,37 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
 
       {/* Søg/Opret boks */}
       <div className="relative">
-         <div className="relative">
+        <div className="relative">
           <input
             type="text"
             value={soegning}
             onChange={(e) => setSoegning(e.target.value)}
             placeholder="Søg efter eksisterende sælger..."
             className="w-full p-2 border border-gray-300 rounded-md shadow-sm"
- 
+
           />
-           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
           </span>
         </div>
-        
+
         {/* Søgeresultater */}
         {(soegeresultater.length > 0 || soegning.length > 0) && (
           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
             <ul>
-        
-               {soegeresultater.map(kontakt => (
+
+              {soegeresultater.map(kontakt => (
                 <li
                   key={kontakt.id}
                   onClick={() => handleTilfoejSaelger(kontakt)}
                   className="p-3 hover:bg-blue-50 cursor-pointer border-b"
-                
+
                 >
-                   <div className="font-medium">{kontakt.fulde_navn}</div>
+                  <div className="font-medium">{kontakt.fulde_navn}</div>
                   <div className="text-sm text-gray-600">{formatAdresse(kontakt)}</div>
                 </li>
               ))}
-              
+
               {/* "Opret 
  ny" knap */}
               {soegeresultater.length === 0 && !isLoading && debouncedSoegning.length > 1 && (
@@ -569,16 +558,16 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
                   onClick={handleOpretNy}
                   className="p-3 text-blue-600 hover:bg-blue-50 cursor-pointer flex items-center"
                 >
- 
-                    <UserPlus size={18} className="mr-2" />
+
+                  <UserPlus size={18} className="mr-2" />
                   Opret ny kontakt...
                 </li>
               )}
             </ul>
           </div>
-       
-         )}
-       </div>
+
+        )}
+      </div>
     </div>
   );
 }

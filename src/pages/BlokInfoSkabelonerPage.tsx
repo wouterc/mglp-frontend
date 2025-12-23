@@ -1,12 +1,12 @@
 // --- Fil: src/pages/BlokInfoSkabelonerPage.tsx ---
 // @# 2025-11-23 19:15 - Tilføjet Import/Export funktionalitet (Excel).
 import React, { useState, useEffect, useMemo, Fragment, ChangeEvent, ReactElement, useCallback } from 'react';
-import { API_BASE_URL } from '../config.ts';
+import { api } from '../api';
 import { PlusCircle, AlertCircle, Edit, Save, XCircle, UploadCloud, Download, Loader2 } from 'lucide-react';
 import type { Blokinfo } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import CsvImportModal from '../components/CsvImportModal';
-import * as XLSX from 'xlsx'; 
+import * as XLSX from 'xlsx';
 
 const formaalBeskrivelser: { [key: number]: string } = {
   1: '1: Procesoversigt (for aktiviteter)',
@@ -39,9 +39,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
     dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerIsLoading: true, blokinfoSkabelonerError: null } });
     try {
-      const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/`);
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-      const data: Blokinfo[] = await response.json();
+      const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: data, erBlokinfoSkabelonerHentet: true } });
     } catch (e) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: 'Kunne ikke hente data.' } });
@@ -93,7 +91,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "BlokInfo");
-      XLSX.writeFile(workbook, `blokinfo_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.writeFile(workbook, `blokinfo_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
     } catch (e) {
       console.error(e);
@@ -120,12 +118,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   const handleSave = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/${id}/`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedData),
-      });
-      if (!response.ok) throw new Error('Kunne ikke gemme ændringer.');
+      await api.put(`/skabeloner/blokinfo/${id}/`, editedData);
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
       hentSkabeloner(); // Genindlæs for at opdatere listen
       handleCancelEdit();
@@ -147,14 +140,9 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   const handleGemNy = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nySkabelonData),
-      });
-      if (!response.ok) throw new Error('Kunne ikke oprette ny skabelon.');
+      await api.post(`/skabeloner/blokinfo/`, nySkabelonData);
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
-      hentSkabeloner(); 
+      hentSkabeloner();
       handleAnnullerOpret();
     } catch (err) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: "Kunne ikke oprette ny skabelon." } });
@@ -163,8 +151,8 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   let lastFormaal: number | null = null;
 
-  if (isLoading && !erBlokinfoSkabelonerHentet) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-blue-600"/></div>;
-  
+  if (isLoading && !erBlokinfoSkabelonerHentet) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /></div>;
+
   if (error) return (
     <div className="p-8 flex flex-col items-center justify-center text-red-600">
       <AlertCircle size={48} className="mb-4" /> <h2 className="text-xl font-bold mb-2">Fejl</h2> <p>{error}</p>
@@ -173,15 +161,15 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      
+
       {/* IMPORT MODAL */}
       <CsvImportModal
         isOpen={visImportModal}
         onClose={() => setVisImportModal(false)}
         onImportComplete={() => {
-            setVisImportModal(false);
-            dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
-            hentSkabeloner();
+          setVisImportModal(false);
+          dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
+          hentSkabeloner();
         }}
         title="Importer BlokInfo (Excel)"
         type="blokinfo"
@@ -190,19 +178,19 @@ function BlokInfoSkabelonerPage(): ReactElement {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">BlokInfo Skabeloner</h2>
         <div className="flex space-x-2">
-            {/* EKSPORT KNAP */}
-            <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">
-                {isExporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20}/>}
-            </button>
-            
-            {/* IMPORT KNAP */}
-            <button onClick={() => setVisImportModal(true)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Importer fra Excel">
-                <UploadCloud size={20}/>
-            </button>
+          {/* EKSPORT KNAP */}
+          <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">
+            {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+          </button>
 
-            <button onClick={handleOpretClick} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Skabelon">
-              <PlusCircle size={20} />
-            </button>
+          {/* IMPORT KNAP */}
+          <button onClick={() => setVisImportModal(true)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Importer fra Excel">
+            <UploadCloud size={20} />
+          </button>
+
+          <button onClick={handleOpretClick} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Skabelon">
+            <PlusCircle size={20} />
+          </button>
         </div>
       </div>
 
@@ -243,7 +231,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                       {Object.entries(formaalBeskrivelser).map(([key, value]) => (
                         <option key={key} value={key}>{value}</option>
                       ))}
-                     </select>
+                    </select>
                     <button onClick={handleGemNy} title="Gem"><Save size={16} className="text-green-600 hover:text-green-800" /></button>
                     <button onClick={handleAnnullerOpret} title="Annuller"><XCircle size={16} className="text-red-600 hover:text-red-800" /></button>
                   </div>
@@ -269,10 +257,10 @@ function BlokInfoSkabelonerPage(): ReactElement {
                         <td className="py-1 px-2"><input type="text" name="titel_kort" value={editedData.titel_kort || ''} onChange={handleEditChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
                         <td className="py-1 px-2"><input type="text" name="beskrivelse" value={editedData.beskrivelse || ''} onChange={handleEditChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
                         <td className="py-1 px-2">
-                           <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2">
                             <button onClick={() => handleSave(skabelon.id)} title="Gem"><Save size={16} className="text-green-600 hover:text-green-800" /></button>
                             <button onClick={handleCancelEdit} title="Annuller"><XCircle size={16} className="text-red-600 hover:text-red-800" /></button>
-                           </div>
+                          </div>
                         </td>
                       </>
                     ) : (

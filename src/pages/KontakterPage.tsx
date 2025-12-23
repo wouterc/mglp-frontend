@@ -1,6 +1,6 @@
 // --- Fil: src/pages/KontakterPage.tsx ---
 import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, MouseEvent, Fragment } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Building, FunnelX, UploadCloud, Download } from 'lucide-react';
 import { Kontakt, Rolle, Virksomhed } from '../types';
 import { useAppState } from '../StateContext';
@@ -11,7 +11,7 @@ import Tooltip from '../components/Tooltip';
 import * as XLSX from 'xlsx'; // <--- Bruges til Excel eksport
 
 interface KontakterPageProps {
-  navigateTo: (side: string, context?: any) => void;
+    navigateTo: (side: string, context?: any) => void;
 }
 
 const VisAdresse = ({ vej, postnr, by }: { vej?: string | null, postnr?: string | null, by?: string | null }) => {
@@ -42,7 +42,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     } = state;
 
     const [visForm, setVisForm] = useState<boolean>(false);
-    
+
     // State til Import/Export
     const [visImportModal, setVisImportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -66,15 +66,13 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterIsLoading: true, kontakterError: null } });
         try {
             // Hent med høj limit for at sikre alt data (kan optimeres senere)
-            const kontakterRes = await fetch(`${API_BASE_URL}/register/kontakter/?limit=2000`);
-            if (!kontakterRes.ok) throw new Error('Kunne ikke hente kontakter.');
-            const kontakterData = await kontakterRes.json();
+            const kontakterData = await api.get<any>('/register/kontakter/?limit=2000');
             const kontakterListe = Array.isArray(kontakterData) ? kontakterData : kontakterData.results;
-            
+
             dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakter: kontakterListe || [], erKontakterHentet: true } });
 
         } catch (e: any) {
-             dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterError: e.message } });
+            dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterError: e.message } });
         } finally {
             dispatch({ type: 'SET_KONTAKTER_STATE', payload: { kontakterIsLoading: false } });
         }
@@ -83,9 +81,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     useEffect(() => {
         const fetchRoller = async () => {
             try {
-                const rollerRes = await fetch(`${API_BASE_URL}/register/roller/`);
-                if (!rollerRes.ok) throw new Error('Kunne ikke hente roller.');
-                const rollerData = await rollerRes.json();
+                const rollerData = await api.get<any>('/register/roller/');
                 const rollerListe = Array.isArray(rollerData) ? rollerData : rollerData.results;
                 setRoller(rollerListe || []);
             } catch (e) {
@@ -101,8 +97,8 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
 
     const filtreredeKontakter = useMemo(() => {
         if (!Array.isArray(kontakter)) return [];
-        
-        return kontakter.filter(k => 
+
+        return kontakter.filter(k =>
             k.fulde_navn.toLowerCase().includes(debouncedNavn.toLowerCase()) &&
             (debouncedRolle === '' || k.roller.some(r => r.id.toString() === debouncedRolle)) &&
             formatVirksomhedsnavn(k.virksomhed).toLowerCase().includes(debouncedVirksomhed.toLowerCase()) &&
@@ -114,8 +110,8 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const handleNavToVirksomhed = (e: MouseEvent, virksomhed: Virksomhed | null) => {
         e.stopPropagation();
         if (!virksomhed) return;
-        navigateTo('virksomheder', { 
-            filter: { navn: virksomhed.navn } 
+        navigateTo('virksomheder', {
+            filter: { navn: virksomhed.navn }
         });
     };
 
@@ -171,7 +167,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             }).catch(err => { console.error(err); });
         }
     };
-    
+
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         dispatch({
@@ -179,7 +175,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             payload: { kontakterFilters: { ...kontakterFilters, [name]: value } }
         });
     };
-    
+
     const handleNulstilFiltre = () => {
         dispatch({
             type: 'SET_KONTAKTER_STATE',
@@ -207,7 +203,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 efternavn: k.efternavn,
                 fulde_navn: k.fulde_navn,
                 // Vi eksporterer virksomhed_id, så importen kan genskabe linket
-                virksomhed_id: k.virksomhed?.id, 
+                virksomhed_id: k.virksomhed?.id,
                 virksomhed_navn: k.virksomhed ? formatVirksomhedsnavn(k.virksomhed) : '',
                 telefon: k.telefon,
                 email: k.email,
@@ -225,7 +221,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             XLSX.utils.book_append_sheet(workbook, worksheet, "Kontakter");
 
             // 3. Download filen
-            XLSX.writeFile(workbook, `kontakter_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(workbook, `kontakter_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
         } catch (e) {
             console.error("Eksport fejl:", e);
@@ -258,13 +254,13 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             )}
 
             {/* <--- IMPORT MODAL ---> */}
-            <CsvImportModal 
+            <CsvImportModal
                 isOpen={visImportModal}
                 onClose={() => setVisImportModal(false)}
                 onImportComplete={() => {
                     setVisImportModal(false);
                     dispatch({ type: 'SET_KONTAKTER_STATE', payload: { erKontakterHentet: false } });
-                    hentKontakter(); 
+                    hentKontakter();
                 }}
                 title="Importer Kontakter (Excel)"
                 type="kontakt"
@@ -274,19 +270,19 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 <h2 className="text-2xl font-bold text-gray-800">Kontakter</h2>
                 <div className="flex space-x-2">
                     {/* <--- EKSPORT KNAP ---> */}
-                    <button 
-                        onClick={handleExport} 
+                    <button
+                        onClick={handleExport}
                         disabled={isExporting}
-                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" 
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50"
                         title="Eksporter til Excel"
                     >
                         {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                     </button>
 
                     {/* <--- IMPORT KNAP ---> */}
-                    <button 
-                        onClick={() => setVisImportModal(true)} 
-                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" 
+                    <button
+                        onClick={() => setVisImportModal(true)}
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50"
                         title="Importer fra Excel"
                     >
                         <UploadCloud size={20} />
@@ -300,12 +296,12 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
 
             <div className="mb-4 py-4 px-2 bg-gray-50 rounded-lg border border-gray-200 flex">
                 <div className="relative w-[25%] pr-4">
-                    <input 
-                        type="text" 
-                        name="navn" 
-                        placeholder="Filtrer på navn..." 
-                        value={kontakterFilters.navn} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="navn"
+                        placeholder="Filtrer på navn..."
+                        value={kontakterFilters.navn}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.navn && (
@@ -314,12 +310,12 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                         </button>
                     )}
                 </div>
-                
+
                 <div className="relative w-[10%] pr-4">
                     <select
-                        name="rolle" 
-                        value={kontakterFilters.rolle} 
-                        onChange={handleFilterChange} 
+                        name="rolle"
+                        value={kontakterFilters.rolle}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm bg-white"
                     >
                         <option value="">Alle roller...</option>
@@ -330,12 +326,12 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 </div>
 
                 <div className="relative w-[20%] pr-4">
-                    <input 
-                        type="text" 
-                        name="virksomhed" 
-                        placeholder="Filtrer på virksomhed..." 
-                        value={kontakterFilters.virksomhed} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="virksomhed"
+                        placeholder="Filtrer på virksomhed..."
+                        value={kontakterFilters.virksomhed}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.virksomhed && (
@@ -344,14 +340,14 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                         </button>
                     )}
                 </div>
-                
+
                 <div className="relative w-[10%] pr-4">
-                    <input 
-                        type="text" 
-                        name="telefon" 
-                        placeholder="Filtrer på telefon..." 
-                        value={kontakterFilters.telefon} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="telefon"
+                        placeholder="Filtrer på telefon..."
+                        value={kontakterFilters.telefon}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.telefon && (
@@ -362,12 +358,12 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 </div>
 
                 <div className="relative w-[30%] pr-2">
-                    <input 
-                        type="text" 
-                        name="email" 
-                        placeholder="Filtrer på email..." 
-                        value={kontakterFilters.email} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="email"
+                        placeholder="Filtrer på email..."
+                        value={kontakterFilters.email}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {kontakterFilters.email && (
@@ -376,7 +372,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                         </button>
                     )}
                 </div>
-                
+
                 <div className="relative w-[5%]">
                     <button onClick={handleNulstilFiltre} className="p-2 text-gray-600 rounded-full hover:bg-gray-200" title="Nulstil Alle Filtre">
                         <FunnelX size={18} />
@@ -399,7 +395,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     <tbody className="text-gray-700 text-sm">
                         {filtreredeKontakter.map(k => (
                             <Fragment key={k.id}>
-                                <tr 
+                                <tr
                                     className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer"
                                     onClick={() => handleRaekkeKlik(k.id)}
                                 >
@@ -418,7 +414,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                     </td>
                                     <td className="py-1 px-2">
                                         {k.virksomhed && (
-                                            <button 
+                                            <button
                                                 className="flex items-center space-x-2 text-left text-blue-600 hover:underline"
                                                 onClick={(e) => handleNavToVirksomhed(e, k.virksomhed)}
                                                 title={`Gå til ${k.virksomhed.navn}`}
@@ -432,8 +428,8 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                     <td className="py-1 px-2">
                                         {k.email && (
                                             <div className="flex items-center space-x-1">
-                                                <button 
-                                                    onClick={(e) => handleCopyEmail(k.email!, k.id, e)} 
+                                                <button
+                                                    onClick={(e) => handleCopyEmail(k.email!, k.id, e)}
                                                     title="Kopier email"
                                                     className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
                                                 >
@@ -443,10 +439,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                                                         <Copy size={14} className="text-blue-500 hover:text-blue-700" />
                                                     )}
                                                 </button>
-                                                <a 
-                                                    href={`mailto:${k.email}`} 
+                                                <a
+                                                    href={`mailto:${k.email}`}
                                                     className="text-blue-600 hover:underline"
-                                                    onClick={(e) => e.stopPropagation()} 
+                                                    onClick={(e) => e.stopPropagation()}
                                                     title="Send email"
                                                 >
                                                     {k.email}
@@ -497,7 +493,7 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     </tbody>
                 </table>
             </div>
-         </div>
+        </div>
     );
 }
 

@@ -11,10 +11,10 @@ interface SmartDateInputProps {
 
 // Hjælpefunktion til at formatere dato til DD-MM-YYYY for pænere visning
 const formatDateForDisplay = (isoDate: string | null): string => {
-    if (!isoDate) return '';
-    const parts = isoDate.split('-');
-    if (parts.length !== 3) return isoDate; // Returner som den er, hvis formatet er uventet
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  if (!isoDate) return '';
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate; // Returner som den er, hvis formatet er uventet
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
 };
 
 function SmartDateInput({ value, onSave, className }: SmartDateInputProps): React.ReactElement {
@@ -26,16 +26,16 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
 
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     const input = e.target.value.trim();
-    
+
     // Hvis input er tomt, gem null
     if (input === '') {
-        if (value !== null) onSave(null);
-        return;
+      if (value !== null) onSave(null);
+      return;
     }
 
     // Hvis brugeren ikke ændrede noget meningsfuldt
     if (formatDateForDisplay(value) === input) {
-        return;
+      return;
     }
 
     const today = new Date();
@@ -43,25 +43,38 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
 
     // Tjek for format "d/M" eller "d-M"
     const dayMonthMatch = input.match(/^(\d{1,2})[./-](\d{1,2})$/);
-    if (dayMonthMatch) {
-        const day = parseInt(dayMonthMatch[1], 10);
-        const month = parseInt(dayMonthMatch[2], 10) - 1; // JS months are 0-indexed
-        newDate = new Date(today.getFullYear(), month, day);
-    } 
+
+    // Tjek for fuldt format "d-M-yyyy", "d/M/yyyy" eller "d.M.yyyy"
+    const fullDateMatch = input.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+
+    if (fullDateMatch) {
+      const day = parseInt(fullDateMatch[1], 10);
+      const month = parseInt(fullDateMatch[2], 10) - 1;
+      let year = parseInt(fullDateMatch[3], 10);
+      // Håndter 2-cifret årstal (antag 20xx)
+      if (year < 100) year += 2000;
+      newDate = new Date(year, month, day);
+    }
+    else if (dayMonthMatch) {
+      const day = parseInt(dayMonthMatch[1], 10);
+      const month = parseInt(dayMonthMatch[2], 10) - 1; // JS months are 0-indexed
+      newDate = new Date(today.getFullYear(), month, day);
+    }
     // Tjek for kun dag "d"
     else if (/^\d{1,2}$/.test(input)) {
-        const day = parseInt(input, 10);
-        if (day >= today.getDate()) {
-            newDate = new Date(today.getFullYear(), today.getMonth(), day);
-        } else {
-            newDate = new Date(today.getFullYear(), today.getMonth() + 1, day);
-        }
+      const day = parseInt(input, 10);
+      if (day >= today.getDate()) {
+        newDate = new Date(today.getFullYear(), today.getMonth(), day);
+      } else {
+        newDate = new Date(today.getFullYear(), today.getMonth() + 1, day);
+      }
     } else {
-        // Forsøg at parse input som en almindelig dato (hvis brugeren selv skriver)
-        const parsed = new Date(input);
-        if (!isNaN(parsed.getTime())) {
-            newDate = parsed;
-        }
+      // Forsøg at parse input som en almindelig dato (hvis brugeren selv skriver)
+      // Bemærk: new Date("dd-mm-yyyy") virker ofte ikke, derfor er regex ovenfor vigtig
+      const parsed = new Date(input);
+      if (!isNaN(parsed.getTime())) {
+        newDate = parsed;
+      }
     }
 
     if (newDate && !isNaN(newDate.getTime())) {
@@ -70,27 +83,27 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
       const month = (newDate.getMonth() + 1).toString().padStart(2, '0');
       const day = newDate.getDate().toString().padStart(2, '0');
       const formattedToSave = `${year}-${month}-${day}`;
-      
+
       // Opdater kun hvis den nye dato er anderledes end den gamle
       if (formattedToSave !== value) {
-          onSave(formattedToSave);
+        onSave(formattedToSave);
       }
       setDisplayValue(formatDateForDisplay(formattedToSave));
 
     } else {
-        // Hvis input ikke genkendes, nulstil til den oprindelige værdi
-        setDisplayValue(formatDateForDisplay(value));
+      // Hvis input ikke genkendes, nulstil til den oprindelige værdi
+      setDisplayValue(formatDateForDisplay(value));
     }
   };
-  
+
   // Viser browserens datovælger, når man klikker på tekstfeltet
   const showPicker = (e: MouseEvent<HTMLInputElement>) => {
-      try {
-          (e.target as HTMLInputElement).showPicker();
-      } catch (error) {
-          // Nogle browsere understøtter ikke showPicker()
-          console.error("showPicker() is not supported by this browser.");
-      }
+    try {
+      (e.target as HTMLInputElement).showPicker();
+    } catch (error) {
+      // Nogle browsere understøtter ikke showPicker()
+      console.error("showPicker() is not supported by this browser.");
+    }
   }
 
   return (

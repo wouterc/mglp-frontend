@@ -1,6 +1,6 @@
 // --- Fil: src/pages/VirksomhederPage.tsx ---
 import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, Fragment, MouseEvent } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Users, FunnelX, UploadCloud, Download } from 'lucide-react';
 import { Virksomhed, VirksomhedGruppe } from '../types';
 import { useAppState } from '../StateContext';
@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx'; // Bruges til Excel eksport
 
 // HER ER DEN MANGLENDE INTERFACE DEFINITION
 interface VirksomhederPageProps {
-  navigateTo: (side: string, context?: any) => void;
+    navigateTo: (side: string, context?: any) => void;
 }
 
 const VisAdresse = ({ vej, postnr, by }: { vej?: string | null, postnr?: string | null, by?: string | null }) => {
@@ -45,7 +45,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
     const [visForm, setVisForm] = useState<boolean>(false);
     const [visImportModal, setVisImportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
-    
+
     const [virksomhedTilRedigering, setVirksomhedTilRedigering] = useState<Virksomhed | null>(null);
     const [udfoldetVirksomhedId, setUdfoldetVirksomhedId] = useState<number | null>(null);
 
@@ -63,14 +63,11 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
         if (erVirksomhederHentet && !visImportModal) return;
         dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { virksomhederIsLoading: true, virksomhederError: null } });
         try {
-            const virksomhederRes = await fetch(`${API_BASE_URL}/register/virksomheder/?limit=2000`);
-            if (!virksomhederRes.ok) throw new Error('Kunne ikke hente virksomheder.');
-            
-            const virksomhederData = await virksomhederRes.json();
-            const virksomhederListe = Array.isArray(virksomhederData) ? virksomhederData : virksomhederData.results;
-            
+            const data = await api.get<any>('/register/virksomheder/?limit=2000');
+            const virksomhederListe = Array.isArray(data) ? data : data.results;
+
             dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { virksomheder: virksomhederListe || [], erVirksomhederHentet: true } });
-            
+
         } catch (e: any) {
             dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { virksomhederError: e.message } });
         } finally {
@@ -81,10 +78,8 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
     useEffect(() => {
         const fetchGrupper = async () => {
             try {
-                const grupperRes = await fetch(`${API_BASE_URL}/register/virksomhedsgrupper/`);
-                if (!grupperRes.ok) throw new Error('Kunne ikke hente grupper.');
-                const grupperData = await grupperRes.json();
-                const grupperListe = Array.isArray(grupperData) ? grupperData : grupperData.results;
+                const data = await api.get<any>('/register/virksomhedsgrupper/');
+                const grupperListe = Array.isArray(data) ? data : data.results;
                 setVirksomhedGrupper(grupperListe || []);
             } catch (e) {
                 console.error("Fejl ved hentning af grupper til filter:", e);
@@ -100,7 +95,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
     const filtreredeVirksomheder = useMemo(() => {
         if (!Array.isArray(virksomheder)) return [];
 
-        return virksomheder.filter(v => 
+        return virksomheder.filter(v =>
             v.navn.toLowerCase().includes(debouncedNavn.toLowerCase()) &&
             (v.afdeling || '').toLowerCase().includes(debouncedAfdeling.toLowerCase()) &&
             (debouncedGruppe === '' || v.gruppe?.id.toString() === debouncedGruppe) &&
@@ -111,8 +106,8 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
     const handleNavToKontakter = (e: MouseEvent, virksomhed: Virksomhed) => {
         e.stopPropagation();
-        navigateTo('kontakter', { 
-            filter: { virksomhed: formatVirksomhedsnavn(virksomhed) } 
+        navigateTo('kontakter', {
+            filter: { virksomhed: formatVirksomhedsnavn(virksomhed) }
         });
     };
 
@@ -122,7 +117,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
     };
 
     const handleRediger = (virksomhed: Virksomhed, e: MouseEvent) => {
-        e.stopPropagation(); 
+        e.stopPropagation();
         setVirksomhedTilRedigering(virksomhed);
         setVisForm(true);
     };
@@ -148,7 +143,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
         if (navigator.clipboard) {
             navigator.clipboard.writeText(email).then(() => {
                 setCopiedEmailId(virksomhedId);
-                setTimeout(() => setCopiedEmailId(null), 2000); 
+                setTimeout(() => setCopiedEmailId(null), 2000);
             }).catch(err => { console.error(err); });
         }
     };
@@ -174,7 +169,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
             payload: { virksomhederFilters: { ...virksomhederFilters, [name]: value } }
         });
     };
-    
+
     const handleNulstilFiltre = () => {
         dispatch({
             type: 'SET_VIRKSOMHEDER_STATE',
@@ -219,7 +214,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
             XLSX.utils.book_append_sheet(workbook, worksheet, "Virksomheder");
 
             // 3. Download filen
-            XLSX.writeFile(workbook, `virksomheder_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(workbook, `virksomheder_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
         } catch (e) {
             console.error("Eksport fejl:", e);
@@ -251,13 +246,13 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                 />
             )}
 
-            <CsvImportModal 
+            <CsvImportModal
                 isOpen={visImportModal}
                 onClose={() => setVisImportModal(false)}
                 onImportComplete={() => {
                     setVisImportModal(false);
                     dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { erVirksomhederHentet: false } });
-                    hentVirksomheder(); 
+                    hentVirksomheder();
                 }}
                 title="Importer Virksomheder (Excel)"
                 type="virksomhed"
@@ -266,18 +261,18 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Virksomheder</h2>
                 <div className="flex space-x-2">
-                    <button 
-                        onClick={handleExport} 
+                    <button
+                        onClick={handleExport}
                         disabled={isExporting}
-                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" 
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50"
                         title="Eksporter til Excel"
                     >
                         {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                     </button>
 
-                    <button 
-                        onClick={() => setVisImportModal(true)} 
-                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" 
+                    <button
+                        onClick={() => setVisImportModal(true)}
+                        className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50"
                         title="Importer fra Excel"
                     >
                         <UploadCloud size={20} />
@@ -291,93 +286,93 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
             <div className="mb-4 py-4 px-2 bg-gray-50 rounded-lg border border-gray-200 flex">
                 <div className="relative w-[25%] pr-4">
-                     <input 
-                        type="text" 
-                        name="navn" 
-                        placeholder="Filtrer på navn..." 
-                        value={virksomhederFilters.navn} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="navn"
+                        placeholder="Filtrer på navn..."
+                        value={virksomhederFilters.navn}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {virksomhederFilters.navn && (
-                         <button onClick={() => handleFilterChange({ target: { name: 'navn', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
+                        <button onClick={() => handleFilterChange({ target: { name: 'navn', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
                             <X size={16} />
                         </button>
                     )}
-                 </div>
-                
-                 <div className="relative w-[15%] pr-4">
-                    <input 
-                        type="text" 
-                        name="afdeling" 
-                        placeholder="Filtrer på afdeling..." 
-                        value={virksomhederFilters.afdeling} 
-                        onChange={handleFilterChange} 
+                </div>
+
+                <div className="relative w-[15%] pr-4">
+                    <input
+                        type="text"
+                        name="afdeling"
+                        placeholder="Filtrer på afdeling..."
+                        value={virksomhederFilters.afdeling}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {virksomhederFilters.afdeling && (
                         <button onClick={() => handleFilterChange({ target: { name: 'afdeling', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
-                         <X size={16} />
+                            <X size={16} />
                         </button>
                     )}
                 </div>
 
                 <div className="relative w-[10%] pr-4">
-                     <select
-                        name="gruppe" 
-                        value={virksomhederFilters.gruppe} 
-                        onChange={handleFilterChange} 
+                    <select
+                        name="gruppe"
+                        value={virksomhederFilters.gruppe}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm bg-white"
-                     >
+                    >
                         <option value="">Alle grupper...</option>
                         {virksomhedGrupper.map(g => (
                             <option key={g.id} value={g.id}>{g.navn}</option>
-                         ))}
+                        ))}
                     </select>
                 </div>
-                 
+
                 <div className="relative w-[10%] pr-4">
-                     <input 
-                        type="text" 
-                        name="telefon" 
-                        placeholder="Filtrer på telefon..." 
-                        value={virksomhederFilters.telefon} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="telefon"
+                        placeholder="Filtrer på telefon..."
+                        value={virksomhederFilters.telefon}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
                     {virksomhederFilters.telefon && (
-                         <button onClick={() => handleFilterChange({ target: { name: 'telefon', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
-                             <X size={16} />
+                        <button onClick={() => handleFilterChange({ target: { name: 'telefon', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
+                            <X size={16} />
                         </button>
                     )}
-                 </div>
+                </div>
 
                 <div className="relative w-[35%] pr-2">
-                    <input 
-                        type="text" 
-                        name="email" 
-                        placeholder="Filtrer på email..." 
-                        value={virksomhederFilters.email} 
-                        onChange={handleFilterChange} 
+                    <input
+                        type="text"
+                        name="email"
+                        placeholder="Filtrer på email..."
+                        value={virksomhederFilters.email}
+                        onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
                     />
-                     {virksomhederFilters.email && (
+                    {virksomhederFilters.email && (
                         <button onClick={() => handleFilterChange({ target: { name: 'email', value: '' } } as any)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
                             <X size={16} />
-                         </button>
+                        </button>
                     )}
                 </div>
-                
+
                 <div className="relative w-[5%]">
                     <button onClick={handleNulstilFiltre} className="p-2 text-gray-600 rounded-full hover:bg-gray-200" title="Nulstil Alle Filtre">
-                         <FunnelX size={18} />
+                        <FunnelX size={18} />
                     </button>
                 </div>
             </div>
 
             <div className="overflow-x-auto rounded-lg shadow-md">
                 <table className="min-w-full bg-white">
-                      <thead className="bg-gray-800 text-white text-sm">
+                    <thead className="bg-gray-800 text-white text-sm">
                         <tr>
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[25%]">Navn</th>
                             <th className="text-left py-1 px-2 uppercase font-semibold w-[15%]">Afdeling</th>
@@ -387,13 +382,13 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                             <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]">Kont.</th>
                         </tr>
                     </thead>
-                     <tbody className="text-gray-700 text-sm">
-                         {filtreredeVirksomheder.map(v => (
+                    <tbody className="text-gray-700 text-sm">
+                        {filtreredeVirksomheder.map(v => (
                             <Fragment key={v.id}>
-                                <tr 
+                                <tr
                                     className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer"
                                     onClick={() => handleRaekkeKlik(v.id)}
-                                 >
+                                >
                                     <td className="py-1 px-2 font-medium">
                                         <div className="flex items-center">
                                             <span>{v.navn}</span>
@@ -410,8 +405,8 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                                     <td className="py-1 px-2">
                                         {v.email && (
                                             <div className="flex items-center space-x-1">
-                                                <button 
-                                                    onClick={(e) => handleCopyEmail(v.email!, v.id, e)} 
+                                                <button
+                                                    onClick={(e) => handleCopyEmail(v.email!, v.id, e)}
                                                     title="Kopier email"
                                                     className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
                                                 >
@@ -421,8 +416,8 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                                                         <Copy size={14} className="text-blue-500 hover:text-blue-700" />
                                                     )}
                                                 </button>
-                                                <a 
-                                                    href={`mailto:${v.email}`} 
+                                                <a
+                                                    href={`mailto:${v.email}`}
                                                     className="text-blue-600 hover:underline"
                                                     onClick={(e) => e.stopPropagation()}
                                                     title="Send email"
@@ -434,8 +429,8 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                                     </td>
                                     <td className="py-1 px-2 text-center">
                                         <div className="flex items-center justify-center space-x-2">
-                                            <button 
-                                                className="flex items-center text-gray-500 hover:text-blue-600" 
+                                            <button
+                                                className="flex items-center text-gray-500 hover:text-blue-600"
                                                 title="Vis tilknyttede kontakter"
                                                 onClick={(e) => handleNavToKontakter(e, v)}
                                             >
@@ -449,22 +444,22 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                                     </td>
                                 </tr>
                                 {udfoldetVirksomhedId === v.id && (
-                                     <tr className="bg-gray-50 border-b border-gray-300">
+                                    <tr className="bg-gray-50 border-b border-gray-300">
                                         <td colSpan={6} className="p-4">
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2">
-                                                 <div>
+                                                <div>
                                                     <div className="flex items-center">
-                                                         <button
-                                                             onClick={(e) => handleCopyAddress(v, e)}
-                                                             title="Kopier adresse"
-                                                             className="p-1 rounded-md hover:bg-gray-200 flex-shrink-0 mr-2"
-                                                         >
-                                                              {copiedAddressId === v.id ? (
+                                                        <button
+                                                            onClick={(e) => handleCopyAddress(v, e)}
+                                                            title="Kopier adresse"
+                                                            className="p-1 rounded-md hover:bg-gray-200 flex-shrink-0 mr-2"
+                                                        >
+                                                            {copiedAddressId === v.id ? (
                                                                 <Check size={16} className="text-green-500" />
-                                                              ) : (
+                                                            ) : (
                                                                 <Copy size={16} className="text-blue-500 hover:text-blue-700" />
-                                                             )}
-                                                         </button>
+                                                            )}
+                                                        </button>
                                                         <h4 className="font-bold text-gray-700">Adresse</h4>
                                                     </div>
                                                     <VisAdresse vej={v.adresse_vej} postnr={v.adresse_postnr} by={v.adresse_by} />

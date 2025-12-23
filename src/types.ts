@@ -22,6 +22,7 @@ export interface SkabAktivitet {
   note: string | null;
   ansvarlig: string | null;
   frist: number | null;
+  er_ny?: boolean;
 }
 
 export interface Status {
@@ -141,8 +142,13 @@ export interface Sag {
   primaer_saelger: Kontakt | null;
   bank_virksomhed: Virksomhed | null;
   bank_kontakt: Kontakt | null;
+  bank_sagsnr: string | null;
 
   raadgiver_tilknytninger: SagRaadgiverTilknytning[];
+  raadgiver_kontakt: Kontakt | null;
+  raadgiver_sagsnr: string | null;
+
+  maegler_sagsnr: string | null;
 
   // @ Nye forsynings-relationer
   vand_virksomhed: Virksomhed | null;
@@ -166,6 +172,9 @@ export interface Aktivitet {
   proces: Blokinfo | null;
   gruppe: Blokinfo | null;
   kommentar: string | null;
+  note: string | null;
+  skabelon_note: string | null;
+  er_ny?: boolean;
 }
 
 export interface AktiviteterFilterState {
@@ -244,6 +253,30 @@ export interface DawaAdresse {
   href: string;
 }
 
+export interface SkabDokument {
+  id: number;
+  dokument_type: string | null;
+  gruppe: Blokinfo | null;
+  dokument_nr: number | null;
+  dokument: string | null;
+  betingelse: string | null;
+  metode: string | null;
+  metode_beskrivelse: string | null;
+  link: string | null;
+  login: string | null;
+  filnavn: string | null;
+  aktiv: boolean | null;
+  udgaaet: boolean | null;
+  kommentar: string | null;
+  er_ny?: boolean;
+}
+
+export interface DokumentskabelonerFilterState {
+  gruppe_nr: string;
+  dokument_nr: string;
+  dokument: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -252,7 +285,31 @@ export interface User {
   email: string;
   is_staff: boolean;
   is_superuser: boolean;
+  is_active: boolean;
   work_phone?: string;
   private_phone?: string;
   private_address?: string;
+  is_online?: boolean;
+  last_seen?: string;
+}
+
+export interface SagsDokument {
+  id: number;
+  sag: number; // ID reference
+  skabelon: number | null; // ID reference
+  skabelon_navn?: string;
+  gruppe: Blokinfo | null;
+  gruppe_navn?: string;
+  titel: string | null;
+  fil: string | null; // URL til fil
+  filnavn: string | null; // Det ønskede filnavn
+  link: string | null;
+  aktiv: boolean;
+  udgaaet: boolean;
+  kommentar: string | null;
+  dato_intern: string | null;
+  dato_ekstern: string | null;
+  ansvarlig: number | null; // User ID
+  ansvarlig_navn?: string;
+  oprettet_dato: string;
 }

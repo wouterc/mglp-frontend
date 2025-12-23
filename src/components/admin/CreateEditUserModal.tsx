@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../ui/Button';
 import { PasswordInput } from '../ui/PasswordInput';
-import { API_BASE_URL } from '../../config';
+import { api } from '../../api';
 
 interface User {
     id?: number;
@@ -74,11 +74,9 @@ export const CreateEditUserModal: React.FC<CreateEditUserModalProps> = ({ isOpen
         setError(null);
 
         try {
-            const url = userToEdit
-                ? `${API_BASE_URL}/kerne/users/${userToEdit.id}/`
-                : `${API_BASE_URL}/kerne/users/`;
-
-            const method = userToEdit ? 'PATCH' : 'POST';
+            const endpoint = userToEdit
+                ? `/kerne/users/${userToEdit.id}/`
+                : `/kerne/users/`;
 
             const body: any = {
                 username,
@@ -99,28 +97,17 @@ export const CreateEditUserModal: React.FC<CreateEditUserModalProps> = ({ isOpen
             if (password) {
                 body.password = password;
             } else if (!userToEdit) {
-                // Creating user without password? backend might reject or set unusable
-                // Let's require it for create
                 throw new Error("Adgangskode er påkrævet ved oprettelse.");
             }
 
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify(body),
-            });
-
-            if (res.ok) {
-                onUserSaved();
-                onClose();
+            if (userToEdit) {
+                await api.patch(endpoint, body);
             } else {
-                const data = await res.json();
-                setError(JSON.stringify(data));
+                await api.post(endpoint, body);
             }
 
+            onUserSaved();
+            onClose();
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Der skete en fejl.");

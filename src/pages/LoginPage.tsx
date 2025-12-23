@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { useAppState } from '../StateContext';
 import { Lock, User } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -19,32 +19,16 @@ const LoginPage: React.FC = () => {
         setError('');
 
         try {
-            const res = await fetch(`${API_BASE_URL}/kerne/login/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({ username, password }),
-            });
+            const user = await api.post<any>('/kerne/login/', { username, password });
 
-            if (res.ok) {
-                const user = await res.json();
-                dispatch({ type: 'SET_CURRENT_USER', payload: user });
-                // Redirect sker automatisk via App.tsx logic eller vi navigerer manuelt her hvis nødvendigt
-                // Men da currentUser opdateres, vil App.tsx (hvis den lytter) reagere. 
-                // Bedre er at navigere til forsiden:
-                window.location.href = '/';
-            } else {
-                const data = await res.json();
-                console.log("Login error response:", data); // @# Debugging
-                // Check common DRF error fields
-                const errorMessage = data.error || data.detail || JSON.stringify(data);
-                setError(errorMessage || 'Login fejlede');
-            }
-        } catch (err) {
-            console.error(err);
-            setError('Der skete en netværksfejl');
+            // Gem i global state
+            dispatch({ type: 'SET_CURRENT_USER', payload: user });
+
+            // Redirect til forsiden
+            window.location.href = '/';
+        } catch (err: any) {
+            console.error("Login fejl:", err);
+            setError(err.message || 'Login fejlede');
         } finally {
             setLoading(false);
         }

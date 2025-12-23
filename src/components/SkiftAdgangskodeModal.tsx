@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import Modal from './Modal';
 import Button from './ui/Button';
 
@@ -54,35 +54,10 @@ const SkiftAdgangskodeModal: React.FC<Props> = ({ isOpen, onClose }) => {
         setIsSaving(true);
 
         try {
-            const res = await fetch(API_BASE_URL + '/kerne/users/set_password/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    current_password: currentPassword,
-                    new_password: newPassword
-                }),
+            await api.post('/kerne/users/set_password/', {
+                current_password: currentPassword,
+                new_password: newPassword
             });
-
-            if (!res.ok) {
-                const data = await res.json();
-                // Håndter specifikke fejl fra backend
-                if (data.current_password) {
-                    throw new Error(data.current_password[0]);
-                }
-                // Check if there is a general error message
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                if (data.detail) {
-                    throw new Error(data.detail);
-                }
-
-                throw new Error("Kunne ikke skifte adgangskode.");
-            }
-
             setSuccess(true);
 
             // Nulstil felter efter kort tid eller lad brugeren lukke manuelt

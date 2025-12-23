@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 import Button from '../components/ui/Button';
 
@@ -28,24 +28,11 @@ const NulstilAdgangskodePage: React.FC = () => {
         }
 
         try {
-            const res = await fetch(`${API_BASE_URL}/kerne/password_reset/confirm/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    uid,
-                    token,
-                    new_password: newPassword
-                }),
+            await api.post('/kerne/password_reset/confirm/', {
+                uid,
+                token,
+                new_password: newPassword
             });
-
-            if (!res.ok) {
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                throw new Error("Kunne ikke nulstille adgangskode. Linket kan være udløbet.");
-            }
-
             setIsSuccess(true);
         } catch (err: any) {
             console.error(err);

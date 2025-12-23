@@ -5,8 +5,8 @@
 // @# 2025-11-03 21:30 - Rettet uendelig loop ved at fjerne 'gruppeLoadingStatus' fra dependencies i 'hentGruppeAktiviteter'
 // @# 2025-11-03 22:15 - Ændret dispatch til at bruge ny 'SET_GRUPPE_LOADING' action.
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, ChangeEvent, KeyboardEvent, useRef, useMemo } from 'react';
-import { API_BASE_URL } from '../config';
-import { Edit, Search, ChevronDown, ChevronUp, MessageSquare, ChevronsDown, ChevronsUp } from 'lucide-react';
+import { api } from '../api';
+import { Edit, Search, ChevronDown, ChevronUp, MessageSquare, Info, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, UploadCloud, Loader2 } from 'lucide-react';
 // @# 2025-11-03 21:45 - Fjernet useDebounce
 // import useDebounce from '../hooks/useDebounce'; 
 import { useAppState } from '../StateContext';
@@ -15,6 +15,7 @@ import SagsAktivitetForm from '../components/SagsAktivitetForm';
 import Tooltip from '../components/Tooltip';
 import SmartDateInput from '../components/SmartDateInput';
 import { useTableNavigation } from '../hooks/useTableNavigation';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 // --- Type-definitioner og sub-komponenter ---
 interface AktiviteterPageProps {
@@ -36,7 +37,7 @@ const InlineTextEditor = ({ value, onSave, type = "text", id }: InlineEditorProp
     const [text, setText] = useState(value);
     useEffect(() => { setText(value); }, [value]);
     const handleBlur = () => { if (text !== value) { onSave(text || ''); } };
-    return <input id={id} type={type} value={text || ''} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} className="w-full p-1 border rounded-md text-sm bg-white" />;
+    return <input id={id} type={type} value={text || ''} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0" />;
 };
 
 
@@ -44,13 +45,15 @@ const InlineTextEditor = ({ value, onSave, type = "text", id }: InlineEditorProp
 function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const { state, dispatch } = useAppState();
     const { valgtSag, aktivitetsGrupper, hentedeAktiviteter, gruppeLoadingStatus, aktiviteterIsLoading, aktiviteterFilters, aktiviteterUdvidedeGrupper } = state;
-    
+
     const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
     const [søgning, setSøgning] = useState<string>('');
     const [søgeResultater, setSøgeResultater] = useState<SøgeResultat[]>([]);
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState<Aktivitet | null>(null);
-    
+    const [quickAddValues, setQuickAddValues] = useState<Record<number, string>>({});
+    const [isSavingNy, setIsSavingNy] = useState<Record<number, boolean>>({});
+
     const [debouncedSøgning, setDebouncedSøgning] = useState(søgning); // Lokal debounce kun for sags-søgning
     const tableRef = useRef<HTMLTableElement>(null);
     useTableNavigation(tableRef);
@@ -84,9 +87,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const queryString = buildQueryString(filters, currentSag.id);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/aktiviteter/?${queryString}`);
-            if (!res.ok) throw new Error('Kunne ikke hente gruppe-opsummering.');
-            const data: AktivitetGruppeSummary[] = await res.json();
+            const data = await api.get<AktivitetGruppeSummary[]>(`/aktiviteter/?${queryString}`);
             dispatch({
                 type: 'SET_SAG_GRUPPE_SUMMARIES',
                 payload: { sagId: currentSag.id, summaries: data },
@@ -99,69 +100,257 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     }, [dispatch, buildQueryString]);
 
     // @# 2025-11-03 21:45 - Stringify 'aktiviteterFilters' for at bruge som dependency
-    const filterDependency = JSON.stringify(aktiviteterFilters);
+    // --- Local State for DATA ---
+    const { cachedAktiviteter } = state;
+    const [allActivities, setAllActivities] = useState<Aktivitet[]>([]);
+    const [isFetchingAll, setIsFetchingAll] = useState(false);
+    const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
 
-    // @# 2025-11-03 21:20 - Flyttet 'hentGruppeAktiviteter' (fra bunden) hertil, før den bruges.
-    // @# 2025-09-15 21:45 - Denne funktion sender nu altid de aktuelle filtre med.
-    const hentGruppeAktiviteter = useCallback(async (gruppeId: number) => {
-        if (!valgtSag) return;
+    // Dialog-state
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        confirmText?: string;
+        cancelText?: string;
+        onConfirm: () => void;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+    });
 
-        // @# 2025-11-03 22:15 - Brug den nye, specifikke action
-        dispatch({ type: 'SET_GRUPPE_LOADING', payload: { gruppeId: gruppeId, isLoading: true } });
-        
-        // @# 2025-11-03 21:45 - Bruger 'aktiviteterFilters' direkte
-        const queryString = buildQueryString(aktiviteterFilters, valgtSag.id);
+    const showAlert = (title: string, message: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title,
+            message,
+            confirmText: 'OK',
+            cancelText: '',
+            onConfirm: () => { },
+        });
+    };
 
-        try {
-            const res = await fetch(`${API_BASE_URL}/aktiviteter/by_gruppe/?gruppe=${gruppeId}&${queryString}`);
-            const data: Aktivitet[] = await res.json();
-            dispatch({ type: 'SET_ENKELT_GRUPPE_AKTIVITETER', payload: { gruppeId: gruppeId, aktiviteter: data } });
-        } catch (e) {
-            console.error("Fejl ved hentning af aktiviteter for gruppe", e);
-        } finally {
-            // @# 2025-11-03 22:15 - Brug den nye, specifikke action
-            dispatch({ type: 'SET_GRUPPE_LOADING', payload: { gruppeId: gruppeId, isLoading: false } });
-        }
-    // @# 2025-11-03 22:15 - 'gruppeLoadingStatus' er fjernet, og 'aktiviteterFilters' er tilføjet.
-    }, [valgtSag, dispatch, buildQueryString, aktiviteterFilters]);
-
-    useEffect(() => {
-        if (valgtSag) {
-            // @# 2025-11-03 21:45 - Bruger 'aktiviteterFilters' direkte
-            hentGruppeSummering(valgtSag, aktiviteterFilters);
-        }
-    // @# 2025-11-03 21:45 - Lytter på 'filterDependency'
-    }, [valgtSag, filterDependency, hentGruppeSummering, aktiviteterFilters]); // aktiviteterFilters tilføjet for hentGruppeSummering
-
-    // @# 2025-11-03 21:10 - NY useEffect til at gen-hente åbne grupper ved filter-ændring
+    // --- Hent ALT data ved sags-skift ---
     useEffect(() => {
         if (!valgtSag) {
+            setAllActivities([]);
             return;
         }
 
-        const udvidedeGrupperForSag = aktiviteterUdvidedeGrupper[valgtSag.id] || {};
-        
-        // Gennemløb de AKTUELLE gruppesummeringer (som lige er blevet opdateret af det andet useEffect)
-        nuvaerendeGruppeSummering.forEach(gruppeSummary => {
-            const gruppeId = gruppeSummary.gruppe.id;
-            const gruppeKey = `${gruppeSummary.proces.id}-${gruppeId}`;
-            
-            // Hvis denne gruppe er markeret som 'udvidet' (åben)
-            if (udvidedeGrupperForSag[gruppeKey]) {
-                // Gen-hent aktiviteterne for denne gruppe, da filteret har ændret sig
-                hentGruppeAktiviteter(gruppeId);
+        // 1. Sæt data fra cache med det samme hvis det findes
+        if (cachedAktiviteter[valgtSag.id]) {
+            setAllActivities(cachedAktiviteter[valgtSag.id]);
+        } else {
+            setAllActivities([]); // Ryd hvis ingen cache
+        }
+
+        const fetchAll = async () => {
+            // Kun vis loading-spinner hvis vi ikke har data i cachen
+            const hasCachedData = !!cachedAktiviteter[valgtSag.id];
+
+            setIsFetchingAll(true);
+            if (!hasCachedData) {
+                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
+            }
+
+            try {
+                const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
+                setAllActivities(data);
+                // Opdater cachen i global state
+                dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
+
+                // Tjek også global synk-status
+                const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
+                setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
+            } catch (e: any) {
+                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
+            } finally {
+                setIsFetchingAll(false);
+                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
+            }
+        };
+
+        fetchAll();
+    }, [valgtSag, dispatch]); // Fjern cachedAktiviteter som dependency for at undgå loop, da vi opdaterer den indeni.
+
+    const handleQuickAdd = async (gruppeId: number, procesId: number, e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const navn = quickAddValues[gruppeId]?.trim();
+        if (!navn || !valgtSag) return;
+
+        setIsSavingNy(prev => ({ ...prev, [gruppeId]: true }));
+        try {
+            await api.post('/aktiviteter/', {
+                sag_id: valgtSag.id,
+                gruppe_id: gruppeId,
+                proces_id: procesId,
+                aktivitet: navn,
+                aktiv: true
+            });
+            setQuickAddValues(prev => ({ ...prev, [gruppeId]: '' }));
+            // Genhent data
+            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
+            setAllActivities(data);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
+        } catch (e: any) {
+            showAlert('Systemet siger', "Fejl ved hurtig-tilføj: " + (e.message || "Ukendt fejl"));
+        } finally {
+            setIsSavingNy(prev => ({ ...prev, [gruppeId]: false }));
+        }
+    };
+
+    const handleGemTilSkabelon = async (aktivitet: Aktivitet) => {
+        const gruppeInfo = `${aktivitet.proces?.nr}.${aktivitet.gruppe?.nr} ${aktivitet.proces?.titel_kort} / ${aktivitet.gruppe?.titel_kort}`;
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Gem som skabelon',
+            message: `Vil du gemme "${aktivitet.aktivitet}" som en permanent skabelon i ${gruppeInfo}?`,
+            confirmText: 'Gem nu',
+            cancelText: 'Annuller',
+            onConfirm: async () => {
+                try {
+                    await api.post(`/aktiviteter/${aktivitet.id}/gem_til_skabelon/`);
+                    showAlert('Systemet siger', "Aktiviteten er nu gemt som skabelon og markeres som synkroniseret.");
+                    // Opdater lokal state
+                    const updated = allActivities.map(a => a.id === aktivitet.id ? { ...a, er_ny: false } : a);
+                    setAllActivities(updated);
+                    dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag!.id, aktiviteter: updated } });
+                    setNyeAktiviteterFindes(true);
+                } catch (e: any) {
+                    showAlert('Systemet siger', "Fejl ved gem til skabelon: " + (e.message || "Ukendt fejl"));
+                }
             }
         });
-        
-    // @# 2025-11-03 21:45 - Lytter på 'filterDependency'
-    }, [filterDependency, nuvaerendeGruppeSummering, aktiviteterUdvidedeGrupper, hentGruppeAktiviteter, valgtSag]);
+    };
+
+    // --- LOKAL FILTRERING OG GRUPPERING ---
+    const { filteredGroups, groupedActivities } = useMemo(() => {
+        if (!allActivities.length) return { filteredGroups: [], groupedActivities: {} };
+
+        const filters = aktiviteterFilters;
+        const lowerAkt = filters.aktivitet.toLowerCase();
+        const lowerAns = filters.ansvarlig.toLowerCase();
+        const today = new Date().toISOString().slice(0, 10);
+
+        // 1. Filtrer aktiviteter
+        const filtered = allActivities.filter(a => {
+            // Tekst søgning
+            if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) return false;
+            // Ansvarlig søgning (bemærk ansvarlig kan være null)
+            if (lowerAns && !a.ansvarlig?.toLowerCase().includes(lowerAns)) return false;
+
+            // Status
+            if (filters.status) {
+                if (filters.status === 'ikke-faerdigmeldt') {
+                    if (a.status?.status_kategori === 1) return false; // 1 = Færdig
+                } else {
+                    if (a.status?.id.toString() !== filters.status.toString()) return false;
+                }
+            }
+
+            // Aktiv / Alle / Udgået sjekkes typisk via 'aktiv' flaget?
+            // "kun_aktive" betyder a.aktiv === true
+            // "alle" betyder status quo (tager både aktiv true/false?)
+            // I backend 'aktiv_filter' var implementationen: hvis 'kun_aktive' -> filter(aktiv=True).
+            if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) return false;
+
+            // Datoer
+            // Bemærk: dato_intern_efter betyder dato >= filter
+            if (filters.dato_intern_efter && (!a.dato_intern || a.dato_intern < filters.dato_intern_efter)) return false;
+            if (filters.dato_intern_foer && (!a.dato_intern || a.dato_intern > filters.dato_intern_foer)) return false;
+
+            // Overskredet logik
+            if (filters.overskredet) {
+                const isDone = a.status?.status_kategori === 1;
+                if (isDone) return false; // Færdige er aldrig overskredne i visningen
+                const internOverskredet = a.dato_intern ? a.dato_intern < today : false;
+                const eksternOverskredet = a.dato_ekstern ? a.dato_ekstern < today : false;
+
+                if (!internOverskredet && !eksternOverskredet) return false;
+            }
+
+            return true;
+        });
+
+        // 2. Gruppér og beregn counts
+        // Vi skal bruge TOTAL counts per gruppe (uanset filter) for headeren "4/41"
+        // Og FILTERED counts for headeren "Viser: 2"
+
+        // Map: "procesId-gruppeId" -> { proces, gruppe, filtered: [], totalCount: 0, totalDone: 0 }
+        const groupsMap: Record<string, any> = {};
+
+        // Først, kør igennem ALLE aktiviteter for at få total counts
+        allActivities.forEach(a => {
+            if (!a.gruppe || !a.proces) return;
+            const key = `${a.proces.id}-${a.gruppe.id}`;
+            if (!groupsMap[key]) {
+                groupsMap[key] = {
+                    proces: a.proces,
+                    gruppe: a.gruppe,
+                    filteredAktiviteter: [],
+                    total_aktiv_count: 0,
+                    total_faerdig_count: 0,
+                    filtered_aktiv_count: 0,
+                    filtered_faerdig_count: 0
+                };
+            }
+            // Tæl totaler (husk 'aktiv' flag logic fra backend: total_summary filtered on aktiv=True usually.
+            // Hvis vi følger backend logikken: "total" i headeren plejer at være "aktive aktiviteter".
+            if (a.aktiv) {
+                groupsMap[key].total_aktiv_count++;
+                if (a.status?.status_kategori === 1) {
+                    groupsMap[key].total_faerdig_count++;
+                }
+            }
+        });
+
+        // Nu tilføj de filtrerede til listerne
+        filtered.forEach(a => {
+            if (!a.gruppe || !a.proces) return;
+            const key = `${a.proces.id}-${a.gruppe.id}`;
+            if (groupsMap[key]) {
+                groupsMap[key].filteredAktiviteter.push(a);
+                // Opdater filtered counts (kun hvis den tæller med i statistikken? Typisk tæller vi bare rækkerne der vises)
+                groupsMap[key].filtered_aktiv_count++;
+                if (a.status?.status_kategori === 1) {
+                    groupsMap[key].filtered_faerdig_count++;
+                }
+            }
+        });
+
+        // Konverter map til array og sorter
+        const processedGroups = Object.values(groupsMap).filter((g: any) =>
+            // Vis kun grupper der enten har filtrerede aktiviteter ELLER (hvis ingen filter matcher) måske skjule?
+            // Backend viste "Ingen aktiviteter matcher" hvis listen var tom.
+            // Her viser vi typisk gruppen hvis den har resultater.
+            g.filteredAktiviteter.length > 0
+        ).sort((a: any, b: any) => {
+            if (a.proces.nr !== b.proces.nr) return a.proces.nr - b.proces.nr;
+            return a.gruppe.nr - b.gruppe.nr;
+        });
+
+        // Lav lookup map for aktiviteter
+        const actMap: Record<number, Aktivitet[]> = {};
+        processedGroups.forEach((g: any) => {
+            // Sorter aktiviteter internt i gruppen
+            g.filteredAktiviteter.sort((a: Aktivitet, b: Aktivitet) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
+            actMap[g.gruppe.id] = g.filteredAktiviteter;
+        });
+
+        return { filteredGroups: processedGroups, groupedActivities: actMap };
+
+    }, [allActivities, aktiviteterFilters]);
+
+    // Dummy funktioner for kompabilitet med existing JSX (vi bruger nu local vars)
+    // Men vi skal overskrive 'nuvaerendeGruppeSummering' variablen i render scope
 
 
     useEffect(() => {
         const fetchAktivitetStatusser = async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/kerne/status/?formaal=2`);
-                const data = await response.json();
+                const data = await api.get<any>('/kerne/status/?formaal=2');
                 setAktivitetStatusser(data.results || data);
             } catch (error) { console.error(error); }
         };
@@ -172,15 +361,13 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const searchSager = async () => {
             const trimmedSearch = debouncedSøgning.trim();
             const erTal = !isNaN(trimmedSearch as any) && trimmedSearch !== '';
-            
+
             if (!trimmedSearch || (!erTal && trimmedSearch.length < 2)) {
                 setSøgeResultater([]);
                 return;
             }
             try {
-                const res = await fetch(`${API_BASE_URL}/sager/search/?q=${trimmedSearch}`);
-                if (!res.ok) throw new Error('Søgefejl');
-                const data: SøgeResultat[] = await res.json();
+                const data = await api.get<SøgeResultat[]>(`/sager/search/?q=${trimmedSearch}`);
                 setSøgeResultater(data);
                 setActiveIndex(-1);
             } catch (error) { console.error("Fejl ved søgning af sager:", error); }
@@ -190,9 +377,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
     const handleSelectSag = async (sagSøgning: SøgeResultat) => {
         try {
-            const sagRes = await fetch(`${API_BASE_URL}/sager/${sagSøgning.id}/`);
-            if (!sagRes.ok) throw new Error('Kunne ikke hente den valgte sag.');
-            const fuldSag: Sag = await sagRes.json();
+            const fuldSag = await api.get<Sag>(`/sager/${sagSøgning.id}/`);
             dispatch({ type: 'NULSTIL_HENTEDE_AKTIVITETER' });
             dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
         } catch (e: any) { console.error(e.message); }
@@ -220,8 +405,8 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     };
 
     const handleToggleAlleGrupper = (vis: boolean) => {
-        if (!valgtSag) return;
-        const alleGruppeKeys = nuvaerendeGruppeSummering.reduce((acc, gruppe) => {
+        if (!filteredGroups.length || !valgtSag) return;
+        const alleGruppeKeys = filteredGroups.reduce((acc: any, gruppe: any) => {
             const gruppeKey = `${gruppe.proces.id}-${gruppe.gruppe.id}`;
             acc[gruppeKey] = vis;
             return acc;
@@ -230,16 +415,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             type: 'SET_AKTIVITETER_STATE',
             payload: { aktiviteterUdvidedeGrupper: { ...aktiviteterUdvidedeGrupper, [valgtSag.id]: alleGruppeKeys } },
         });
-        if (vis) {
-            nuvaerendeGruppeSummering.forEach(gruppe => {
-                if (!hentedeAktiviteter[gruppe.gruppe.id]) {
-                    hentGruppeAktiviteter(gruppe.gruppe.id);
-                }
-            });
-        }
     };
 
-    const handleToggleGruppe = async (gruppe: AktivitetGruppeSummary) => {
+    const handleToggleGruppe = async (gruppe: any) => { // Type 'any' pga vores local filteredGroups struct
         const gruppeId = gruppe.gruppe.id;
         const gruppeKey = `${gruppe.proces.id}-${gruppeId}`;
         const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
@@ -251,61 +429,83 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             type: 'SET_AKTIVITETER_STATE',
             payload: { aktiviteterUdvidedeGrupper: { ...aktiviteterUdvidedeGrupper, [valgtSag!.id]: nyUdvidetState } },
         });
-        if (!erUdvidet && !hentedeAktiviteter[gruppeId]) {
-            hentGruppeAktiviteter(gruppeId);
-        }
     };
-    
+
     const handleInlineSave = async (aktivitet: Aktivitet, field: string, value: string | boolean | null) => {
         const feltNavn = field === 'status' ? 'status_id' : field;
         const payload = { [feltNavn]: value };
         try {
-            const response = await fetch(`${API_BASE_URL}/aktiviteter/${aktivitet.id}/`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            if (!response.ok) throw new Error('Kunne ikke gemme ændring.');
-            
-            const opdateretAktivitet: Aktivitet = await response.json();
-            const gruppeId = aktivitet.gruppe?.id;
-            if (gruppeId && hentedeAktiviteter[gruppeId]) {
-                const opdateredeListe = hentedeAktiviteter[gruppeId].map(a =>
-                    a.id === opdateretAktivitet.id ? opdateretAktivitet : a
-                );
-                dispatch({ type: 'SET_ENKELT_GRUPPE_AKTIVITETER', payload: { gruppeId, aktiviteter: opdateredeListe } });
-            }
-            if ((field === 'status' || field === 'aktiv') && valgtSag) {
-                // @# 2025-11-03 21:45 - Bruger 'aktiviteterFilters' direkte
-                hentGruppeSummering(valgtSag, aktiviteterFilters);
-            }
+            const opdateretAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitet.id}/`, payload);
+
+            // Opdater lokal state direkte
+            setAllActivities(prev => prev.map(a =>
+                a.id === opdateretAktivitet.id ? opdateretAktivitet : a
+            ));
+
         } catch (e) {
             console.error("Fejl ved inline save:", e);
         }
     };
-    
-    const handleFormSave = () => {
-        if (aktivitetTilRedigering && aktivitetTilRedigering.gruppe) {
-            hentGruppeAktiviteter(aktivitetTilRedigering.gruppe.id);
-        }
-        setAktivitetTilRedigering(null);
-        if (valgtSag) {
-            // @# 2025-11-03 21:45 - Bruger 'aktiviteterFilters' direkte
-            hentGruppeSummering(valgtSag, aktiviteterFilters);
+
+    const handleSynkroniser = async () => {
+        if (!valgtSag) return;
+        setIsFetchingAll(true);
+        try {
+            const res = await api.post<any>(`/sager/${valgtSag.id}/synkroniser_aktiviteter/`);
+            // Genhent alt data
+            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
+            setAllActivities(data);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
+            setNyeAktiviteterFindes(false);
+
+            if (res.detaljer) {
+                showAlert('Systemet siger', res.detaljer);
+            } else if (res.tilfoejede && res.tilfoejede.length > 0) {
+                showAlert('Systemet siger', `Synkronisering fuldført! ${res.tilfoejede.length} nye aktiviteter tilføjet:\n\n- ${res.tilfoejede.join('\n- ')}`);
+            } else {
+                showAlert('Systemet siger', "Sagen er allerede fuldt synkroniseret.");
+            }
+        } catch (e: any) {
+            showAlert('Systemet siger', `Fejl ved synkronisering: ${e.message}`);
+        } finally {
+            setIsFetchingAll(false);
         }
     };
-    
+
+    const handleFormSave = () => {
+        setAktivitetTilRedigering(null);
+        if (valgtSag) {
+            // Genhent alt data for at være sikker ved store opdateringer
+            // (Vi kalder fetchAll via en simpel trigger - eller vi kopierer fetchAll logikken her, 
+            // men da fetchAll er i useEffect afhængig af sag, kan vi potentielt tvinge en reload ved at toggle sag,
+            // men bedre: kald fetchAll logik explict. Da fetchAll er inde i useEffect, kan vi ikke kalde den udefra.
+            // Løsning: Vi flytter fetch logic ud eller genindlæser manuelt:
+            // Simpel hack: tøm allActivities og lad useEffect køre igen? Nej, useEffect kører på valgtSag.
+            // Vi duplerer bare fetch logikken her for enkelhedens skyld, da det er en 'reload'.
+            const reload = async () => {
+                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true } });
+                try {
+                    const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
+                    setAllActivities(data);
+                } finally {
+                    dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
+                }
+            };
+            reload();
+        }
+    };
+
     const visteAktiviteterForGruppe = (gruppeId: number) => {
         return hentedeAktiviteter[gruppeId] || [];
     };
 
     const samletTaeling = useMemo(() => {
-        return nuvaerendeGruppeSummering.reduce((acc, gruppe) => {
+        return filteredGroups.reduce((acc: any, gruppe: any) => {
             acc.total += gruppe.total_aktiv_count;
             acc.faerdige += gruppe.total_faerdig_count;
             return acc;
         }, { total: 0, faerdige: 0 });
-    }, [nuvaerendeGruppeSummering]);
+    }, [filteredGroups]);
 
     return (
         <div className="p-4 sm:p-6 lg:p-8">
@@ -317,7 +517,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                     onCancel={() => setAktivitetTilRedigering(null)}
                 />
             )}
-            
+
             <div className="flex justify-between items-center mb-6 gap-4">
                 <div className="flex items-center gap-4 flex-shrink-0">
                     <h2 className="text-2xl font-bold text-gray-800">
@@ -333,10 +533,24 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                             </button>
                         </Tooltip>
                         <Tooltip content="Fold alle grupper sammen">
-                             <button onClick={() => handleToggleAlleGrupper(false)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-md">
+                            <button onClick={() => handleToggleAlleGrupper(false)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-md">
                                 <ChevronsUp size={18} />
                             </button>
                         </Tooltip>
+                        {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
+                            <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
+                                <button
+                                    onClick={handleSynkroniser}
+                                    disabled={isFetchingAll}
+                                    className={`
+                                        p-1.5 rounded-full transition-all border
+                                        ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
+                                    `}
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+                            </Tooltip>
+                        )}
                     </div>
                 </div>
                 <div className="relative min-w-64">
@@ -353,7 +567,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                     )}
                 </div>
             </div>
-            
+
             <div className="overflow-x-auto rounded-lg shadow-md">
                 <table className="min-w-full bg-white table-fixed" ref={tableRef}>
                     <thead className="bg-gray-800 text-white text-sm">
@@ -369,18 +583,20 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                         </tr>
                     </thead>
                     <tbody>
-                        {aktiviteterIsLoading ? (
-                            <tr><td colSpan={8} className="text-center p-4">Henter gruppeoversigt...</td></tr>
+                        {aktiviteterIsLoading || isFetchingAll ? (
+                            <tr><td colSpan={8} className="text-center p-4">Henter aktiviteter...</td></tr>
+                        ) : state.aktiviteterError ? (
+                            <tr><td colSpan={8} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
                         ) : !valgtSag ? (
                             <tr><td colSpan={8} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
-                        ) : nuvaerendeGruppeSummering.length === 0 ? (
-                            <tr><td colSpan={8} className="text-center p-4">Ingen aktivitetsgrupper matcher de valgte filtre.</td></tr>
-                        ) : nuvaerendeGruppeSummering.map(gruppeSummary => {
+                        ) : filteredGroups.length === 0 ? (
+                            <tr><td colSpan={8} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
+                        ) : filteredGroups.map((gruppeSummary: any) => {
                             const gruppeKey = `${gruppeSummary.proces.id}-${gruppeSummary.gruppe.id}`;
                             const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
-                            const aktiviteter = visteAktiviteterForGruppe(gruppeSummary.gruppe.id);
-                            const isGruppeLoading = gruppeLoadingStatus[gruppeSummary.gruppe.id];
-                            const harAktivtFilter = gruppeSummary.filtered_aktiv_count !== gruppeSummary.total_aktiv_count || gruppeSummary.filtered_faerdig_count !== gruppeSummary.total_faerdig_count;
+                            const aktiviteter = groupedActivities[gruppeSummary.gruppe.id] || [];
+
+                            const harAktivtFilter = gruppeSummary.filtered_aktiv_count !== gruppeSummary.total_aktiv_count; // Simplificeret check for visuel indikator
 
                             return (
                                 <Fragment key={gruppeKey}>
@@ -400,40 +616,85 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                             )}
                                         </td>
                                     </tr>
-                                    {erUdvidet && (
-                                        isGruppeLoading ? (
-                                            <tr><td colSpan={8} className="text-center p-4 italic">Henter aktiviteter...</td></tr>
-                                        ) : (
-                                            aktiviteter.map(aktivitet => (
-                                                <tr key={aktivitet.id} className="border-b border-gray-200 hover:bg-gray-50">
-                                                    <td className="py-1 px-2 text-center">
-                                                        <input id={`cell-${aktivitet.id}-0`} type="checkbox" checked={!!aktivitet.aktiv} onChange={(e) => handleInlineSave(aktivitet, 'aktiv', e.target.checked)} />
-                                                    </td>
-                                                    <td className="py-1 px-2 pl-8 break-words">{aktivitet.aktivitet_nr} - {aktivitet.aktivitet}</td>
-                                                    <td className="py-1 px-2">
-                                                        <select id={`cell-${aktivitet.id}-2`} value={aktivitet.status?.id || ''} onChange={(e) => handleInlineSave(aktivitet, 'status', e.target.value)} className="w-full p-1 border rounded-md text-sm bg-white">
-                                                            <option value="">Vælg...</option>
-                                                            {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td className="py-1 px-2 text-center">
-                                                        <Tooltip content={aktivitet.kommentar}>
-                                                            <button id={`cell-${aktivitet.id}-3`} onClick={() => setAktivitetTilRedigering(aktivitet)} className="p-1">
-                                                                <Edit size={16} className={aktivitet.kommentar ? 'text-green-600' : 'text-blue-600'} />
+                                    {erUdvidet && aktiviteter.map((aktivitet: Aktivitet) => (
+                                        <tr key={aktivitet.id} className="border-b border-gray-200 hover:bg-gray-50">
+                                            <td className="py-0.5 px-2 text-center">
+                                                <input id={`cell-${aktivitet.id}-0`} type="checkbox" checked={!!aktivitet.aktiv} onChange={(e) => handleInlineSave(aktivitet, 'aktiv', e.target.checked)} />
+                                            </td>
+                                            <td className="py-0.5 px-2 pl-8 break-words text-sm">{aktivitet.aktivitet_nr} - {aktivitet.aktivitet}</td>
+                                            <td className="py-0.5 px-2">
+                                                <div className="flex items-center">
+                                                    <div className="w-5 flex-shrink-0 flex justify-center">
+                                                        {(aktivitet.skabelon_note || aktivitet.note) && (
+                                                            <Tooltip content={aktivitet.skabelon_note || aktivitet.note}>
+                                                                <Info size={14} className="text-red-600 cursor-help" />
+                                                            </Tooltip>
+                                                        )}
+                                                    </div>
+                                                    <select id={`cell-${aktivitet.id}-2`} value={aktivitet.status?.id || ''} onChange={(e) => handleInlineSave(aktivitet, 'status', e.target.value)} className="flex-grow py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0">
+                                                        <option value="">Vælg...</option>
+                                                        {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="py-0.5 px-2 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Tooltip content={aktivitet.kommentar}>
+                                                        <button id={`cell-${aktivitet.id}-3`} onClick={() => setAktivitetTilRedigering(aktivitet)} className="p-0.5">
+                                                            <Edit size={16} className={aktivitet.kommentar ? 'text-green-600' : 'text-blue-600'} />
+                                                        </button>
+                                                    </Tooltip>
+                                                    {aktivitet.er_ny && (
+                                                        <Tooltip content="Denne aktivitet er kun på denne sag. Klik for at gemme den som en global skabelon.">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleGemTilSkabelon(aktivitet); }}
+                                                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                                                            >
+                                                                <UploadCloud size={16} />
                                                             </button>
                                                         </Tooltip>
-                                                    </td>
-                                                    <td className="py-1 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-4`} value={aktivitet.ansvarlig} onSave={(val) => handleInlineSave(aktivitet, 'ansvarlig', val)} /></td>
-                                                    <td className="py-1 px-2">
-                                                        <SmartDateInput value={aktivitet.dato_intern} onSave={(val) => handleInlineSave(aktivitet, 'dato_intern', val)} className={`w-full p-1 border rounded-md text-sm bg-white focus:text-gray-700 ${!aktivitet.dato_intern ? 'text-transparent' : ''}`} />
-                                                    </td>
-                                                    <td className="py-1 px-2">
-                                                        <SmartDateInput value={aktivitet.dato_ekstern} onSave={(val) => handleInlineSave(aktivitet, 'dato_ekstern', val)} className={`w-full p-1 border rounded-md text-sm bg-white focus:text-gray-700 ${!aktivitet.dato_ekstern ? 'text-transparent' : ''}`} />
-                                                    </td>
-                                                    <td className="py-1 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-7`} value={aktivitet.resultat} onSave={(val) => handleInlineSave(aktivitet, 'resultat', val)} /></td>
-                                                </tr>
-                                            ))
-                                        )
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-0.5 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-4`} value={aktivitet.ansvarlig} onSave={(val) => handleInlineSave(aktivitet, 'ansvarlig', val)} /></td>
+                                            <td className="py-0.5 px-2">
+                                                <SmartDateInput value={aktivitet.dato_intern} onSave={(val) => handleInlineSave(aktivitet, 'dato_intern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`} />
+                                            </td>
+                                            <td className="py-0.5 px-2">
+                                                <SmartDateInput value={aktivitet.dato_ekstern} onSave={(val) => handleInlineSave(aktivitet, 'dato_ekstern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`} />
+                                            </td>
+                                            <td className="py-0.5 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-7`} value={aktivitet.resultat} onSave={(val) => handleInlineSave(aktivitet, 'resultat', val)} /></td>
+                                        </tr>
+                                    ))}
+
+                                    {/* Hurtig-tilføj række i bunden af gruppen */}
+                                    {erUdvidet && (
+                                        <tr className="bg-blue-50/20 border-b border-blue-100">
+                                            <td className="py-1 px-2 text-center text-blue-300">
+                                                <PlusCircle size={14} className="mx-auto" />
+                                            </td>
+                                            <td className="py-1 px-2 pl-8" colSpan={6}>
+                                                <form onSubmit={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Nyt aktivitet navn... (Enter for at gemme)"
+                                                        value={quickAddValues[gruppeSummary.gruppe.id] || ''}
+                                                        onChange={(e) => setQuickAddValues(prev => ({ ...prev, [gruppeSummary.gruppe.id]: e.target.value }))}
+                                                        className="w-full px-2 py-0.5 text-sm border border-blue-100 rounded focus:ring-1 focus:ring-blue-400 outline-none bg-white/50"
+                                                    />
+                                                </form>
+                                            </td>
+                                            <td className="py-1 px-2 text-center">
+                                                <button
+                                                    onClick={() => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id)}
+                                                    disabled={isSavingNy[gruppeSummary.gruppe.id] || !quickAddValues[gruppeSummary.gruppe.id]?.trim()}
+                                                    className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors flex items-center gap-1 mx-auto"
+                                                >
+                                                    {isSavingNy[gruppeSummary.gruppe.id] ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
+                                                    Hurtig-tilføj
+                                                </button>
+                                            </td>
+                                        </tr>
                                     )}
                                 </Fragment>
                             );
@@ -441,6 +702,17 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                     </tbody>
                 </table>
             </div>
+            {confirmDialog.isOpen && (
+                <ConfirmModal
+                    isOpen={confirmDialog.isOpen}
+                    title={confirmDialog.title}
+                    message={confirmDialog.message}
+                    confirmText={confirmDialog.confirmText}
+                    cancelText={confirmDialog.cancelText}
+                    onConfirm={confirmDialog.onConfirm}
+                    onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                />
+            )}
         </div>
     );
 }

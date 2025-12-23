@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../StateContext';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import Modal from './Modal';
 import Button from './ui/Button';
 
@@ -39,27 +39,14 @@ const RedigerProfilModal: React.FC<Props> = ({ isOpen, onClose }) => {
         setError(null);
 
         try {
-            const res = await fetch(API_BASE_URL + '/kerne/me/', {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include', // Vigtigt for session cookie
-                body: JSON.stringify({
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: email,
-                    work_phone: workPhone,
-                    private_phone: privatePhone,
-                    private_address: privateAddress
-                }),
+            const updatedUser = await api.patch<any>('/kerne/me/', {
+                first_name: firstName,
+                last_name: lastName,
+                email: email,
+                work_phone: workPhone,
+                private_phone: privatePhone,
+                private_address: privateAddress
             });
-
-            if (!res.ok) {
-                throw new Error("Kunne ikke gemme ændringer.");
-            }
-
-            const updatedUser = await res.json();
 
             // Opdater global state
             dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });

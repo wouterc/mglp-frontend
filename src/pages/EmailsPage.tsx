@@ -1,5 +1,6 @@
 // --- Fil: src/pages/EmailsPage.tsx ---
 import React, { useEffect, useState } from 'react';
+import { api } from '../api';
 import { API_BASE_URL } from '../config';
 import { Mail, User, Calendar, RefreshCw, LogIn, Loader2, AlertCircle, Save, X } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -40,22 +41,7 @@ export default function EmailsPage() {
         setNeedsLogin(false);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/emails/list/`);
-
-            if (res.status === 404) {
-                // 404 betyder her: "Ingen token fundet i DB" -> Vi skal logge ind
-                setNeedsLogin(true);
-                setConnectedEmail(null);
-                setIsLoading(false);
-                return;
-            }
-
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Kunne ikke hente emails');
-            }
-
-            const data = await res.json();
+            const data = await api.get<any>('/emails/list/');
 
             // Backend returnerer nu { connected_email: "...", messages: [...] }
             // eller bare en liste, hvis vi ikke har ændret det hele 100% korrekt (bagudkompatibilitet)
@@ -67,7 +53,12 @@ export default function EmailsPage() {
 
         } catch (e: any) {
             console.error(e);
-            setError(e.message);
+            if (e.message?.includes('404')) {
+                setNeedsLogin(true);
+                setConnectedEmail(null);
+            } else {
+                setError(e.message);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -93,7 +84,7 @@ export default function EmailsPage() {
 
     const handleLogout = async () => {
         try {
-            await fetch(`${API_BASE_URL}/emails/logout/`, { method: 'POST' });
+            await api.post('/emails/logout/');
             // Når logget ud lokalt, genindlæs state (vil vise 'Forbind Outlook')
             setConnectedEmail(null);
             setEmails([]);
@@ -122,22 +113,10 @@ export default function EmailsPage() {
         setSaveMessage(null);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/emails/save/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    email_id: savingEmail.id,
-                    sags_nr: sagsNrInput
-                })
+            await api.post('/emails/save/', {
+                email_id: savingEmail.id,
+                sags_nr: sagsNrInput
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'Kunne ikke gemme email');
-            }
 
             setSaveMessage({ type: 'success', text: `Email gemt på sag ${sagsNrInput}!` });
             // Luk dialog efter kort tid eller lad brugeren lukke den? 

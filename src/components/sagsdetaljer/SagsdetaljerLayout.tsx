@@ -2,17 +2,17 @@
 // @# 2025-11-22 17:30 - Oprettet layout til sagsdetaljer med venstre-menu og top-navigation.
 // @# 2025-11-23 10:00 - Fjernet rediger-knap (flyttet til tab). Tilføjet global søgning i top-bar.
 import React, { ReactNode, useMemo, useState, useEffect, useRef } from 'react';
-import { 
-    LayoutDashboard, Building2, User, Landmark, LifeBuoy, 
-    Building, MapPin, Waves, ChevronLeft, ChevronRight, 
-    ArrowLeft, Search, Loader2 
+import {
+    LayoutDashboard, Building2, User, Landmark, LifeBuoy,
+    Building, MapPin, Waves, ChevronLeft, ChevronRight,
+    ArrowLeft, Search, Loader2, FileText
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
-import { API_BASE_URL } from '../../config';
+import { api } from '../../api';
 
-export type TabType = 'overblik' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
+export type TabType = 'overblik' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning' | 'dokumenter';
 
 interface SagsdetaljerLayoutProps {
     children: ReactNode;
@@ -33,23 +33,24 @@ const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'forening', label: 'Forening', icon: Building },
     { id: 'kommune', label: 'Kommune', icon: MapPin },
     { id: 'forsyning', label: 'Forsyning', icon: Waves },
+    { id: 'dokumenter', label: 'Dokumenter', icon: FileText },
 ];
 
-function SagsdetaljerLayout({ 
-    children, 
-    sag, 
-    activeTab, 
-    onTabChange, 
-    onBack, 
+function SagsdetaljerLayout({
+    children,
+    sag,
+    activeTab,
+    onTabChange,
+    onBack,
     onNavigateToSag,
 }: SagsdetaljerLayoutProps) {
-    
+
     const { state } = useAppState();
     const { sagsIdListe } = state;
 
     // --- SØGNING LOGIK ---
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<{id: number, sags_nr: string, alias: string}[]>([]);
+    const [searchResults, setSearchResults] = useState<{ id: number, sags_nr: string, alias: string }[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showResults, setShowResults] = useState(false);
     const debouncedSearch = useDebounce(searchTerm, 300);
@@ -75,12 +76,9 @@ function SagsdetaljerLayout({
             }
             setIsSearching(true);
             try {
-                const res = await fetch(`${API_BASE_URL}/sager/search/?q=${debouncedSearch}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setSearchResults(data);
-                    setShowResults(true);
-                }
+                const data = await api.get<any>(`/sager/search/?q=${debouncedSearch}`);
+                setSearchResults(data);
+                setShowResults(true);
             } catch (error) {
                 console.error("Søgefejl:", error);
             } finally {
@@ -108,20 +106,20 @@ function SagsdetaljerLayout({
 
     return (
         <div className="flex h-full flex-col bg-gray-100">
-            
+
             {/* --- TOP BAR --- */}
             <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm sticky top-0 z-10 gap-4">
-                
+
                 {/* Venstre side: Tilbage + Titel */}
                 <div className="flex items-center space-x-4 flex-1">
-                    <button 
+                    <button
                         onClick={onBack}
                         className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
                         title="Tilbage til oversigt"
                     >
                         <ArrowLeft size={20} />
                     </button>
-                    
+
                     <div className="flex flex-col min-w-0">
                         <h1 className="text-xl font-bold text-gray-800 truncate">
                             Sag {sag.sags_nr}: {sag.alias}
@@ -177,7 +175,7 @@ function SagsdetaljerLayout({
                             {navState.index} af {navState.total}
                         </span>
                     )}
-                    
+
                     <div className="flex bg-gray-100 rounded-md p-1">
                         <button
                             onClick={() => navState.prev && onNavigateToSag(navState.prev)}
@@ -201,7 +199,7 @@ function SagsdetaljerLayout({
 
             {/* --- MAIN CONTENT AREA (Split View) --- */}
             <div className="flex flex-1 overflow-hidden">
-                
+
                 {/* Venstre Menu (Tabs) */}
                 <nav className="w-64 bg-white border-r border-gray-200 overflow-y-auto py-4 flex-shrink-0">
                     <div className="space-y-1 px-2">
@@ -214,8 +212,8 @@ function SagsdetaljerLayout({
                                     onClick={() => onTabChange(item.id)}
                                     className={`
                                         w-full flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded-md transition-colors
-                                        ${isActive 
-                                            ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' 
+                                        ${isActive
+                                            ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600'
                                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
                                         }
                                     `}

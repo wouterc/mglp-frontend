@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppState } from '../../StateContext';
-import { API_BASE_URL } from '../../config';
+import { api } from '../../api';
 import Button from '../../components/ui/Button';
 import { Plus, Edit, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 
@@ -31,18 +31,11 @@ const UserListPage: React.FC = () => {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/kerne/users/`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setUsers(data);
-            } else {
-                setError("Kunne ikke hente brugerliste. Du har muligvis ikke adgang.");
-            }
-        } catch (e) {
+            const data = await api.get<User[]>('/kerne/users/');
+            setUsers(data);
+        } catch (e: any) {
             console.error(e);
-            setError("Netværksfejl.");
+            setError("Kunne ikke hente brugerliste. Du har muligvis ikke adgang.");
         } finally {
             setLoading(false);
         }

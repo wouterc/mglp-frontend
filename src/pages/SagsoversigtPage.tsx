@@ -1,8 +1,9 @@
 // --- Fil: src/pages/SagsoversigtPage.tsx ---
 // @# 2025-11-22 17:00 - Opdateret til at sende filtrerede sags-ID'er til global state.
 // @# 2025-11-23 14:00 - Bruger nu globale 'statusser' i stedet for lokale, så de huskes ved tilbage-navigation.
+import { useNavigate } from 'react-router-dom'; // @#
 import React, { useState, useEffect, useMemo, ChangeEvent, MouseEvent, useCallback, ReactNode, useRef } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import SagsForm from '../components/SagsForm';
 import { Edit, ArrowUp, ArrowDown, FileText, Folder, ListChecks, PlusCircle, FunnelX, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import type { Sag, Status, Virksomhed } from '../types';
@@ -16,13 +17,14 @@ interface SagsoversigtPageProps {
 }
 
 const formatVirksomhedsnavn = (v: Virksomhed | null | undefined): string => {
-    if (!v) return '';
-    return v.afdeling ? `${v.navn} - ${v.afdeling}` : v.navn;
+  if (!v) return '';
+  return v.afdeling ? `${v.navn} - ${v.afdeling}` : v.navn;
 };
 
 type SortKey = keyof Sag | `status.${keyof Status}`;
 
 function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
+  const navigate = useNavigate(); // @#
   const { state, dispatch } = useAppState();
   const {
     sager,
@@ -41,54 +43,44 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const [udfoldetSagId, setUdfoldetSagId] = useState<number | null>(null);
   const [visFlereFiltre, setVisFlereFiltre] = useState<boolean>(false);
   const [creatingActivitiesForSagId, setCreatingActivitiesForSagId] = useState<number | null>(null);
+  const [creatingDocumentsForSagId, setCreatingDocumentsForSagId] = useState<number | null>(null); // @# Ny state
   const [modalInfo, setModalInfo] = useState<{ isOpen: boolean; title: string; message: ReactNode }>({ isOpen: false, title: '', message: null });
   const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
-  
+
   const tableRef = useRef<HTMLTableElement>(null);
   useTableNavigation(tableRef);
 
-  const hentData = useCallback(async () => { 
+  const hentData = useCallback(async () => {
     // @# Hent kun hvis vi mangler sager ELLER statusser
     if (erSagerHentet && statusser.length > 0) return;
 
     dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: true, sagsoversigtError: null } });
-    try { 
-      const promises = [];
-      if (!erSagerHentet) promises.push(fetch(`${API_BASE_URL}/sager/`));
-      if (statusser.length === 0) promises.push(fetch(`${API_BASE_URL}/kerne/status/?formaal=1`));
-      
-      const results = await Promise.all(promises);
-      
-      // Tjek svar
-      for (const res of results) {
-          if (!res.ok) throw new Error(`HTTP error!`);
-      }
-
+    try {
       let sagerData = null;
       let statusData = null;
 
-      // Udpak resultater baseret på hvad vi bad om
       if (!erSagerHentet && statusser.length === 0) {
-           sagerData = await results[0].json();
-           statusData = await results[1].json();
+        [sagerData, statusData] = await Promise.all([
+          api.get<any>('/sager/'),
+          api.get<any>('/kerne/status/?formaal=1')
+        ]);
       } else if (!erSagerHentet) {
-           sagerData = await results[0].json();
-      } else {
-           statusData = await results[0].json();
+        sagerData = await api.get<any>('/sager/');
+      } else if (statusser.length === 0) {
+        statusData = await api.get<any>('/kerne/status/?formaal=1');
       }
 
       if (sagerData) {
-          const sagsliste: Sag[] = Array.isArray(sagerData.results) ? sagerData.results : Array.isArray(sagerData) ? sagerData : [];
-          dispatch({ type: 'SET_SAGER_STATE', payload: { sager: sagsliste, erSagerHentet: true } });
-      }
-      
-      if (statusData) {
-          const statusliste: Status[] = Array.isArray(statusData.results) ? statusData.results : Array.isArray(statusData) ? statusData : [];
-          // @# Gemmer statusser globalt
-          dispatch({ type: 'SET_STATUSSER', payload: statusliste });
+        const sagsliste: Sag[] = Array.isArray(sagerData.results) ? sagerData.results : Array.isArray(sagerData) ? sagerData : [];
+        dispatch({ type: 'SET_SAGER_STATE', payload: { sager: sagsliste, erSagerHentet: true } });
       }
 
-    } catch (e: any) { 
+      if (statusData) {
+        const statusliste: Status[] = Array.isArray(statusData.results) ? statusData.results : Array.isArray(statusData) ? statusData : [];
+        dispatch({ type: 'SET_STATUSSER', payload: statusliste });
+      }
+
+    } catch (e: any) {
       dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtError: `Kunne ikke hente data.\nSikr at backend-serveren kører.` } });
       console.error("Fejl ved hentning:", e);
     } finally {
@@ -100,76 +92,88 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
 
   const handleStatusSave = async (sagId: number, nyStatusId: string) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/sager/${sagId}/`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status_id: nyStatusId }),
-        });
-        if (!response.ok) throw new Error('Kunne ikke opdatere status.');
-        const opdateretSag: Sag = await response.json();
-        const opdateredeSager = sager.map(sag => (sag.id === sagId ? opdateretSag : sag));
-        dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+      const opdateretSag = await api.patch<Sag>(`/sager/${sagId}/`, { status_id: nyStatusId });
+      const opdateredeSager = sager.map(sag => (sag.id === sagId ? opdateretSag : sag));
+      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
     } catch (error) {
-        console.error("Fejl ved opdatering af status:", error);
+      console.error("Fejl ved opdatering af status:", error);
     }
   };
 
   const handleCopyEmail = (email: string, key: string, e: MouseEvent) => {
-      e.stopPropagation();
-      if (navigator.clipboard) {
-          navigator.clipboard.writeText(email).then(() => {
-              setCopiedEmailId(key);
-              setTimeout(() => setCopiedEmailId(null), 2000);
-          }).catch(err => {
-              console.error('Kunne ikke kopiere email:', err);
-          });
-      }
+    e.stopPropagation();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(email).then(() => {
+        setCopiedEmailId(key);
+        setTimeout(() => setCopiedEmailId(null), 2000);
+      }).catch(err => {
+        console.error('Kunne ikke kopiere email:', err);
+      });
+    }
   };
 
   const handleOpretAktiviteter = async (sagId: number) => {
     setCreatingActivitiesForSagId(sagId);
     try {
-        const response = await fetch(`${API_BASE_URL}/sager/${sagId}/opret_aktiviteter/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Der opstod en fejl.');
-        }
-        const sagRes = await fetch(`${API_BASE_URL}/sager/${sagId}/`);
-        const opdateretSag: Sag = await sagRes.json();
-        const opdateredeSager = sager.map(s => s.id === sagId ? opdateretSag : s);
-        dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
-        
-        setModalInfo({
-            isOpen: true,
-            title: "Succes",
-            message: (
-                <div className="text-center">
-                    <p className="text-gray-600">Aktiviteter til</p>
-                    <p className="font-bold text-lg my-1">{opdateretSag.sags_nr} - {opdateretSag.alias}</p>
-                    <p className="text-gray-600">er oprettet.</p>
-                </div>
-            )
-        });
+      await api.post(`/sager/${sagId}/opret_aktiviteter/`, {});
+      const opdateretSag = await api.get<Sag>(`/sager/${sagId}/`);
+      const opdateredeSager = sager.map(s => s.id === sagId ? opdateretSag : s);
+      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+
+      setModalInfo({
+        isOpen: true,
+        title: "Succes",
+        message: (
+          <div className="text-center">
+            <p className="text-gray-600">Aktiviteter til</p>
+            <p className="font-bold text-lg my-1">{opdateretSag.sags_nr} - {opdateretSag.alias}</p>
+            <p className="text-gray-600">er oprettet.</p>
+          </div>
+        )
+      });
     } catch (error: any) {
-        setModalInfo({ isOpen: true, title: "Fejl", message: error.message });
+      setModalInfo({ isOpen: true, title: "Fejl", message: error.message });
     } finally {
-        setCreatingActivitiesForSagId(null);
+      setCreatingActivitiesForSagId(null);
+    }
+  };
+
+  const handleOpretDokumenter = async (sagId: number) => {
+    setCreatingDocumentsForSagId(sagId);
+    try {
+      await api.post(`/sager/${sagId}/synkroniser_dokumenter/`, {});
+      const opdateretSag = await api.get<Sag>(`/sager/${sagId}/`);
+      const opdateredeSager = sager.map(s => s.id === sagId ? opdateretSag : s);
+      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+
+      setModalInfo({
+        isOpen: true,
+        title: "Succes",
+        message: (
+          <div className="text-center">
+            <p className="text-gray-600">Dokumentstruktur for</p>
+            <p className="font-bold text-lg my-1">{opdateretSag.sags_nr}</p>
+            <p className="text-gray-600">er oprettet/opdateret.</p>
+          </div>
+        )
+      });
+    } catch (error: any) {
+      setModalInfo({ isOpen: true, title: "Fejl", message: error.message || "Kunne ikke oprette dokumenter." });
+    } finally {
+      setCreatingDocumentsForSagId(null);
     }
   };
 
   const sorteredeOgFiltreredeSager = useMemo(() => {
     const getNestedValue = (obj: any, path: string) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
     let filtreret = [...sager];
-    
+
     if (filter.sags_nr || filter.status) {
       filtreret = filtreret.filter(sag => {
         if (filter.sags_nr && !sag.sags_nr?.toString().includes(filter.sags_nr)) return false;
         if (filter.status) {
           const searchLower = filter.status.toLowerCase();
-           const statusMatch = sag.status?.beskrivelse.toLowerCase().includes(searchLower) || sag.status?.status_nummer.toString().includes(searchLower);
+          const statusMatch = sag.status?.beskrivelse.toLowerCase().includes(searchLower) || sag.status?.status_nummer.toString().includes(searchLower);
           if (!statusMatch) return false;
         }
         return true;
@@ -201,31 +205,31 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
 
   // Sync den filtrerede liste af ID'er til global state
   useEffect(() => {
-      const ids = sorteredeOgFiltreredeSager.map(s => s.id);
-      dispatch({ type: 'SET_SAGS_ID_LISTE', payload: ids });
+    const ids = sorteredeOgFiltreredeSager.map(s => s.id);
+    dispatch({ type: 'SET_SAGS_ID_LISTE', payload: ids });
   }, [sorteredeOgFiltreredeSager, dispatch]);
 
-  const requestSort = (key: SortKey) => { 
+  const requestSort = (key: SortKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') { 
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
-    } 
+    }
     dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtSortConfig: { key, direction } } });
   };
 
-  const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => { 
+  const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtFilters: { ...filter, [name]: value } } });
   };
 
-  const handleNulstilFiltre = () => { 
-    dispatch({ 
-        type: 'SET_SAGER_STATE', 
-        payload: { 
-            sagsoversigtFilters: { sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' },
-            sagsoversigtVisLukkede: false,
-            sagsoversigtVisAnnullerede: false
-        } 
+  const handleNulstilFiltre = () => {
+    dispatch({
+      type: 'SET_SAGER_STATE',
+      payload: {
+        sagsoversigtFilters: { sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' },
+        sagsoversigtVisLukkede: false,
+        sagsoversigtVisAnnullerede: false
+      }
     });
   };
 
@@ -233,22 +237,22 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const handleRedigerSag = (sag: Sag) => { setSagTilRedigering(sag); setVisForm(true); };
   const handleAnnuller = () => { setVisForm(false); setSagTilRedigering(null); };
   const handleRaekkeKlik = (sagId: number) => { setUdfoldetSagId(udfoldetSagId === sagId ? null : sagId); };
-  
-  const handleSaveSag = () => { 
+
+  const handleSaveSag = () => {
     dispatch({ type: 'SET_SAGER_STATE', payload: { erSagerHentet: false } });
-    setVisForm(false); 
-    setSagTilRedigering(null); 
+    setVisForm(false);
+    setSagTilRedigering(null);
   };
-  
-  const getSortIcon = (key: SortKey) => { 
+
+  const getSortIcon = (key: SortKey) => {
     if (sortConfig.key !== key) return null;
-    if (sortConfig.direction === 'ascending') return <ArrowUp className="inline-block ml-1 h-4 w-4" />; 
-    return <ArrowDown className="inline-block ml-1 h-4 w-4" />; 
+    if (sortConfig.direction === 'ascending') return <ArrowUp className="inline-block ml-1 h-4 w-4" />;
+    return <ArrowDown className="inline-block ml-1 h-4 w-4" />;
   };
 
   if (error) return <div className="p-8 flex flex-col items-center justify-center text-red-600"><AlertCircle size={48} className="mb-4" /><h2 className="text-xl font-bold mb-2">Fejl</h2><p>{error}</p></div>;
   if (visForm) return <SagsForm onSave={handleSaveSag} onCancel={handleAnnuller} sagTilRedigering={sagTilRedigering} />;
-  
+
   return (
     <div className="p-4">
       <Modal
@@ -256,7 +260,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
         onClose={() => setModalInfo({ isOpen: false, title: '', message: null })}
         title={modalInfo.title}
         footer={
-          <Button 
+          <Button
             onClick={() => setModalInfo({ isOpen: false, title: '', message: null })}
             variant="primary"
           >
@@ -268,22 +272,22 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
       </Modal>
 
       <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2><button onClick={handleOpretNySag} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Sag"><PlusCircle size={20} /></button></div>
-      
+
       <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
-          <input type="text" name="sags_nr" placeholder="Sagsnr..." value={filter.sags_nr} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm"/>
-          <input type="text" name="status" placeholder="Status..." value={filter.status} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm"/>
-          <input type="text" name="alias" placeholder="Alias..." value={filter.alias} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm"/>
-          <input type="text" name="hovedansvarlige" placeholder="Ansvarlig..." value={filter.hovedansvarlige} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-3 text-sm"/>
-          <input type="text" name="adresse" placeholder="Adresse..." value={filter.adresse} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-3 text-sm"/>
+          <input type="text" name="sags_nr" placeholder="Sagsnr..." value={filter.sags_nr} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm" />
+          <input type="text" name="status" placeholder="Status..." value={filter.status} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm" />
+          <input type="text" name="alias" placeholder="Alias..." value={filter.alias} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-2 text-sm" />
+          <input type="text" name="hovedansvarlige" placeholder="Ansvarlig..." value={filter.hovedansvarlige} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-3 text-sm" />
+          <input type="text" name="adresse" placeholder="Adresse..." value={filter.adresse} onChange={handleFilterChange} className="p-2 border border-gray-300 rounded-md lg:col-span-3 text-sm" />
         </div>
         <div className="flex justify-between items-center mt-4">
           <button onClick={() => setVisFlereFiltre(!visFlereFiltre)} className="text-blue-600 hover:text-blue-800 text-sm">{visFlereFiltre ? 'Skjul flere filtre' : 'Vis flere filtre'}</button>
           <button onClick={handleNulstilFiltre} className="p-2 text-gray-600 rounded-full hover:bg-gray-200" title="Nulstil Alle Filtre"><FunnelX size={18} /></button>
         </div>
         {visFlereFiltre && (<div className="mt-4 pt-4 border-t border-gray-200"><div className="flex flex-wrap items-center gap-4 text-sm">
-        <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visLukkede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisLukkede: !visLukkede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/><span>Vis lukkede</span></label>
-        <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visAnnullerede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisAnnullerede: !visAnnullerede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/><span>Vis annullerede</span></label></div></div>)}
+          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visLukkede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisLukkede: !visLukkede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis lukkede</span></label>
+          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visAnnullerede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisAnnullerede: !visAnnullerede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis annullerede</span></label></div></div>)}
       </div>
 
       <div className="overflow-x-auto rounded-lg shadow-md">
@@ -299,132 +303,145 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
             </tr>
           </thead>
           <tbody className="text-gray-700 text-sm">
-            {isLoading 
-              ? (<tr><td colSpan={6} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>) 
-              : sorteredeOgFiltreredeSager.length === 0 
-              ? (<tr><td colSpan={6} className="text-center py-4">Ingen sager fundet.</td></tr>) 
-              : (sorteredeOgFiltreredeSager.map(sag => (<React.Fragment key={sag.id}>
-                <tr onClick={() => handleRaekkeKlik(sag.id)} className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer">
-                  <td className="py-1 px-2">{sag.sags_nr}</td>
-                   <td className="py-1 px-2">{sag.alias}</td>
-                  <td className="py-1 px-2">
-                    <select
+            {isLoading
+              ? (<tr><td colSpan={6} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>)
+              : sorteredeOgFiltreredeSager.length === 0
+                ? (<tr><td colSpan={6} className="text-center py-4">Ingen sager fundet.</td></tr>)
+                : (sorteredeOgFiltreredeSager.map(sag => (<React.Fragment key={sag.id}>
+                  <tr onClick={() => handleRaekkeKlik(sag.id)} className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer">
+                    <td className="py-1 px-2">{sag.sags_nr}</td>
+                    <td className="py-1 px-2">{sag.alias}</td>
+                    <td className="py-1 px-2">
+                      <select
                         id={`cell-${sag.id}-2`}
-                         value={sag.status ? sag.status.id : ''}
+                        value={sag.status ? sag.status.id : ''}
                         onChange={(e) => handleStatusSave(sag.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
                         className="p-1 border border-gray-300 rounded-md bg-white w-full"
-                     >
-                     {statusser.map(s => (
-                         <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
-                    ))}
-                    </select>
-                   </td>
-                  <td className="py-1 px-2">{sag.hovedansvarlige}</td>
-                   <td className="py-1 px-2">{sag.fuld_adresse}</td>
-                  <td className="py-1 px-2">
+                      >
+                        {statusser.map(s => (
+                          <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1 px-2">{sag.hovedansvarlige}</td>
+                    <td className="py-1 px-2">{sag.fuld_adresse}</td>
+                    <td className="py-1 px-2">
                       <div className="flex items-center space-x-3">
-                         <button id={`cell-${sag.id}-5`} onClick={(e: MouseEvent) => { e.stopPropagation(); handleRedigerSag(sag); }} title="Rediger sag"><Edit size={18} className="text-gray-500 hover:text-blue-600" /></button>
+                        <button id={`cell-${sag.id}-5`} onClick={(e: MouseEvent) => { e.stopPropagation(); handleRedigerSag(sag); }} title="Rediger sag"><Edit size={18} className="text-gray-500 hover:text-blue-600" /></button>
                         <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('sagsdetaljer', sag); }} title="Vis sagsdetaljer"><FileText size={18} className="text-gray-500 hover:text-green-600" /></button>
                         {creatingActivitiesForSagId === sag.id ? (
-                            <Loader2 size={18} className="text-gray-500 animate-spin" />
+                          <Loader2 size={18} className="text-gray-500 animate-spin" />
                         ) : sag.opgaver_oprettet ? (
-                            <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('aktiviteter', sag); }} title="Vis aktiviteter">
-                                <ListChecks size={18} className="text-gray-500 hover:text-purple-600" />
-                             </button>
+                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('aktiviteter', sag); }} title="Vis aktiviteter">
+                            <ListChecks size={18} className="text-gray-500 hover:text-purple-600" />
+                          </button>
                         ) : (
-                            <button onClick={(e: MouseEvent) => { e.stopPropagation(); handleOpretAktiviteter(sag.id); }} title="Opret Aktiviteter">
-                                 <ListChecks size={18} className="text-red-500 hover:text-red-700" />
-                            </button>
+                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); handleOpretAktiviteter(sag.id); }} title="Opret Aktiviteter">
+                            <ListChecks size={18} className="text-red-500 hover:text-red-700" />
+                          </button>
                         )}
-                         <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('dokumenter', sag); }} title="Vis dokumenter">
-                            <Folder size={18} className={sag.mappen_oprettet ? "text-gray-500 hover:text-yellow-600" : "text-red-500 hover:text-yellow-600"} />
-                        </button>
-                      </div>
-                  </td>
-                </tr>
- 
-                {udfoldetSagId === sag.id && (
-                  <tr className="bg-gray-50">
-                    <td colSpan={6} className="p-4">
- 
-                   {/* Original række */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <h4 className="font-bold text-gray-700">Adresse</h4>
-                           <p>{sag.fuld_adresse || "Ikke angivet"}</p>
-                        </div>
-                        <div>
-                           <h4 className="font-bold text-gray-700">Boliginformation</h4>
-                           <p><span className="font-semibold">Type:</span> {sag.bolig_type || "N/A"}</p>
-                          <p><span className="font-semibold">Matrikel:</span> {sag.bolig_matrikel || "N/A"}</p>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-gray-700">Hovedansvarlig (Intern)</h4>
-                         <p>{sag.hovedansvarlige || "Ikke angivet"}</p>
-                        </div>
-                      </div>
-                      
-                      {/* Ny Mægler-række */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
-                        <div>
-                          <h4 className="font-bold text-gray-700">Mægler Virksomhed</h4>
-                           <div className="flex items-center space-x-1">
-                            <span>{formatVirksomhedsnavn(sag.maegler_virksomhed) || <span className="italic text-gray-500">Ikke valgt</span>}</span>
-                            {sag.maegler_virksomhed?.email && (
-                              <button 
-                                  onClick={(e) => handleCopyEmail(sag.maegler_virksomhed!.email!, `v-${sag.id}`, e)} 
-                                  title={`Kopier ${sag.maegler_virksomhed.email}`}
-                                  className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
-           >
-                                  {copiedEmailId === `v-${sag.id}` ? (
-                                      <Check size={14} className="text-green-500" />
-                             ) : (
-                                      <Copy size={14} className="text-blue-500 hover:text-blue-700" />
-                    
-               )}
-                             </button>
-                            )}
-                         </div>
-           </div>
-                        <div>
-                          <h4 className="font-bold text-gray-700">Mægler Kontakt</h4>
-                           <p>{sag.maegler_kontakt?.fulde_navn || <span className="italic text-gray-500">Ikke valgt</span>}</p>
-                          {sag.maegler_kontakt?.email && (
-                            <div className="flex items-center space-x-1 text-xs">
-                              <button 
-                                 onClick={(e) => handleCopyEmail(sag.maegler_kontakt!.email!, `k-${sag.id}`, e)} 
-                                  title={`Kopier ${sag.maegler_kontakt.email}`}
-                                   className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
-                              >
-                                   {copiedEmailId === `k-${sag.id}` ? (
-                           <Check size={14} className="text-green-500" />
-                                  ) : (
-                                      <Copy size={14} className="text-blue-500 hover:text-blue-700" />
-                               )}
-                               </button>
-                              <a 
-                                   href={`mailto:${sag.maegler_kontakt.email}`} 
-                                  className="text-blue-600 hover:underline"
-                                  onClick={(e) => e.stopPropagation()} 
-                                       title="Send email"
-                              >
-                                  {sag.maegler_kontakt.email}
-                             </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Kommentar-række */}
-                      <div className="mt-4 pt-4 border-t">
-                        <h4 className="font-bold text-gray-700">Kommentar</h4>
-                         <p>{sag.kommentar || <span className="italic text-gray-500">Ingen kommentar</span>}</p>
+                        {creatingDocumentsForSagId === sag.id ? (
+                          <Loader2 size={18} className="text-gray-500 animate-spin" />
+                        ) : sag.mappen_oprettet ? (
+                          <button onClick={(e: MouseEvent) => {
+                            e.stopPropagation();
+                            // Sæt valgt sag for en sikkerheds skyld, selvom navigateTo også gør det
+                            dispatch({ type: 'SET_VALGT_SAG', payload: sag });
+                            navigate('/sagsdetaljer', { state: { initialTab: 'dokumenter' } });
+                          }} title="Vis dokumenter">
+                            <Folder size={18} className="text-gray-500 hover:text-yellow-600" />
+                          </button>
+                        ) : (
+                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); handleOpretDokumenter(sag.id); }} title="Opret Dokumentstruktur">
+                            <Folder size={18} className="text-red-500 hover:text-red-700" />
+                          </button>
+                        )}
                       </div>
                     </td>
-                  </tr> 
-                )}
-              </React.Fragment>)))}
+                  </tr>
+
+                  {udfoldetSagId === sag.id && (
+                    <tr className="bg-gray-50">
+                      <td colSpan={6} className="p-4">
+
+                        {/* Original række */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <h4 className="font-bold text-gray-700">Adresse</h4>
+                            <p>{sag.fuld_adresse || "Ikke angivet"}</p>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-700">Boliginformation</h4>
+                            <p><span className="font-semibold">Type:</span> {sag.bolig_type || "N/A"}</p>
+                            <p><span className="font-semibold">Matrikel:</span> {sag.bolig_matrikel || "N/A"}</p>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-700">Hovedansvarlig (Intern)</h4>
+                            <p>{sag.hovedansvarlige || "Ikke angivet"}</p>
+                          </div>
+                        </div>
+
+                        {/* Ny Mægler-række */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                          <div>
+                            <h4 className="font-bold text-gray-700">Mægler Virksomhed</h4>
+                            <div className="flex items-center space-x-1">
+                              <span>{formatVirksomhedsnavn(sag.maegler_virksomhed) || <span className="italic text-gray-500">Ikke valgt</span>}</span>
+                              {sag.maegler_virksomhed?.email && (
+                                <button
+                                  onClick={(e) => handleCopyEmail(sag.maegler_virksomhed!.email!, `v-${sag.id}`, e)}
+                                  title={`Kopier ${sag.maegler_virksomhed.email}`}
+                                  className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
+                                >
+                                  {copiedEmailId === `v-${sag.id}` ? (
+                                    <Check size={14} className="text-green-500" />
+                                  ) : (
+                                    <Copy size={14} className="text-blue-500 hover:text-blue-700" />
+
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-700">Mægler Kontakt</h4>
+                            <p>{sag.maegler_kontakt?.fulde_navn || <span className="italic text-gray-500">Ikke valgt</span>}</p>
+                            {sag.maegler_kontakt?.email && (
+                              <div className="flex items-center space-x-1 text-xs">
+                                <button
+                                  onClick={(e) => handleCopyEmail(sag.maegler_kontakt!.email!, `k-${sag.id}`, e)}
+                                  title={`Kopier ${sag.maegler_kontakt.email}`}
+                                  className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
+                                >
+                                  {copiedEmailId === `k-${sag.id}` ? (
+                                    <Check size={14} className="text-green-500" />
+                                  ) : (
+                                    <Copy size={14} className="text-blue-500 hover:text-blue-700" />
+                                  )}
+                                </button>
+                                <a
+                                  href={`mailto:${sag.maegler_kontakt.email}`}
+                                  className="text-blue-600 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Send email"
+                                >
+                                  {sag.maegler_kontakt.email}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Kommentar-række */}
+                        <div className="mt-4 pt-4 border-t">
+                          <h4 className="font-bold text-gray-700">Kommentar</h4>
+                          <p>{sag.kommentar || <span className="italic text-gray-500">Ingen kommentar</span>}</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>)))}
           </tbody>
         </table>
       </div>

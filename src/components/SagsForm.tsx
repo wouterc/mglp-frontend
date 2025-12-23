@@ -8,7 +8,7 @@
 // @# 2025-11-15 12:30 - Opdateret til at bruge genbrugelig Button-komponent
 // @# 2025-11-19 20:30 - Tilføjet håndtering af kommunekode fra DAWA.
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import AdresseSøgning from './AdresseSøgning';
 // @# 2025-11-10 19:05 - Importeret globale typer
 import type { Status, BbrAnvendelse, DawaAdresse, Sag } from '../types';
@@ -43,7 +43,7 @@ interface SagsDataState {
   adresse_id_dawa: string | null;
   adressebetegnelse: string;
   // @# 2025-11-19 20:30 - Tilføjet kommunekode til state (som string for nemheds skyld i forms)
-  kommunekode: string; 
+  kommunekode: string;
   bolig_type: string;
   bolig_bfe: string;
   bolig_matrikel: string;
@@ -52,6 +52,10 @@ interface SagsDataState {
   kommentar: string;
   byggeaar: string;
   boligareal: string;
+  maegler_sagsnr: string;
+  bank_sagsnr: string;
+  raadgiver_sagsnr: string;
+  raadgiver_kontakt_id: string;
   [key: string]: any;
 }
 
@@ -78,6 +82,10 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     kommentar: '',
     byggeaar: '',
     boligareal: '',
+    maegler_sagsnr: '',
+    bank_sagsnr: '',
+    raadgiver_sagsnr: '',
+    raadgiver_kontakt_id: '',
   });
   const [statusser, setStatusser] = useState<Status[]>([]);
   const [bbrAnvendelser, setBbrAnvendelser] = useState<BbrAnvendelse[]>([]);
@@ -90,14 +98,14 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       setSagsData({
         // Bevar felter, der kun findes på SagsDataState (som byggeaar)
         ...sagsData,
-        
+
         // Udfyld fra sagTilRedigering og konverter 'null' til 'string'
         id: sagTilRedigering.id,
         sags_nr: sagTilRedigering.sags_nr || '',
         alias: sagTilRedigering.alias || '',
         hovedansvarlige: sagTilRedigering.hovedansvarlige || '',
         status_id: sagTilRedigering.status ? String(sagTilRedigering.status.id) : '',
-        
+
         adresse_vej: sagTilRedigering.adresse_vej || '',
         adresse_husnr: sagTilRedigering.adresse_husnr || '',
         adresse_etage: sagTilRedigering.adresse_etage || '',
@@ -116,36 +124,34 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         bolig_anvendelse_id: sagTilRedigering.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : '',
 
         kommentar: sagTilRedigering.kommentar || '',
+        maegler_sagsnr: sagTilRedigering.maegler_sagsnr || '',
+        bank_sagsnr: sagTilRedigering.bank_sagsnr || '',
+        raadgiver_sagsnr: sagTilRedigering.raadgiver_sagsnr || '',
+        raadgiver_kontakt_id: sagTilRedigering.raadgiver_kontakt ? String(sagTilRedigering.raadgiver_kontakt.id) : '',
       });
     }
   }, [sagTilRedigering, erRedigering]);
-  
+
   useEffect(() => {
     const fetchStatusser = async () => {
-        try {
-            // @# 2025-11-10 19:20 - Tilføjet ?formaal=1 for kun at hente sags-statusser
-            const response = await fetch(`${API_BASE_URL}/kerne/status/?formaal=1`);
-            if (!response.ok) throw new Error('Kunne ikke hente statusser');
-            // @# 2025-11-10 19:05 - Brug 'any' til at håndtere pagineret/ikke-pagineret svar
-            const data: any = await response.json();
-            setStatusser(data.results || data);
-        } catch (error) {
-            console.error('Fejl ved hentning af statusser:', error);
-        }
+      try {
+        const data = await api.get<any>('/kerne/status/?formaal=1');
+        setStatusser(data.results || data);
+      } catch (error) {
+        console.error('Fejl ved hentning af statusser:', error);
+      }
     };
     fetchStatusser();
   }, []);
 
   useEffect(() => {
     const fetchBbrAnvendelser = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/kerne/bbr-anvendelser/`);
-            if (!response.ok) throw new Error('Could not fetch BBR applications');
-            const data: BbrAnvendelse[] = await response.json();
-            setBbrAnvendelser(data);
-        } catch (error) {
-           console.error('Error fetching BBR applications:', error);
-        }
+      try {
+        const data = await api.get<BbrAnvendelse[]>('/kerne/bbr-anvendelser/');
+        setBbrAnvendelser(data);
+      } catch (error) {
+        console.error('Error fetching BBR applications:', error);
+      }
     };
     fetchBbrAnvendelser();
   }, []);
@@ -190,7 +196,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
 
       const matrikelnr = adgangsAdresseData?.jordstykke?.matrikelnr || '';
       const bfeNummer = adgangsAdresseData?.bfe_nummer || '';
-      
+
       // @# 2025-11-19 20:30 - Hent kommunekode fra DAWA (ligger i adgangsadresse -> kommune -> kode)
       const kommunekodeRaw = adgangsAdresseData?.kommune?.kode || '';
 
@@ -198,15 +204,14 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       let bbrKode = '';
       let byggeaar = '';
       let boligareal = '';
-      
+
       if (bygningHref) {
-        const bygningResponse = await fetch(bygningHref);
-        const bygningDetaljer = await bygningResponse.json();
+        const bygningDetaljer = await api.get<any>(bygningHref);
         bbrKode = bygningDetaljer.byg_anvendelse?.kode || '';
         byggeaar = bygningDetaljer.opfoerelsesaar || '';
         boligareal = bygningDetaljer.samlet_bolig_areal || '';
       }
-      
+
       const matchendeAnvendelse = bbrAnvendelser.find(a => String(a.kode) === String(bbrKode));
       const anvendelseId = matchendeAnvendelse ? String(matchendeAnvendelse.id) : '';
 
@@ -230,12 +235,13 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     e.preventDefault();
     // @# 2025-11-10 20:10 - Rettet type fra Partial<SagsDataState> til 'any'
     // Objektet er en API-payload, der tillader 'null', hvor SagsDataState kun tillader 'string'.
-    const dataToSave: any = { 
+    const dataToSave: any = {
       ...sagsData,
       bolig_anvendelse_id: sagsData.bolig_anvendelse_id === '' ? null : sagsData.bolig_anvendelse_id,
       status_id: sagsData.status_id === '' ? null : sagsData.status_id,
       // @# 2025-11-19 20:30 - Konverter kommunekode til int eller null
-      kommunekode: sagsData.kommunekode ? parseInt(sagsData.kommunekode, 10) : null
+      kommunekode: sagsData.kommunekode ? parseInt(sagsData.kommunekode, 10) : null,
+      raadgiver_kontakt_id: sagsData.raadgiver_kontakt_id === '' ? null : parseInt(sagsData.raadgiver_kontakt_id, 10),
     };
 
     delete dataToSave.byggeaar;
@@ -243,24 +249,23 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     // @# 2025-11-10 19:20 - Slet read-only felter (objekter) før 'send'
     delete (dataToSave as any).status;
     delete (dataToSave as any).bolig_anvendelse;
-    
+
     if (!erRedigering) {
       delete dataToSave.sags_nr;
     }
 
-    const url = erRedigering ? `${API_BASE_URL}/sager/${dataToSave.id}/` : `${API_BASE_URL}/sager/`;
-    const method = erRedigering ? 'PUT' : 'POST';
-    
+
+
     try {
-      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSave) });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({ detail: 'Unknown server error.' }));
-        console.error('Server error:', errorBody);
-        throw new Error(`Network response was not ok: ${response.status}`);
+      if (erRedigering) {
+        await api.put(`/sager/${dataToSave.id}/`, dataToSave);
+      } else {
+        await api.post(`/sager/`, dataToSave);
       }
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving case:', error);
+      alert(`Fejl ved gemning: ${error.message}`);
     }
   };
 
@@ -274,101 +279,101 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         </h2>
         {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}
         <div className="flex justify-end space-x-4">
-           <Button type="button" onClick={onCancel} variant="secondary">
+          <Button type="button" onClick={onCancel} variant="secondary">
             Annuller (Esc)
           </Button>
-           <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary">
+          <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary">
             Gem Sag
           </Button>
         </div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="p-4 border rounded-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Generelt</h3>
-           
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {erRedigering && (
-                <div>
-                    <label htmlFor="sags_nr" className="block text-sm font-medium text-gray-700">SagsNr</label>
-                    <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
-                )}
-                <div>
-                    <label htmlFor="status_id" className="block text-sm font-medium text-gray-700">Status</label>
-                    <select
-                        id="status_id"
-                        name="status_id"
-                        value={sagsData.status_id || ''}
-                        onChange={handleChange}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    >
-                        <option value="">Vælg status...</option>
-                        {statusser.map(status => (
-                            <option key={status.id} value={status.id}>
-                                {status.status_nummer} - {status.beskrivelse}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label htmlFor="alias" className="block text-sm font-medium text-gray-700">Alias (Påkrævet)</label>
-                    <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
-                </div>
-                <div>
-                    {/* @# 2025-11-10 19:20 - Rettet tastefejl </Lavel> til </label> */}
-                    <label htmlFor="hovedansvarlige" className="block text-sm font-medium text-gray-700">Hovedansvarlig (Påkrævet)</label>
-                    <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
-                </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Generelt</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {erRedigering && (
+              <div>
+                <label htmlFor="sags_nr" className="block text-sm font-medium text-gray-700">SagsNr</label>
+                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              </div>
+            )}
+            <div>
+              <label htmlFor="status_id" className="block text-sm font-medium text-gray-700">Status</label>
+              <select
+                id="status_id"
+                name="status_id"
+                value={sagsData.status_id || ''}
+                onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="">Vælg status...</option>
+                {statusser.map(status => (
+                  <option key={status.id} value={status.id}>
+                    {status.status_nummer} - {status.beskrivelse}
+                  </option>
+                ))}
+              </select>
             </div>
+            <div>
+              <label htmlFor="alias" className="block text-sm font-medium text-gray-700">Alias (Påkrævet)</label>
+              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+            </div>
+            <div>
+              {/* @# 2025-11-10 19:20 - Rettet tastefejl </Lavel> til </label> */}
+              <label htmlFor="hovedansvarlige" className="block text-sm font-medium text-gray-700">Hovedansvarlig (Påkrævet)</label>
+              <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+            </div>
+          </div>
         </div>
-        
+
         <div className="p-4 border rounded-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Adresse</h3>
-            <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
-            {isFetchingDetails && <div className="mt-2 text-sm text-gray-500">Henter detaljer...</div>}
-            
-            <div className="grid grid-cols-12 gap-4 mt-4">
-                <div className="col-span-12 sm:col-span-6">
-                    <label htmlFor="adresse_vej_vis" className="block text-sm font-medium text-gray-700">Vejnavn</label>
-                    <input type="text" id="adresse_vej_vis" value={sagsData.adresse_vej || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_husnr_vis" className="block text-sm font-medium text-gray-700">Nr.</label>
-                    <input type="text" id="adresse_husnr_vis" value={sagsData.adresse_husnr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_etage_vis" className="block text-sm font-medium text-gray-700">Etage</label>
-                    <input type="text" id="adresse_etage_vis" value={sagsData.adresse_etage || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                    <label htmlFor="adresse_doer_vis" className="block text-sm font-medium text-gray-700">Dør</label>
-                    <input type="text" id="adresse_doer_vis" value={sagsData.adresse_doer || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Adresse</h3>
+          <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
+          {isFetchingDetails && <div className="mt-2 text-sm text-gray-500">Henter detaljer...</div>}
+
+          <div className="grid grid-cols-12 gap-4 mt-4">
+            <div className="col-span-12 sm:col-span-6">
+              <label htmlFor="adresse_vej_vis" className="block text-sm font-medium text-gray-700">Vejnavn</label>
+              <input type="text" id="adresse_vej_vis" value={sagsData.adresse_vej || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
             </div>
-            <div className="grid grid-cols-12 gap-4 mt-4">
-                <div className="col-span-12 sm:col-span-4">
-                    <label htmlFor="adresse_post_nr_vis" className="block text-sm font-medium text-gray-700">Postnr.</label>
-                     <input type="text" id="adresse_post_nr_vis" value={sagsData.adresse_post_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
-                <div className="col-span-12 sm:col-span-8">
-                    <label htmlFor="adresse_by_vis" className="block text-sm font-medium text-gray-700">By</label>
-                    <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
-                </div>
+            <div className="col-span-4 sm:col-span-2">
+              <label htmlFor="adresse_husnr_vis" className="block text-sm font-medium text-gray-700">Nr.</label>
+              <input type="text" id="adresse_husnr_vis" value={sagsData.adresse_husnr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
             </div>
-            
-            {/* @# 2025-11-19 20:30 - Visning af kommunekode (skrivebeskyttet) */}
-            <div className="mt-4">
-                 <label htmlFor="kommunekode_vis" className="block text-sm font-medium text-gray-700">Kommunekode</label>
-                 <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-1 block w-1/4 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"/>
+            <div className="col-span-4 sm:col-span-2">
+              <label htmlFor="adresse_etage_vis" className="block text-sm font-medium text-gray-700">Etage</label>
+              <input type="text" id="adresse_etage_vis" value={sagsData.adresse_etage || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
             </div>
+            <div className="col-span-4 sm:col-span-2">
+              <label htmlFor="adresse_doer_vis" className="block text-sm font-medium text-gray-700">Dør</label>
+              <input type="text" id="adresse_doer_vis" value={sagsData.adresse_doer || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-12 gap-4 mt-4">
+            <div className="col-span-12 sm:col-span-4">
+              <label htmlFor="adresse_post_nr_vis" className="block text-sm font-medium text-gray-700">Postnr.</label>
+              <input type="text" id="adresse_post_nr_vis" value={sagsData.adresse_post_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+            </div>
+            <div className="col-span-12 sm:col-span-8">
+              <label htmlFor="adresse_by_vis" className="block text-sm font-medium text-gray-700">By</label>
+              <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+            </div>
+          </div>
+
+          {/* @# 2025-11-19 20:30 - Visning af kommunekode (skrivebeskyttet) */}
+          <div className="mt-4">
+            <label htmlFor="kommunekode_vis" className="block text-sm font-medium text-gray-700">Kommunekode</label>
+            <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-1 block w-1/4 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+          </div>
         </div>
-        
+
         {/* @ 2025-09-14 11:58 - Udkommenteret hele Bolig-blokken */}
         {/* ... (bolig sektion udeladt for klarhed) ... */}
-        
+
         <div>
-            <label htmlFor="kommentar" className="block text-sm font-medium text-gray-700">Kommentar</label>
-            <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+          <label htmlFor="kommentar" className="block text-sm font-medium text-gray-700">Kommentar</label>
+          <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
         </div>
 
         {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}

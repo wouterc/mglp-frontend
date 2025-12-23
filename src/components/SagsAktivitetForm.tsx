@@ -2,7 +2,7 @@
 // @# 2025-09-15 15:01 - Opdateret til at bruge korrekt 'Aktivitet'-type uden 'any'-hacks.
 // @# 2025-09-15 15:58 - Tilføjet funktionalitet til at lukke med 'Escape'-tasten.
 import React, { useState, useEffect, ReactElement, ChangeEvent, FormEvent } from 'react';
-import { API_BASE_URL } from '../config.ts';
+import { api } from '../api';
 import { Save, X } from 'lucide-react';
 import type { Aktivitet } from '../types';
 
@@ -60,19 +60,13 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const url = `${API_BASE_URL}/aktiviteter/${aktivitet?.id}/`;
-        const method = 'PATCH';
 
         try {
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-            if (!response.ok) throw new Error('Netværksfejl.');
+            await api.patch(`/aktiviteter/${aktivitet?.id}/`, formData);
             onSave();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Fejl ved lagring af sagsaktivitet:', error);
+            alert(`Fejl ved gemning: ${error.message}`);
         }
     };
 
@@ -81,11 +75,11 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId }: SagsAktivitet
             <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="flex justify-between items-center">
-                         <h2 className="text-xl font-bold">Rediger Aktivitet</h2>
+                        <h2 className="text-xl font-bold">Rediger Aktivitet</h2>
                         <div>
                             {/* @# Denne knap håndterer klik på 'X' */}
-                            <button type="button" onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200" title="Annuller (Esc)"><X size={20}/></button>
-                             <button type="submit" className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 ml-2" title="Gem"><Save size={20}/></button>
+                            <button type="button" onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200" title="Annuller (Esc)"><X size={20} /></button>
+                            <button type="submit" className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 ml-2" title="Gem"><Save size={20} /></button>
                         </div>
                     </div>
                     <div>

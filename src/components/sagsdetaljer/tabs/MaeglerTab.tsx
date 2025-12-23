@@ -2,9 +2,10 @@
 // @# 2025-11-22 18:00 - Udtrukket Mægler-logik til selvstændig fane.
 // @# 2025-11-23 11:30 - Opdateret layout: Ikoner altid synlige, Hus-ikon kopierer, Rediger-knapper tilføjet.
 import React, { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
-import { Building2, Phone, Mail, Home, User, Check, Copy, Loader2, Edit } from 'lucide-react';
-import { API_BASE_URL } from '../../../config';
+import { Building2, Phone, Mail, Home, User, Check, Copy, Loader2, Edit, Save } from 'lucide-react';
+import { api } from '../../../api';
 import { Sag, Virksomhed, Kontakt } from '../../../types';
+import useDebounce from '../../../hooks/useDebounce';
 import VirksomhedForm from '../../VirksomhedForm';
 import KontaktForm from '../../KontaktForm';
 
@@ -19,7 +20,24 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
     const [isLoadingMaeglere, setIsLoadingMaeglere] = useState(false);
     const [isLoadingKontakter, setIsLoadingKontakter] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSavingSagsNr, setIsSavingSagsNr] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    // Lokal state for sagsnummer for at undgå API-kald ved hvert tastetryk
+    const [localSagsNr, setLocalSagsNr] = useState(sag.maegler_sagsnr || '');
+    const debouncedSagsNr = useDebounce(localSagsNr, 1000);
+
+    // Opdater lokal state hvis sagen ændres udefra
+    useEffect(() => {
+        setLocalSagsNr(sag.maegler_sagsnr || '');
+    }, [sag.maegler_sagsnr]);
+
+    // Effekt til automatisk gemning (debounce)
+    useEffect(() => {
+        if (debouncedSagsNr !== (sag.maegler_sagsnr || '')) {
+            saveSagsNr(debouncedSagsNr);
+        }
+    }, [debouncedSagsNr]);
 
     // State til redigering
     const [visVirksomhedForm, setVisVirksomhedForm] = useState(false);
@@ -31,11 +49,8 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
         const fetchMaeglere = async () => {
             setIsLoadingMaeglere(true);
             try {
-                const res = await fetch(`${API_BASE_URL}/register/virksomheder/?er_maegler=true`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setAlleMaeglere(Array.isArray(data) ? data : data.results);
-                }
+                const data = await api.get<any>('/register/virksomheder/?er_maegler=true');
+                setAlleMaeglere(Array.isArray(data) ? data : data.results);
             } catch (error) {
                 console.error("Fejl ved hentning af mæglere:", error);
             } finally {
@@ -50,11 +65,8 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
             const fetchKontakter = async () => {
                 setIsLoadingKontakter(true);
                 try {
-                    const res = await fetch(`${API_BASE_URL}/register/kontakter/?virksomhed=${sag.maegler_virksomhed?.id}&er_maegler_kontakt=true`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setKontakter(Array.isArray(data) ? data : data.results);
-                    }
+                    const data = await api.get<any>(`/register/kontakter/?virksomhed=${sag.maegler_virksomhed?.id}&er_maegler_kontakt=true`);
+                    setKontakter(Array.isArray(data) ? data : data.results);
                 } catch (error) {
                     console.error("Fejl ved hentning af kontakter:", error);
                 } finally {
@@ -70,18 +82,24 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/sager/${sag.id}/`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(opdatering),
-            });
-            if (res.ok) {
-                onUpdate();
-            }
+            await api.patch(`/sager/${sag.id}/`, opdatering);
+            onUpdate();
         } catch (e) {
             console.error(e);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const saveSagsNr = async (value: string) => {
+        setIsSavingSagsNr(true);
+        try {
+            await api.patch(`/sager/${sag.id}/`, { maegler_sagsnr: value });
+            onUpdate();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSavingSagsNr(false);
         }
     };
 
@@ -127,28 +145,59 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
     };
 
     return (
-        <>
+        <div className="space-y-6">
+            {/* Topbar: Sagsnummer Reference */}
+            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Mæglerens sagsnummer</label>
+                    {isSavingSagsNr && (
+                        <div className="flex items-center text-blue-500 text-xs font-medium animate-pulse">
+                            <Loader2 size={12} className="animate-spin mr-1" />
+                            Gemmer...
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-2 max-w-md">
+                    <div className="relative flex-grow">
+                        <input
+                            type="text"
+                            value={localSagsNr}
+                            onChange={(e) => setLocalSagsNr(e.target.value)}
+                            onBlur={() => {
+                                if (localSagsNr !== (sag.maegler_sagsnr || '')) {
+                                    saveSagsNr(localSagsNr);
+                                }
+                            }}
+                            placeholder="Indtast sagsnr..."
+                            className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                        />
+                    </div>
+                    {sag.maegler_sagsnr && (
+                        <button onClick={(e) => handleCopy(sag.maegler_sagsnr!, 'm-sagsnr', e)} className="p-2 text-gray-400 hover:text-blue-600 border border-gray-300 rounded-md transition-colors bg-gray-50">
+                            {copiedId === 'm-sagsnr' ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                        </button>
+                    )}
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Kolonne 1: Virksomhed */}
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                {/* Venstre kolonne: Mæglervirksomhed */}
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
-                            <Building2 size={20} className="mr-3 text-gray-500" />
+                            <Building2 size={24} className="mr-3 text-gray-400" />
                             Mæglervirksomhed
-                            {isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin text-blue-600" />}
+                            {isSaving && <Loader2 size={16} className="ml-2 animate-spin text-blue-600" />}
                         </h2>
-                        {sag.maegler_virksomhed && (
-                            <button onClick={handleEditVirksomhed} className="p-1 text-gray-400 hover:text-blue-600" title="Rediger virksomhed">
-                                <Edit size={16} />
-                            </button>
-                        )}
+                        <button onClick={handleEditVirksomhed} className="p-1 text-gray-400 hover:text-blue-600 transition-colors">
+                            <Edit size={18} />
+                        </button>
                     </div>
-                    
+
                     <select
                         value={sag.maegler_virksomhed?.id || ''}
                         onChange={handleVirksomhedChange}
-                        disabled={isLoadingMaeglere || isSaving}
-                        className="w-full p-2 border border-gray-300 rounded-md bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm"
                     >
                         {isLoadingMaeglere ? <option>Henter...</option> : <option value="">Vælg mægler...</option>}
                         {alleMaeglere.map(m => (
@@ -156,112 +205,117 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                         ))}
                     </select>
 
-                    {sag.maegler_virksomhed && (
-                        <div className="mt-6 pt-4 border-t border-gray-100 space-y-3">
-                            {/* Telefon */}
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                <span>{sag.maegler_virksomhed.telefon || "-"}</span>
-                            </div>
-                            
-                            {/* Email */}
-                            <div className="flex items-center text-sm">
-                                <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                {sag.maegler_virksomhed.email ? (
-                                    <>
-                                        <a href={`mailto:${sag.maegler_virksomhed.email}`} className="text-blue-600 hover:underline mr-2 truncate">
-                                            {sag.maegler_virksomhed.email}
-                                        </a>
-                                        <button onClick={(e) => handleCopy(sag.maegler_virksomhed!.email!, 'mv-email', e)} className="text-blue-500 hover:text-blue-700 flex-shrink-0">
-                                            {copiedId === 'mv-email' ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
-                                        </button>
-                                    </>
-                                ) : <span className="text-gray-400">-</span>}
-                            </div>
+                    <div className="flex-grow">
+                        {sag.maegler_virksomhed ? (
+                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                                {/* Telefon */}
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    <span>{sag.maegler_virksomhed.telefon || "-"}</span>
+                                </div>
 
-                            {/* Adresse */}
-                            <div className="flex items-start text-sm text-gray-600">
-                                <button 
-                                    onClick={(e) => handleCopy(`${sag.maegler_virksomhed?.adresse_vej}\n${sag.maegler_virksomhed?.adresse_postnr} ${sag.maegler_virksomhed?.adresse_by}`, 'mv-adr', e)} 
-                                    className="mr-3 mt-0.5 text-gray-400 hover:text-blue-700 flex-shrink-0"
-                                    title="Kopier adresse"
-                                    disabled={!sag.maegler_virksomhed.adresse_vej && !sag.maegler_virksomhed.adresse_postnr}
-                                >
-                                    {copiedId === 'mv-adr' ? <Check size={16} className="text-green-500"/> : <Home size={16}/>}
-                                </button>
-                                <div>
-                                    {(sag.maegler_virksomhed.adresse_vej || sag.maegler_virksomhed.adresse_postnr) ? (
+                                {/* Email */}
+                                <div className="flex items-center text-sm">
+                                    <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    {sag.maegler_virksomhed.email ? (
                                         <>
-                                            <div>{sag.maegler_virksomhed.adresse_vej}</div>
-                                            <div>{sag.maegler_virksomhed.adresse_postnr} {sag.maegler_virksomhed.adresse_by}</div>
+                                            <a href={`mailto:${sag.maegler_virksomhed.email}`} className="text-blue-600 hover:underline mr-2 truncate">
+                                                {sag.maegler_virksomhed.email}
+                                            </a>
+                                            <button onClick={(e) => handleCopy(sag.maegler_virksomhed!.email!, 'm-email', e)} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                                                {copiedId === 'm-email' ? <Check size={14} className="text-green-500" /> : <Copy size={14} className="text-gray-300" />}
+                                            </button>
                                         </>
-                                    ) : <span className="text-gray-400">-</span>}
+                                    ) : <span className="text-gray-600">-</span>}
+                                </div>
+
+                                {/* Adresse */}
+                                <div className="flex items-start text-sm text-gray-600">
+                                    <Home size={16} className="mr-3 mt-1 text-gray-400 flex-shrink-0" />
+                                    <div className="flex-grow">
+                                        <div className="flex items-center">
+                                            <span>{sag.maegler_virksomhed.adresse_vej}</span>
+                                            {sag.maegler_virksomhed.adresse_vej && (
+                                                <button
+                                                    onClick={(e) => handleCopy(`${sag.maegler_virksomhed!.adresse_vej}, ${sag.maegler_virksomhed!.adresse_postnr} ${sag.maegler_virksomhed!.adresse_by}`, 'm-adr', e)}
+                                                    className="ml-2 p-1 rounded hover:bg-gray-100 transition-colors"
+                                                >
+                                                    {copiedId === 'm-adr' ? <Check size={14} className="text-green-500" /> : <Copy size={14} className="text-gray-300" />}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div>{sag.maegler_virksomhed.adresse_postnr} {sag.maegler_virksomhed.adresse_by}</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-400 italic">
+                                Ingen mægler valgt
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Kolonne 2: Kontakt */}
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                {/* Højre kolonne: Kontaktperson */}
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
-                            <User size={20} className="mr-3 text-gray-500" />
+                            <User size={24} className="mr-3 text-gray-400" />
                             Kontaktperson
                         </h2>
-                        {sag.maegler_kontakt && (
-                            <button onClick={handleEditKontakt} className="p-1 text-gray-400 hover:text-blue-600" title="Rediger kontakt">
-                                <Edit size={16} />
-                            </button>
-                        )}
+                        <button onClick={handleEditKontakt} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" disabled={!sag.maegler_kontakt}>
+                            <Edit size={18} />
+                        </button>
                     </div>
 
                     <select
                         value={sag.maegler_kontakt?.id || ''}
                         onChange={handleKontaktChange}
-                        disabled={!sag.maegler_virksomhed || isLoadingKontakter || isSaving}
-                        className="w-full p-2 border border-gray-300 rounded-md bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                        disabled={!sag.maegler_virksomhed}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm disabled:bg-gray-50 disabled:text-gray-400"
                     >
-                        {!sag.maegler_virksomhed ? <option>Vælg virksomhed først</option> : 
-                        isLoadingKontakter ? <option>Henter kontakter...</option> :
-                        kontakter.length === 0 ? <option>Ingen kontakter fundet</option> :
-                        <>
-                            <option value="">Vælg kontakt...</option>
-                            {kontakter.map(k => <option key={k.id} value={k.id}>{k.fulde_navn}</option>)}
-                        </>
-                        }
+                        {isLoadingKontakter ? <option>Henter...</option> : <option value="">Vælg kontaktperson...</option>}
+                        {kontakter.map(k => (
+                            <option key={k.id} value={k.id}>{k.fulde_navn}</option>
+                        ))}
                     </select>
 
-                    {sag.maegler_kontakt && (
-                        <div className="mt-6 pt-4 border-t border-gray-100 space-y-3">
-                            {/* Telefon */}
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                <span>{sag.maegler_kontakt.telefon || "-"}</span>
-                            </div>
+                    <div className="flex-grow">
+                        {sag.maegler_kontakt ? (
+                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                                {/* Telefon */}
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    <span>{sag.maegler_kontakt.telefon || "-"}</span>
+                                </div>
 
-                            {/* Email */}
-                            <div className="flex items-center text-sm">
-                                <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                {sag.maegler_kontakt.email ? (
-                                    <>
-                                        <a href={`mailto:${sag.maegler_kontakt.email}`} className="text-blue-600 hover:underline mr-2 truncate">
-                                            {sag.maegler_kontakt.email}
-                                        </a>
-                                        <button onClick={(e) => handleCopy(sag.maegler_kontakt!.email!, 'mk-email', e)} className="text-blue-500 hover:text-blue-700 flex-shrink-0">
-                                            {copiedId === 'mk-email' ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
-                                        </button>
-                                    </>
-                                ) : <span className="text-gray-400">-</span>}
+                                {/* Email */}
+                                <div className="flex items-center text-sm">
+                                    <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    {sag.maegler_kontakt.email ? (
+                                        <>
+                                            <a href={`mailto:${sag.maegler_kontakt.email}`} className="text-blue-600 hover:underline mr-2 truncate">
+                                                {sag.maegler_kontakt.email}
+                                            </a>
+                                            <button onClick={(e) => handleCopy(sag.maegler_kontakt!.email!, 'k-email', e)} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                                                {copiedId === 'k-email' ? <Check size={14} className="text-green-500" /> : <Copy size={14} className="text-gray-300" />}
+                                            </button>
+                                        </>
+                                    ) : <span className="text-gray-600">-</span>}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-400 italic">
+                                Ingen kontaktperson valgt
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Popup Forms */}
             {visVirksomhedForm && (
-                <VirksomhedForm 
+                <VirksomhedForm
                     virksomhedTilRedigering={virksomhedTilRedigering}
                     onSave={handleFormSave}
                     onCancel={() => setVisVirksomhedForm(false)}
@@ -274,7 +328,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                     onCancel={() => setVisKontaktForm(false)}
                 />
             )}
-        </>
+        </div>
     );
 }
 

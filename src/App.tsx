@@ -8,7 +8,7 @@
 // @# 2025-11-23 20:00 - Tilføjet useEffect til at hente Current User ved start.
 import React, { ReactNode, useContext, useEffect, useState } from 'react'; // @# Tilføj useEffect
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { API_BASE_URL } from './config'; // @# Tilføj import
+import { api } from './api';
 
 import Layout from './components/Layout';
 import ConfirmModal from './components/ui/ConfirmModal';
@@ -47,18 +47,12 @@ function App() {
     if (!currentUser) {
       const fetchMe = async () => {
         try {
-          // VIGTIGT: Tilføjet credentials: 'include' for at sende session-cookie med
-          const res = await fetch(`${API_BASE_URL}/kerne/me/`, { credentials: 'include' });
-
-          if (res.ok) {
-            const user = await res.json();
-            dispatch({ type: 'SET_CURRENT_USER', payload: user });
-          } else {
-            // Hvis vi får 403, betyder det bare at brugeren ikke er logget ind endnu.
-            console.log("Ikke logget ind (403)");
+          const user = await api.get<any>('/kerne/me/');
+          dispatch({ type: 'SET_CURRENT_USER', payload: user });
+        } catch (e: any) {
+          if (e.status !== 403) {
+            console.error("Kunne ikke hente brugerinfo:", e);
           }
-        } catch (e) {
-          console.error("Kunne ikke hente brugerinfo:", e);
         } finally {
           dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
         }
@@ -74,10 +68,7 @@ function App() {
 
   const performLogout = async () => {
     try {
-      await fetch(`${API_BASE_URL}/kerne/logout/`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      await api.post('/kerne/logout/');
     } catch (e) {
       console.error("Logout fejl:", e);
     }
@@ -93,7 +84,7 @@ function App() {
     }
 
     // Håndter specifik navigationslogik (f.eks. sæt filtre)
-    if (side === 'sagsdetaljer' && context && (context as Sag).sags_nr) {
+    if (['sagsdetaljer', 'aktiviteter', 'dokumenter'].includes(side) && context && (context as Sag).sags_nr) {
       dispatch({ type: 'SET_VALGT_SAG', payload: context as Sag });
     }
     else if (side === 'sagsoversigt' && context?.filter) {

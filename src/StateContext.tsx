@@ -6,6 +6,7 @@ import type {
   Aktivitet, Sag, SagsoversigtFilterState, SagsoversigtSortConfig, Status,
   AktiviteterFilterState, Blokinfo, SkabAktivitet, BlokinfoSkabelonerFilterState,
   AktivitetsskabelonerFilterState, AktivitetGruppeSummary,
+  SkabDokument, DokumentskabelonerFilterState,
   Virksomhed, Kontakt,
   VirksomhedFilterState, KontaktFilterState,
   User // @# Husk at importere User
@@ -33,6 +34,7 @@ interface AppState {
   aktiviteterError: string | null;
   aktiviteterFilters: AktiviteterFilterState;
   aktiviteterUdvidedeGrupper: { [key: number]: { [key: string]: boolean } };
+  cachedAktiviteter: { [sagId: number]: Aktivitet[] };
 
   // State for SagsoversigtPage
   sager: Sag[];
@@ -74,6 +76,14 @@ interface AppState {
   kontakterIsLoading: boolean;
   kontakterError: string | null;
   erKontakterHentet: boolean;
+
+  // State for DokumentskabelonerPage
+  dokumentskabeloner: SkabDokument[];
+  dokumentskabelonerFilters: DokumentskabelonerFilterState;
+  dokumentskabelonerVisUdgaaede: boolean;
+  dokumentskabelonerIsLoading: boolean;
+  dokumentskabelonerError: string | null;
+  erDokumentskabelonerHentet: boolean;
 }
 
 // --- 2. Definer de handlinger (actions) du kan udføre ---
@@ -94,7 +104,9 @@ type AppAction =
   | { type: 'SET_GRUPPE_LOADING'; payload: { gruppeId: number; isLoading: boolean } }
   | { type: 'TOGGLE_FILTER_MENU' }
   | { type: 'SET_VIRKSOMHEDER_STATE'; payload: Partial<AppState> }
-  | { type: 'SET_KONTAKTER_STATE'; payload: Partial<AppState> };
+  | { type: 'SET_KONTAKTER_STATE'; payload: Partial<AppState> }
+  | { type: 'SET_DOKUMENTSSKABELONER_STATE'; payload: Partial<AppState> }
+  | { type: 'SET_CACHED_AKTIVITETER'; payload: { sagId: number; aktiviteter: Aktivitet[] } };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
   navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
@@ -104,11 +116,20 @@ const initialKontaktFilters: KontaktFilterState = {
 };
 
 // --- 3. Initial state ---
+const getSavedState = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
 const initialState: AppState = {
-  valgtSag: null,
+  valgtSag: getSavedState('mglp_valgtSag', null),
   erFilterMenuAaben: true,
-  currentUser: null, // @# Init til null
-  isAuthChecking: true, // @# Starter som true
+  currentUser: null,
+  isAuthChecking: true,
   statusser: [],
 
   // Aktiviteter
@@ -117,13 +138,14 @@ const initialState: AppState = {
   gruppeLoadingStatus: {},
   aktiviteterIsLoading: false,
   aktiviteterError: null,
-  aktiviteterFilters: { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false },
-  aktiviteterUdvidedeGrupper: {},
+  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false }),
+  aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
+  cachedAktiviteter: {},
 
   // Sagsoversigt
   sager: [],
   sagsIdListe: [],
-  sagsoversigtFilters: { sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' },
+  sagsoversigtFilters: getSavedState('mglp_sagsoversigtFilters', { sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' }),
   sagsoversigtSortConfig: { key: 'sags_nr', direction: 'ascending' },
   sagsoversigtVisLukkede: false,
   sagsoversigtVisAnnullerede: false,
@@ -160,6 +182,14 @@ const initialState: AppState = {
   kontakterIsLoading: true,
   kontakterError: null,
   erKontakterHentet: false,
+
+  // Dokumentskabeloner
+  dokumentskabeloner: [],
+  dokumentskabelonerFilters: { gruppe_nr: '', dokument_nr: '', dokument: '' },
+  dokumentskabelonerVisUdgaaede: false,
+  dokumentskabelonerIsLoading: true,
+  dokumentskabelonerError: null,
+  erDokumentskabelonerHentet: false,
 };
 
 // --- 4. Reducer-funktionen, der håndterer state-opdateringer ---
@@ -169,7 +199,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, valgtSag: action.payload };
     case 'SET_STATUSSER':
       return { ...state, statusser: action.payload };
-    case 'SET_CURRENT_USER': // @# Håndter opdatering af bruger
+    case 'SET_CURRENT_USER':
       return { ...state, currentUser: action.payload };
     case 'SET_AUTH_CHECKING':
       return { ...state, isAuthChecking: action.payload };
@@ -223,6 +253,16 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, ...action.payload };
     case 'SET_KONTAKTER_STATE':
       return { ...state, ...action.payload };
+    case 'SET_DOKUMENTSSKABELONER_STATE':
+      return { ...state, ...action.payload };
+    case 'SET_CACHED_AKTIVITETER':
+      return {
+        ...state,
+        cachedAktiviteter: {
+          ...state.cachedAktiviteter,
+          [action.payload.sagId]: action.payload.aktiviteter
+        }
+      };
     default:
       return state;
   }
@@ -250,6 +290,24 @@ interface StateProviderProps {
 
 export const StateProvider = ({ children }: StateProviderProps) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Persistence effects
+  React.useEffect(() => {
+    localStorage.setItem('mglp_valgtSag', JSON.stringify(state.valgtSag));
+  }, [state.valgtSag]);
+
+  React.useEffect(() => {
+    localStorage.setItem('mglp_udvidedeGrupper', JSON.stringify(state.aktiviteterUdvidedeGrupper));
+  }, [state.aktiviteterUdvidedeGrupper]);
+
+  React.useEffect(() => {
+    localStorage.setItem('mglp_aktiviteterFilters', JSON.stringify(state.aktiviteterFilters));
+  }, [state.aktiviteterFilters]);
+
+  React.useEffect(() => {
+    localStorage.setItem('mglp_sagsoversigtFilters', JSON.stringify(state.sagsoversigtFilters));
+  }, [state.sagsoversigtFilters]);
+
   return (
     <StateContext.Provider value={{
       state,

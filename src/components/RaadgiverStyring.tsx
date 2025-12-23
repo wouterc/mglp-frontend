@@ -4,7 +4,7 @@
 // @# 2025-11-23 13:30 - Rettet: Tilføjet Mail import og explicit typing af 'ny' parameter.
 // @# 2025-11-23 15:45 - Rettet: Henter nu FULDE kontakt-data ved redigering (fixer tomt skema).
 import React, { useState, useEffect, useMemo, MouseEvent } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { Kontakt, Virksomhed, Rolle, SagRaadgiverTilknytning } from '../types';
 import useDebounce from '../hooks/useDebounce';
 import { X, UserPlus, Loader2, Search, User, Edit, Copy, Check, Phone, Home, Building, Mail } from 'lucide-react';
@@ -19,7 +19,7 @@ interface RaadgiverStyringProps {
   onTilknytningOpdateret: () => void;
 }
 
-type SoegeResultat = 
+type SoegeResultat =
   | { type: 'virksomhed', data: Virksomhed }
   | { type: 'kontakt', data: Kontakt };
 
@@ -33,15 +33,15 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   const [tilknytninger, setTilknytninger] = useState<SagRaadgiverTilknytning[]>(initialTilknytninger);
   const [soegning, setSoegning] = useState('');
   const [soegeresultater, setSoegeresultater] = useState<SoegeResultat[]>([]);
-  
+
   // States til formularer
   const [visKontaktForm, setVisKontaktForm] = useState(false);
   const [visVirksomhedForm, setVisVirksomhedForm] = useState(false);
-  
+
   // Redigerings-states
   const [kontaktTilRedigering, setKontaktTilRedigering] = useState<Kontakt | null>(null);
   const [virksomhedTilRedigering, setVirksomhedTilRedigering] = useState<Virksomhed | null>(null);
-  
+
   // State til at vise loading-spinner PÅ selve rediger-knappen
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
@@ -49,7 +49,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [raadgiverRolleId, setRaadgiverRolleId] = useState<number | null>(null);
   const debouncedSoegning = useDebounce(soegning, 300);
 
@@ -60,8 +60,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   useEffect(() => {
     const fetchRaadgiverRolleId = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/register/roller/?er_raadgiver_kontakt=true`);
-        const data: Rolle[] = await res.json();
+        const data = await api.get<Rolle[]>('/register/roller/?er_raadgiver_kontakt=true');
         if (data.length > 0) {
           setRaadgiverRolleId(data[0].id);
         } else {
@@ -86,13 +85,11 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
         const tilknyttedeKontaktIds = new Set(tilknytninger.map(t => t.kontakt?.id).filter(Boolean));
 
         const vParams = new URLSearchParams({ search: debouncedSoegning, er_raadgiver: 'true' });
-        const vRes = await fetch(`${API_BASE_URL}/register/virksomheder/?${vParams.toString()}`);
-        const vData = await vRes.json();
+        const vData = await api.get<any>(`/register/virksomheder/?${vParams.toString()}`);
         const vListe: Virksomhed[] = (Array.isArray(vData) ? vData : vData.results) || [];
-        
+
         const kParams = new URLSearchParams({ search: debouncedSoegning, er_raadgiver_kontakt: 'true' });
-        const kRes = await fetch(`${API_BASE_URL}/register/kontakter/?${kParams.toString()}`);
-        const kData = await kRes.json();
+        const kData = await api.get<any>(`/register/kontakter/?${kParams.toString()}`);
         const kListe: Kontakt[] = (Array.isArray(kData) ? kData : kData.results) || [];
 
         const vResultater: SoegeResultat[] = vListe
@@ -115,12 +112,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   const opretTilknytning = async (payload: { virksomhed_id?: number | null, kontakt_id?: number | null }) => {
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/sager/raadgivere/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sag_id: sagId, ...payload }),
-      });
-      if (!res.ok) throw new Error("Kunne ikke oprette tilknytning");
+      await api.post(`/sager/raadgivere/`, { sag_id: sagId, ...payload });
       onTilknytningOpdateret();
       setSoegning('');
       setSoegeresultater([]);
@@ -134,8 +126,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   const sletTilknytning = async (tilknytningId: number) => {
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/sager/raadgivere/${tilknytningId}/`, { method: 'DELETE' });
-      if (!res.ok) throw new Error("Kunne ikke slette tilknytning");
+      await api.delete(`/sager/raadgivere/${tilknytningId}/`);
       onTilknytningOpdateret();
     } catch (e) {
       console.error(e);
@@ -165,7 +156,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
     setKontaktTilRedigering(null);
     setVisKontaktForm(true);
   };
-  
+
   const handleOpretNyVirksomhed = () => {
     setVirksomhedTilRedigering(null);
     setVisVirksomhedForm(true);
@@ -173,26 +164,21 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
 
   // @# RETTELSE: Hent fulde data for kontakten før redigering
   const handleRedigerKontakt = async (kontakt: Kontakt, uniqueKey: string) => {
-      setLoadingEditId(uniqueKey);
-      try {
-        const res = await fetch(`${API_BASE_URL}/register/kontakter/${kontakt.id}/`);
-        if (res.ok) {
-            const fuldKontakt = await res.json();
-            setKontaktTilRedigering(fuldKontakt);
-            setVisKontaktForm(true);
-        } else {
-            alert("Kunne ikke hente kontakt-data.");
-        }
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setLoadingEditId(null);
-      }
+    setLoadingEditId(uniqueKey);
+    try {
+      const fuldKontakt = await api.get<Kontakt>(`/register/kontakter/${kontakt.id}/`);
+      setKontaktTilRedigering(fuldKontakt);
+      setVisKontaktForm(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingEditId(null);
+    }
   };
 
   const handleRedigerVirksomhed = (virksomhed: Virksomhed) => {
-      setVirksomhedTilRedigering(virksomhed);
-      setVisVirksomhedForm(true);
+    setVirksomhedTilRedigering(virksomhed);
+    setVisVirksomhedForm(true);
   };
 
   const handleFormLuk = () => {
@@ -203,29 +189,29 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
   };
 
   const handleKontaktSave = (nyKontakt?: Kontakt) => {
-      handleFormLuk();
-      if (nyKontakt) {
-          opretTilknytning({ kontakt_id: nyKontakt.id, virksomhed_id: nyKontakt.virksomhed?.id || null });
-      } else {
-          onTilknytningOpdateret();
-      }
+    handleFormLuk();
+    if (nyKontakt) {
+      opretTilknytning({ kontakt_id: nyKontakt.id, virksomhed_id: nyKontakt.virksomhed?.id || null });
+    } else {
+      onTilknytningOpdateret();
+    }
   };
 
   const handleVirksomhedSave = (nyVirksomhed?: Virksomhed) => {
-      handleFormLuk();
-      if (nyVirksomhed) {
-          opretTilknytning({ virksomhed_id: nyVirksomhed.id, kontakt_id: null });
-      } else {
-          onTilknytningOpdateret();
-      }
+    handleFormLuk();
+    if (nyVirksomhed) {
+      opretTilknytning({ virksomhed_id: nyVirksomhed.id, kontakt_id: null });
+    } else {
+      onTilknytningOpdateret();
+    }
   };
 
   const handleCopy = (text: string, key: string, e: MouseEvent) => {
-      e.stopPropagation();
-      navigator.clipboard.writeText(text).then(() => {
-          setCopiedId(key);
-          setTimeout(() => setCopiedId(null), 2000);
-      });
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(key);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   const sorteredeTilknytninger = useMemo(() => {
@@ -238,7 +224,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
 
   return (
     <div className="bg-white rounded-lg">
-      
+
       {visKontaktForm && (
         <KontaktForm
           onCancel={handleFormLuk}
@@ -248,7 +234,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
           defaultRolleIds={raadgiverRolleId ? [raadgiverRolleId] : []}
         />
       )}
-      
+
       {visVirksomhedForm && (
         <VirksomhedForm
           onCancel={handleFormLuk}
@@ -268,7 +254,7 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
 
       {/* Søgeboks */}
       <div className="relative mb-4">
-         <div className="relative">
+        <div className="relative">
           <input
             type="text"
             value={soegning}
@@ -276,27 +262,27 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
             placeholder="Søg efter rådgiver (firma eller person)..."
             className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
-           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
           </span>
         </div>
-        
+
         {(soegeresultater.length > 0 || soegning.length > 0) && (
           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
             <ul>
-               {soegeresultater.map(res => (
+              {soegeresultater.map(res => (
                 <li key={`${res.type}-${res.data.id}`} onClick={() => handleSoegevalg(res)} className="p-3 hover:bg-blue-50 cursor-pointer border-b flex justify-between items-center">
-                   <div>
-                       <div className="font-medium flex items-center">
-                        {res.type === 'virksomhed' ? <Building size={16} className="mr-2 text-gray-500" /> : <User size={16} className="mr-2 text-gray-500" />}
-                        {res.type === 'virksomhed' ? res.data.navn : res.data.fulde_navn}
-                       </div>
-                       <div className="text-sm text-gray-600 pl-6">
-                         {res.type === 'kontakt' && res.data.virksomhed ? res.data.virksomhed.navn : formatAdresse(res.data)}
-                       </div>
-                   </div>
+                  <div>
+                    <div className="font-medium flex items-center">
+                      {res.type === 'virksomhed' ? <Building size={16} className="mr-2 text-gray-500" /> : <User size={16} className="mr-2 text-gray-500" />}
+                      {res.type === 'virksomhed' ? res.data.navn : res.data.fulde_navn}
+                    </div>
+                    <div className="text-sm text-gray-600 pl-6">
+                      {res.type === 'kontakt' && res.data.virksomhed ? res.data.virksomhed.navn : formatAdresse(res.data)}
+                    </div>
+                  </div>
                 </li>
-               ))}
+              ))}
               {soegeresultater.length === 0 && !isLoading && debouncedSoegning.length > 1 && (
                 <>
                   <li onClick={handleOpretNyVirksomhed} className="p-3 text-blue-600 hover:bg-blue-50 cursor-pointer flex items-center">
@@ -309,96 +295,96 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
               )}
             </ul>
           </div>
-         )}
-       </div>
+        )}
+      </div>
 
       {/* Liste */}
       <div className="space-y-3">
         {isSaving && <div className="flex justify-center"><Loader2 size={24} className="animate-spin text-blue-600" /></div>}
         {tilknytninger.length === 0 && <p className="text-sm text-gray-500 italic text-center py-4">Ingen rådgivere tilknyttet.</p>}
-         
-         {sorteredeTilknytninger.map(t => (
+
+        {sorteredeTilknytninger.map(t => (
           <div key={t.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
-              
+
               <div className="space-y-3 w-full">
                 {/* Virksomhed */}
                 {t.virksomhed && (
                   <div className="flex items-center justify-between group">
-                      <div className="flex items-center space-x-2">
-                        <Building size={18} className="text-blue-600 flex-shrink-0" />
-                        <span className="font-semibold text-gray-800 text-lg">{t.virksomhed.navn}</span>
-                      </div>
-                      <button 
-                        onClick={() => handleRedigerVirksomhed(t.virksomhed!)} 
-                        className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
-                        title="Rediger virksomhed"
-                      >
-                          <Edit size={16} />
-                      </button>
+                    <div className="flex items-center space-x-2">
+                      <Building size={18} className="text-blue-600 flex-shrink-0" />
+                      <span className="font-semibold text-gray-800 text-lg">{t.virksomhed.navn}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRedigerVirksomhed(t.virksomhed!)}
+                      className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
+                      title="Rediger virksomhed"
+                    >
+                      <Edit size={16} />
+                    </button>
                   </div>
                 )}
-                
+
                 {/* Kontakt */}
                 {t.kontakt && (
                   <div className={`flex items-center justify-between group ${t.virksomhed ? 'pl-6 border-l-2 border-gray-200 ml-1' : ''}`}>
                     <div className="flex items-center space-x-2">
-                        <User size={18} className="text-gray-600 flex-shrink-0" />
-                        <span className="font-medium text-gray-700">{t.kontakt.fulde_navn}</span>
+                      <User size={18} className="text-gray-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-700">{t.kontakt.fulde_navn}</span>
                     </div>
-                    <button 
-                        onClick={() => handleRedigerKontakt(t.kontakt!, `k-${t.id}`)} 
-                        className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
-                        title="Rediger kontakt"
-                        disabled={loadingEditId === `k-${t.id}`}
+                    <button
+                      onClick={() => handleRedigerKontakt(t.kontakt!, `k-${t.id}`)}
+                      className="text-gray-400 hover:text-blue-600 p-1 transition-colors"
+                      title="Rediger kontakt"
+                      disabled={loadingEditId === `k-${t.id}`}
                     >
-                        {loadingEditId === `k-${t.id}` ? <Loader2 size={16} className="animate-spin" /> : <Edit size={16} />}
+                      {loadingEditId === `k-${t.id}` ? <Loader2 size={16} className="animate-spin" /> : <Edit size={16} />}
                     </button>
                   </div>
                 )}
 
                 {/* Info-linje */}
                 <div className="pl-7 text-sm text-gray-500 space-y-1">
-                    {(t.kontakt || t.virksomhed) && (
-                        <>
-                            <div className="flex items-center space-x-2">
-                                <Phone size={14} className="text-gray-400" />
-                                <span>{t.kontakt?.telefon || t.virksomhed?.telefon || "-"}</span>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                                <Mail size={14} className="text-gray-400" />
-                                {t.kontakt?.email || t.virksomhed?.email ? (
-                                    <>
-                                        <a href={`mailto:${t.kontakt?.email || t.virksomhed?.email}`} className="text-blue-600 hover:underline">{t.kontakt?.email || t.virksomhed?.email}</a>
-                                        <button onClick={(e) => handleCopy((t.kontakt?.email || t.virksomhed?.email)!, `t-${t.id}-email`, e)} className="p-0.5 rounded hover:bg-gray-200">
-                                            {copiedId === `t-${t.id}-email` ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
-                                        </button>
-                                    </>
-                                ) : <span>-</span>}
-                            </div>
+                  {(t.kontakt || t.virksomhed) && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Phone size={14} className="text-gray-400" />
+                        <span>{t.kontakt?.telefon || t.virksomhed?.telefon || "-"}</span>
+                      </div>
 
-                            <div className="flex items-start space-x-2">
-                                <button onClick={(e) => handleCopy(formatAdresse(t.kontakt || t.virksomhed), `t-${t.id}-adr`, e)} className="mt-0.5 p-0.5 rounded hover:bg-gray-200">
-                                    {copiedId === `t-${t.id}-adr` ? <Check size={14} className="text-green-500"/> : <Home size={14} className="text-gray-400 hover:text-blue-600"/>}
-                                </button>
-                                <div>
-                                    <div>{t.kontakt?.adresse_vej || t.virksomhed?.adresse_vej}</div>
-                                    <div>{t.kontakt?.adresse_postnr || t.virksomhed?.adresse_postnr} {t.kontakt?.adresse_by || t.virksomhed?.adresse_by}</div>
-                                </div>
-                            </div>
-                        </>
-                    )}
+                      <div className="flex items-center space-x-2">
+                        <Mail size={14} className="text-gray-400" />
+                        {t.kontakt?.email || t.virksomhed?.email ? (
+                          <>
+                            <a href={`mailto:${t.kontakt?.email || t.virksomhed?.email}`} className="text-blue-600 hover:underline">{t.kontakt?.email || t.virksomhed?.email}</a>
+                            <button onClick={(e) => handleCopy((t.kontakt?.email || t.virksomhed?.email)!, `t-${t.id}-email`, e)} className="p-0.5 rounded hover:bg-gray-200">
+                              {copiedId === `t-${t.id}-email` ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                            </button>
+                          </>
+                        ) : <span>-</span>}
+                      </div>
+
+                      <div className="flex items-start space-x-2">
+                        <button onClick={(e) => handleCopy(formatAdresse(t.kontakt || t.virksomhed), `t-${t.id}-adr`, e)} className="mt-0.5 p-0.5 rounded hover:bg-gray-200">
+                          {copiedId === `t-${t.id}-adr` ? <Check size={14} className="text-green-500" /> : <Home size={14} className="text-gray-400 hover:text-blue-600" />}
+                        </button>
+                        <div>
+                          <div>{t.kontakt?.adresse_vej || t.virksomhed?.adresse_vej}</div>
+                          <div>{t.kontakt?.adresse_postnr || t.virksomhed?.adresse_postnr} {t.kontakt?.adresse_by || t.virksomhed?.adresse_by}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
               <button onClick={() => handleFjernTilknytning(t)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0 ml-2">
-                  <X size={20} />
+                <X size={20} />
               </button>
             </div>
           </div>
         ))}
-       </div>
+      </div>
     </div>
   );
 }

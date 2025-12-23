@@ -71,13 +71,15 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                         >
                             {confirmText}
                         </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={onClose}
-                            className="mt-3 w-full sm:mt-0 sm:w-auto sm:ml-3"
-                        >
-                            {cancelText}
-                        </Button>
+                        {cancelText && (
+                            <Button
+                                variant="secondary"
+                                onClick={onClose}
+                                className="mt-3 w-full sm:mt-0 sm:w-auto sm:ml-3"
+                            >
+                                {cancelText}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

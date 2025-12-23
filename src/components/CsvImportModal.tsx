@@ -2,11 +2,11 @@
 // @# 2025-11-23 19:30 - Opdateret til at håndtere 'aktivitetsskabelon' med opslag på Proces/Gruppe.
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import * as XLSX from 'xlsx'; 
+import * as XLSX from 'xlsx';
 import { UploadCloud, FileText, AlertCircle, CheckCircle, Loader2, X, ArrowRight } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './Modal';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 
 interface CsvImportModalProps {
     isOpen: boolean;
@@ -54,13 +54,13 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
         }
     }, []);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
-        onDrop, 
-        accept: { 
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
             'application/vnd.ms-excel': ['.xls']
         },
-        multiple: false 
+        multiple: false
     });
 
     const logMsg = (row: number, message: string, status: ImportLog['status']) => {
@@ -70,8 +70,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
     // --- OPSLAGSFUNKTIONER ---
     const findExistingVirksomhed = async (cvr: string): Promise<number | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/register/virksomheder/?cvr_nr=${cvr}`);
-            const data = await res.json();
+            const data = await api.get<any>(`/register/virksomheder/?cvr_nr=${cvr}`);
             const results = Array.isArray(data) ? data : data.results;
             return (results && results.length > 0) ? results[0].id : null;
         } catch (e) { return null; }
@@ -79,8 +78,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
 
     const findExistingKontakt = async (email: string): Promise<number | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/register/kontakter/?email=${email}`);
-            const data = await res.json();
+            const data = await api.get<any>(`/register/kontakter/?email=${email}`);
             const results = Array.isArray(data) ? data : data.results;
             return (results && results.length > 0) ? results[0].id : null;
         } catch (e) { return null; }
@@ -88,8 +86,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
 
     const findExistingBlokinfo = async (formaal: number, nr: number): Promise<number | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/skabeloner/blokinfo/?formaal=${formaal}&nr=${nr}`);
-            const data = await res.json();
+            const data = await api.get<any>(`/skabeloner/blokinfo/?formaal=${formaal}&nr=${nr}`);
             const results = Array.isArray(data) ? data : data.results;
             return (results && results.length > 0) ? results[0].id : null;
         } catch (e) { return null; }
@@ -98,8 +95,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
     // Finder aktivitet baseret på den logiske nøgle: ProcesNr + GruppeNr + AktivitetNr
     const findExistingAktivitet = async (procesNr: number, gruppeNr: number, aktivitetNr: number): Promise<number | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/skabeloner/aktiviteter/?proces_nr=${procesNr}&gruppe_nr=${gruppeNr}&aktivitet_nr=${aktivitetNr}`);
-            const data = await res.json();
+            const data = await api.get<any>(`/skabeloner/aktiviteter/?proces_nr=${procesNr}&gruppe_nr=${gruppeNr}&aktivitet_nr=${aktivitetNr}`);
             const results = Array.isArray(data) ? data : data.results;
             return (results && results.length > 0) ? results[0].id : null;
         } catch (e) { return null; }
@@ -107,8 +103,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
 
     const fetchCvrData = async (cvr: string): Promise<any | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/register/cvr_opslag/${cvr}/`);
-            if (res.ok) return await res.json();
+            return await api.get<any>(`/register/cvr_opslag/${cvr}/`);
         } catch (e) { console.error("CVR fejl", e); }
         return null;
     };
@@ -138,7 +133,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                     if (!isNaN(val)) row[key] = val;
                 }
             });
-            
+
             if (row.cvr_nr) row.cvr_nr = row.cvr_nr.toString().replace(/\D/g, '');
 
             // --- SPECIAL LOGIK FOR AKTIVITETSSKABELONER ---
@@ -161,7 +156,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                     }
                 }
                 // Fjern _nr felterne fra payload, da API forventer _id
-                delete row.proces_nr; 
+                delete row.proces_nr;
                 delete row.gruppe_nr;
             }
 
@@ -169,7 +164,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                 // TRIN 1: Tjek ID
                 if (row.id) {
                     idToUpdate = parseInt(row.id, 10);
-                } 
+                }
                 // TRIN 2: Tjek unikke nøgler
                 else {
                     if (type === 'virksomhed' && row.cvr_nr) {
@@ -180,7 +175,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                         idToUpdate = await findExistingBlokinfo(row.formaal, row.nr);
                     } else if (type === 'aktivitetsskabelon') {
                         // For aktiviteter skal vi kigge i de originale parsedData for at finde nr, da vi lige slettede dem fra row
-                        const origRow = parsedData[i]; 
+                        const origRow = parsedData[i];
                         if (origRow.proces_nr && origRow.gruppe_nr && origRow.aktivitet_nr) {
                             idToUpdate = await findExistingAktivitet(origRow.proces_nr, origRow.gruppe_nr, origRow.aktivitet_nr);
                         }
@@ -189,18 +184,12 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
 
                 if (idToUpdate) {
                     // --- OPDATER ---
-                    const res = await fetch(`${API_BASE_URL}/${endpoint}/${idToUpdate}/`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(row)
-                    });
-                    
-                    if (res.ok) {
+                    try {
+                        await api.patch(`/${endpoint}/${idToUpdate}/`, row);
                         let navn = row.navn || row.fulde_navn || row.titel_kort || row.aktivitet || '';
                         logMsg(rowNum, `Opdateret ID ${idToUpdate}: ${navn}`, 'update');
-                    } else {
-                        const err = await res.json();
-                        logMsg(rowNum, `Fejl opdatering ID ${idToUpdate}: ${JSON.stringify(err)}`, 'error');
+                    } catch (err: any) {
+                        logMsg(rowNum, `Fejl opdatering ID ${idToUpdate}: ${err.message}`, 'error');
                     }
 
                 } else {
@@ -219,26 +208,19 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                         }
                     }
 
-                    const res = await fetch(`${API_BASE_URL}/${endpoint}/`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(row)
-                    });
-
-                    if (res.ok) {
-                        const created = await res.json();
+                    try {
+                        const created = await api.post<any>(`/${endpoint}/`, row);
                         let navn = created.navn || created.fulde_navn || created.titel_kort || created.aktivitet || '';
                         logMsg(rowNum, `Oprettet ny: ${navn} (ID: ${created.id})`, 'success');
-                    } else {
-                        const err = await res.json();
-                        logMsg(rowNum, `Fejl ved oprettelse: ${JSON.stringify(err)}`, 'error');
+                    } catch (err: any) {
+                        logMsg(rowNum, `Fejl ved oprettelse: ${err.message}`, 'error');
                     }
                 }
 
             } catch (error: any) {
                 logMsg(rowNum, `Netværksfejl: ${error.message}`, 'error');
             }
-            
+
             setProgress(Math.round(((i + 1) / parsedData.length) * 100));
         }
 
@@ -257,8 +239,8 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
         <Modal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="space-y-4">
                 {!file && (
-                    <div 
-                        {...getRootProps()} 
+                    <div
+                        {...getRootProps()}
                         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
                             ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}
                         `}
@@ -307,11 +289,10 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                 {logs.length > 0 && (
                     <div className="mt-4 border rounded-md max-h-60 overflow-y-auto bg-slate-900 text-slate-50 font-mono text-xs p-2 shadow-inner">
                         {logs.map((log, idx) => (
-                            <div key={idx} className={`flex items-center mb-1 last:mb-0 ${
-                                log.status === 'error' ? 'text-red-400' : 
-                                log.status === 'update' ? 'text-blue-300' : 
-                                'text-green-400'
-                            }`}>
+                            <div key={idx} className={`flex items-center mb-1 last:mb-0 ${log.status === 'error' ? 'text-red-400' :
+                                    log.status === 'update' ? 'text-blue-300' :
+                                        'text-green-400'
+                                }`}>
                                 <span className="mr-2 flex-shrink-0">
                                     {log.status === 'success' && <CheckCircle size={12} />}
                                     {log.status === 'update' && <ArrowRight size={12} />}

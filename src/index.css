@@ -1,4 +1,63 @@
-/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    /* En central variabel til alle INPUT-rammer for at sikre god kontrast. */
+    --app-input-border-color: #94a3b8;
+    /* Slate-400 for tydelige felter */
+    --app-input-border-focus: #3b82f6;
+    /* Blue-500 */
+    --app-input-bg: #ffffff;
+}
+
+/* Globale overrides KUN for input-elementer */
+input,
+select,
+textarea {
+    border-color: var(--app-input-border-color) !important;
+    background-color: var(--app-input-bg);
+}
+
+/* Undtagelse for checkboxes/radiobuttons og andre special-inputs hvis nødvendigt, 
+   men som udgangspunkt gælder det tekst-felter. */
+input[type="checkbox"],
+input[type="radio"] {
+    border-color: #cbd5e1 !important;
+    /* Standard Tailwind gray-300 for at undgå at de bliver for tunge */
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--app-input-border-focus) !important;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+}
+
+/* Globale tabel-indstillinger for at gøre dem mere kompakte på tværs af hele systemet */
+table th {
+    padding-top: 0.25rem !important;
+    /* py-1 svarer til 0.25rem */
+    padding-bottom: 0.25rem !important;
+    padding-left: 0.5rem !important;
+    /* px-2 svarer til 0.5rem */
+    padding-right: 0.5rem !important;
+}
+
+table td {
+    padding-top: 0.125rem !important;
+    /* py-0.5 svarer til 0.125rem */
+    padding-bottom: 0.125rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+/* Sikrer at links og knapper i tabeller ikke tvinger rækkerne til at blive for høje */
+table td button,
+table td a,
+table td input:not([type="checkbox"]),
+table td select {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}

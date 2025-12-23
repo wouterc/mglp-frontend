@@ -11,7 +11,7 @@ interface SaelgereTabProps {
 
 function SaelgereTab({ sag, onUpdate }: SaelgereTabProps) {
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
             <SaelgerStyring
                 sagId={sag.id}
                 initialSaelgere={sag.saelgere || []}

@@ -3,7 +3,7 @@
 // @# 2025-11-23 12:15 - Tilføjet redigerings-mulighed (popup) for kommune-adresser.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Home, Phone, Mail, MapPin, Edit } from 'lucide-react';
-import { API_BASE_URL } from '../../../config';
+import { api } from '../../../api';
 import { Sag, Virksomhed } from '../../../types';
 import VirksomhedForm from '../../VirksomhedForm';
 
@@ -22,14 +22,11 @@ function KommuneTab({ sag }: KommuneTabProps) {
     // Flyttet fetch-logik ud i en genbrugelig funktion
     const fetchKommune = useCallback(async () => {
         if (!sag.kommunekode) return;
-        
+
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/register/virksomheder/?er_kommune=true&kommunekode=${sag.kommunekode}`);
-            if (res.ok) {
-                const data = await res.json();
-                setAdresser(Array.isArray(data) ? data : data.results || []);
-            }
+            const data = await api.get<any>(`/register/virksomheder/?er_kommune=true&kommunekode=${sag.kommunekode}`);
+            setAdresser(Array.isArray(data) ? data : data.results || []);
         } catch (error) {
             console.error(error);
         } finally {
@@ -79,13 +76,13 @@ function KommuneTab({ sag }: KommuneTabProps) {
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {adresser.map(k => (
-                    <div key={k.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                        
+                    <div key={k.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
+
                         {/* Header med Navn + Rediger knap */}
                         <div className="flex justify-between items-start mb-1">
                             <h3 className="font-bold text-gray-800 text-lg">{k.navn}</h3>
-                            <button 
-                                onClick={() => handleEdit(k)} 
+                            <button
+                                onClick={() => handleEdit(k)}
                                 className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                                 title="Rediger stamdata"
                             >
@@ -94,7 +91,7 @@ function KommuneTab({ sag }: KommuneTabProps) {
                         </div>
 
                         {k.afdeling && <div className="text-sm font-semibold text-blue-600 mb-4">{k.afdeling}</div>}
-                        
+
                         <div className="space-y-3 text-sm text-gray-600">
                             {(k.adresse_vej || k.adresse_postnr) && (
                                 <div className="flex items-start space-x-3">
@@ -126,7 +123,7 @@ function KommuneTab({ sag }: KommuneTabProps) {
 
             {/* Popup Form */}
             {visForm && (
-                <VirksomhedForm 
+                <VirksomhedForm
                     virksomhedTilRedigering={virksomhedTilRedigering}
                     onSave={handleFormSave}
                     onCancel={() => setVisForm(false)}

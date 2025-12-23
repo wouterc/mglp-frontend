@@ -3,7 +3,7 @@
 // @# 2025-11-03 21:45 - Implementeret manuel 'Filtrer'-knap for at stoppe automatiske API-kald.
 // @# 2025-11-15 12:30 - Opdateret til at bruge genbrugelig Button-komponent
 import React, { useState, useEffect, ChangeEvent } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { useAppState } from '../StateContext';
 import FilterSidebar from './FilterSidebar';
 import type { Status, AktiviteterFilterState } from '../types';
@@ -14,23 +14,13 @@ import Button from './ui/Button'; // Importer den nye knap
 function AktiviteterFilter() {
     const { state, dispatch } = useAppState();
     const { aktiviteterFilters } = state;
-    
-    // @# 2025-11-03 21:45 - Lokal state til at holde filter-ændringer, før de anvendes.
-    const [lokaleFiltre, setLokaleFiltre] = useState<AktiviteterFilterState>(aktiviteterFilters);
-    
+
     const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
-    // @# 2025-11-03 21:45 - Synkroniserer lokal state, hvis den globale state nulstilles.
-    useEffect(() => {
-        setLokaleFiltre(aktiviteterFilters);
-    }, [aktiviteterFilters]);
-    
+
     useEffect(() => {
         const fetchAktivitetStatusser = async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/kerne/status/?formaal=2`);
-                if (!response.ok) return;
-                const data = await response.json();
-             
+                const data = await api.get<any>('/kerne/status/?formaal=2');
                 setAktivitetStatusser(data.results || data);
             } catch (error) {
                 console.error("Kunne ikke hente statusser til filter:", error);
@@ -38,38 +28,38 @@ function AktiviteterFilter() {
         };
         fetchAktivitetStatusser();
     }, []);
-    
-    // @# 2025-11-03 21:45 - Opdaterer nu kun den LOKALE state.
+
+    // @# 2025-12-21 - Opdaterer nu direkte den GLOBALE state for instant respons.
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         const isCheckbox = type === 'checkbox';
         const checked = (e.target as HTMLInputElement).checked;
-        setLokaleFiltre(prev => ({ ...prev, [name]: isCheckbox ? checked : value }));
-    };
-    
-    // @# 2025-11-03 21:45 - Ny funktion, der sender den lokale state til den globale state.
-    const handleSubmitFilter = () => {
+
+        const updatedFilters = {
+            ...aktiviteterFilters,
+            [name]: isCheckbox ? checked : value
+        };
+
         dispatch({
             type: 'SET_AKTIVITETER_STATE',
-            payload: { aktiviteterFilters: lokaleFiltre },
+            payload: { aktiviteterFilters: updatedFilters },
         });
     };
 
-    // @# 2025-11-03 21:45 - Nulstiller nu både lokal og global state.
+    // @# 2025-11-03 21:45 - Nulstiller den globale state.
     const handleNulstilFiltre = () => {
-        const nulstilletState: AktiviteterFilterState = { 
-            aktivitet: '', 
-            ansvarlig: '', 
-            status: '', 
-            aktiv_filter: 'kun_aktive', 
-            dato_intern_efter: '', 
-            
-            dato_intern_foer: '', 
-            dato_ekstern_efter: '', 
-            dato_ekstern_foer: '', 
-            overskredet: false 
+        const nulstilletState: AktiviteterFilterState = {
+            aktivitet: '',
+            ansvarlig: '',
+            status: '',
+            aktiv_filter: 'kun_aktive',
+            dato_intern_efter: '',
+
+            dato_intern_foer: '',
+            dato_ekstern_efter: '',
+            dato_ekstern_foer: '',
+            overskredet: false
         };
-        setLokaleFiltre(nulstilletState);
         dispatch({
             type: 'SET_AKTIVITETER_STATE',
             payload: { aktiviteterFilters: nulstilletState }
@@ -79,34 +69,30 @@ function AktiviteterFilter() {
     return (
         <FilterSidebar onNulstil={handleNulstilFiltre}>
             <div className="space-y-4">
-                <input type="text" name="aktivitet" placeholder="Søg i aktivitet..." value={lokaleFiltre.aktivitet} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm"/>
-                <input type="text" name="ansvarlig" placeholder="Søg i ansvarlig..." value={lokaleFiltre.ansvarlig} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm"/>
-                <select name="status" value={lokaleFiltre.status} onChange={handleFilterChange} 
+                <input type="text" name="aktivitet" placeholder="Søg i aktivitet..." value={aktiviteterFilters.aktivitet} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm" />
+                <input type="text" name="ansvarlig" placeholder="Søg i ansvarlig..." value={aktiviteterFilters.ansvarlig} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm" />
+
+                <select name="status" value={aktiviteterFilters.status} onChange={handleFilterChange}
                     className="p-2 w-full border rounded-md text-sm bg-white">
                     <option value="">Alle statusser</option>
                     <option value="ikke-faerdigmeldt">Alle ikke-færdigmeldte</option>
                     {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                 </select>
-         
-               <div className="pt-2">
-                    <label className="flex items-center space-x-2 text-sm"><input type="radio" name="aktiv_filter" value="kun_aktive" checked={lokaleFiltre.aktiv_filter === 'kun_aktive'} onChange={handleFilterChange} /> <span>Kun aktive</span></label>
-                    <label className="flex items-center space-x-2 text-sm"><input type="radio" name="aktiv_filter" value="alle" checked={lokaleFiltre.aktiv_filter === 'alle'} onChange={handleFilterChange} /> <span>Alle</span></label>
-                </div>
- 
-           
-             <div className="pt-2 border-t mt-2">
-                     <label className="flex items-center space-x-2 text-sm"><input type="checkbox" name="overskredet" checked={lokaleFiltre.overskredet} onChange={handleFilterChange} /> <span>Vis kun overskredne</span></label>
+
+                <div className="pt-2">
+                    <label className="flex items-center space-x-2 text-sm">
+                        <input type="radio" name="aktiv_filter" value="kun_aktive" checked={aktiviteterFilters.aktiv_filter === 'kun_aktive'} onChange={handleFilterChange} /> <span>Kun aktive</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm">
+                        <input type="radio" name="aktiv_filter" value="alle" checked={aktiviteterFilters.aktiv_filter === 'alle'} onChange={handleFilterChange} /> <span>Alle</span>
+                    </label>
                 </div>
 
-                {/* @# 2025-11-03 21:45 - Den nye manuelle 'Filtrer'-knap */}
-                {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}
-                <Button
-                    onClick={handleSubmitFilter}
-                    variant="primary"
-                    className="w-full !p-2" // Justerer padding specifikt
-                >
-                    Filtrer
-                </Button>
+                <div className="pt-2 border-t mt-2">
+                    <label className="flex items-center space-x-2 text-sm">
+                        <input type="checkbox" name="overskredet" checked={aktiviteterFilters.overskredet} onChange={handleFilterChange} /> <span>Vis kun overskredne</span>
+                    </label>
+                </div>
             </div>
         </FilterSidebar>
     );

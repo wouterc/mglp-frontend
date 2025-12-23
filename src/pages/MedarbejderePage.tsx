@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../config';
+import { api } from '../api';
 import { useAppState } from '../StateContext';
 import { Mail, Phone, User, Users } from 'lucide-react';
 
@@ -23,24 +23,12 @@ const MedarbejderePage: React.FC = () => {
         const fetchEmployees = async () => {
             setLoading(true);
             try {
-                // We reuse the /users/ endpoint but accessible for everyone (filtered in frontend or separate view if needed)
-                // Actually, standard users might not have access to 'UserViewSet' which is AdminOnly. 
-                // We need a public endpoint or allow ReadOnly on UserViewSet for Authenticated users.
-                // Let's assume for now we use a new simple view or modify permissions. 
-                // To keep it simple, let's try calling users endpoint first. If 403, we know we need to Fix Backend Permissions.
-                const res = await fetch(`${API_BASE_URL}/kerne/users/`, { credentials: 'include' });
-                if (res.ok) {
-                    const data = await res.json();
-                    // Filter to active users only
-                    const active = data.filter((u: any) => u.is_active);
-                    setEmployees(active);
-                } else {
-                    // Try alternative endpoint if created, or handle error
-                    setError("Kunne ikke hente medarbejderliste. (Manglende rettigheder?)");
-                }
-            } catch (err) {
+                const data = await api.get<any[]>('/kerne/users/');
+                const active = data.filter((u: any) => u.is_active);
+                setEmployees(active);
+            } catch (err: any) {
                 console.error(err);
-                setError("Netværksfejl.");
+                setError("Kunne ikke hente medarbejderliste. (Manglende rettigheder?)");
             } finally {
                 setLoading(false);
             }
