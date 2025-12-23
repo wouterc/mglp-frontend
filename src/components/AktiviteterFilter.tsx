@@ -6,7 +6,7 @@ import React, { useState, useEffect, ChangeEvent } from 'react';
 import { api } from '../api';
 import { useAppState } from '../StateContext';
 import FilterSidebar from './FilterSidebar';
-import type { Status, AktiviteterFilterState } from '../types';
+import type { Status, AktiviteterFilterState, User } from '../types';
 import Button from './ui/Button'; // Importer den nye knap
 
 // Importer AktiviteterFilterState
@@ -16,6 +16,13 @@ function AktiviteterFilter() {
     const { aktiviteterFilters } = state;
 
     const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
+    const [colleagues, setColleagues] = useState<User[]>([]);
+
+    useEffect(() => {
+        api.get<User[]>('/kerne/users/').then(data => {
+            setColleagues(data.filter(u => u.is_active));
+        });
+    }, []);
 
     useEffect(() => {
         const fetchAktivitetStatusser = async () => {
@@ -70,7 +77,18 @@ function AktiviteterFilter() {
         <FilterSidebar onNulstil={handleNulstilFiltre}>
             <div className="space-y-4">
                 <input type="text" name="aktivitet" placeholder="Søg i aktivitet..." value={aktiviteterFilters.aktivitet} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm" />
-                <input type="text" name="ansvarlig" placeholder="Søg i ansvarlig..." value={aktiviteterFilters.ansvarlig} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm" />
+
+                <select
+                    name="ansvarlig"
+                    value={aktiviteterFilters.ansvarlig || ''}
+                    onChange={handleFilterChange}
+                    className="p-2 w-full border rounded-md text-sm bg-white"
+                >
+                    <option value="">Alle ansvarlige</option>
+                    {colleagues.map(u => (
+                        <option key={u.id} value={u.username}>{u.username}</option>
+                    ))}
+                </select>
 
                 <select name="status" value={aktiviteterFilters.status} onChange={handleFilterChange}
                     className="p-2 w-full border rounded-md text-sm bg-white">

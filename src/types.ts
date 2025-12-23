@@ -298,8 +298,11 @@ export interface SagsDokument {
   sag: number; // ID reference
   skabelon: number | null; // ID reference
   skabelon_navn?: string;
+  skabelon_kommentar?: string;
   gruppe: Blokinfo | null;
   gruppe_navn?: string;
+  gruppe_nr?: number;
+  dokument_nr?: number;
   titel: string | null;
   fil: string | null; // URL til fil
   filnavn: string | null; // Det ønskede filnavn
@@ -311,5 +314,6 @@ export interface SagsDokument {
   dato_ekstern: string | null;
   ansvarlig: number | null; // User ID
   ansvarlig_navn?: string;
+  ansvarlig_username?: string;
   oprettet_dato: string;
 }

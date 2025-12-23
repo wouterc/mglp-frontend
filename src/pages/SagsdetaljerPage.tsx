@@ -18,7 +18,6 @@ import SaelgereTab from '../components/sagsdetaljer/tabs/SaelgereTab';
 import RaadgivereTab from '../components/sagsdetaljer/tabs/RaadgivereTab';
 import KommuneTab from '../components/sagsdetaljer/tabs/KommuneTab';
 import ForsyningTab from '../components/sagsdetaljer/tabs/ForsyningTab';
-import DokumenterTab from '../components/sagsdetaljer/tabs/DokumenterTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
@@ -189,9 +188,6 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 return <KommuneTab sag={sag} />;
             case 'forsyning':
                 return <ForsyningTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'dokumenter':
-                return <DokumenterTab sag={sag} onUpdate={handleUpdateSag} />;
-
             case 'koebere':
             case 'forening':
                 return (

@@ -346,9 +346,9 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
                         ) : sag.mappen_oprettet ? (
                           <button onClick={(e: MouseEvent) => {
                             e.stopPropagation();
-                            // Sæt valgt sag for en sikkerheds skyld, selvom navigateTo også gør det
+                            // Sæt valgt sag
                             dispatch({ type: 'SET_VALGT_SAG', payload: sag });
-                            navigate('/sagsdetaljer', { state: { initialTab: 'dokumenter' } });
+                            navigate('/dokumenter');
                           }} title="Vis dokumenter">
                             <Folder size={18} className="text-gray-500 hover:text-yellow-600" />
                           </button>

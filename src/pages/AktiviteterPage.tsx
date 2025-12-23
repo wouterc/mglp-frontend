@@ -10,7 +10,7 @@ import { Edit, Search, ChevronDown, ChevronUp, MessageSquare, Info, ChevronsDown
 // @# 2025-11-03 21:45 - Fjernet useDebounce
 // import useDebounce from '../hooks/useDebounce'; 
 import { useAppState } from '../StateContext';
-import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState } from '../types';
+import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState, User } from '../types';
 import SagsAktivitetForm from '../components/SagsAktivitetForm';
 import Tooltip from '../components/Tooltip';
 import SmartDateInput from '../components/SmartDateInput';
@@ -105,6 +105,13 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const [allActivities, setAllActivities] = useState<Aktivitet[]>([]);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
+    const [colleagues, setColleagues] = useState<User[]>([]);
+
+    useEffect(() => {
+        api.get<User[]>('/kerne/users/').then(data => {
+            setColleagues(data.filter(u => u.is_active));
+        });
+    }, []);
 
     // Dialog-state
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -232,7 +239,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const filters = aktiviteterFilters;
         const lowerAkt = filters.aktivitet.toLowerCase();
         const lowerAns = filters.ansvarlig.toLowerCase();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local time
 
         // 1. Filtrer aktiviteter
         const filtered = allActivities.filter(a => {
@@ -258,17 +265,22 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
             // Datoer
             // Bemærk: dato_intern_efter betyder dato >= filter
-            if (filters.dato_intern_efter && (!a.dato_intern || a.dato_intern < filters.dato_intern_efter)) return false;
-            if (filters.dato_intern_foer && (!a.dato_intern || a.dato_intern > filters.dato_intern_foer)) return false;
+            if (filters.dato_intern_efter && (!a.dato_intern || new Date(a.dato_intern) < new Date(filters.dato_intern_efter))) return false;
+            if (filters.dato_intern_foer && (!a.dato_intern || new Date(a.dato_intern) > new Date(filters.dato_intern_foer))) return false;
 
             // Overskredet logik
+            // Overskredet Filter
             if (filters.overskredet) {
+                // Done check: Hvis aktiviteten er færdigmeldt, er den ikke overskredet
                 const isDone = a.status?.status_kategori === 1;
-                if (isDone) return false; // Færdige er aldrig overskredne i visningen
-                const internOverskredet = a.dato_intern ? a.dato_intern < today : false;
-                const eksternOverskredet = a.dato_ekstern ? a.dato_ekstern < today : false;
+                if (isDone) return false;
 
-                if (!internOverskredet && !eksternOverskredet) return false;
+                // Dato check: Sammenlign datoer korrekt
+                const internPast = a.dato_intern && new Date(a.dato_intern) < new Date(today);
+                const eksternPast = a.dato_ekstern && new Date(a.dato_ekstern) < new Date(today);
+
+                // Hvis ingen af datoerne er i fortiden, er den ikke overskredet
+                if (!internPast && !eksternPast) return false;
             }
 
             return true;
@@ -332,11 +344,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         });
 
         // Lav lookup map for aktiviteter
-        const actMap: Record<number, Aktivitet[]> = {};
+        const actMap: Record<string, Aktivitet[]> = {};
         processedGroups.forEach((g: any) => {
             // Sorter aktiviteter internt i gruppen
             g.filteredAktiviteter.sort((a: Aktivitet, b: Aktivitet) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
-            actMap[g.gruppe.id] = g.filteredAktiviteter;
+            const key = `${g.proces.id}-${g.gruppe.id}`;
+            actMap[key] = g.filteredAktiviteter;
         });
 
         return { filteredGroups: processedGroups, groupedActivities: actMap };
@@ -518,49 +531,62 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 />
             )}
 
-            <div className="flex justify-between items-center mb-6 gap-4">
-                <div className="flex items-center gap-4 flex-shrink-0">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                        Aktiviteter for Sag {valgtSag ? `${valgtSag.sags_nr} - ${valgtSag.alias}` : 'Vælg en sag'}
-                    </h2>
-                    <span className="text-lg font-medium text-gray-500 bg-gray-200 px-3 py-1 rounded-full">
-                        {samletTaeling.faerdige} / {samletTaeling.total}
-                    </span>
-                    <div className="flex gap-1">
-                        <Tooltip content="Fold alle grupper ud">
-                            <button onClick={() => handleToggleAlleGrupper(true)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-md">
-                                <ChevronsDown size={18} />
-                            </button>
-                        </Tooltip>
-                        <Tooltip content="Fold alle grupper sammen">
-                            <button onClick={() => handleToggleAlleGrupper(false)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-md">
-                                <ChevronsUp size={18} />
-                            </button>
-                        </Tooltip>
-                        {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
-                            <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
-                                <button
-                                    onClick={handleSynkroniser}
-                                    disabled={isFetchingAll}
-                                    className={`
-                                        p-1.5 rounded-full transition-all border
-                                        ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
-                                    `}
-                                >
-                                    <RefreshCw size={16} />
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+                            Aktiviteter for Sag {valgtSag ? `${valgtSag.sags_nr} - ${valgtSag.alias}` : 'Vælg en sag'}
+                            {valgtSag && (
+                                <span className="text-lg font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                    {samletTaeling.faerdige} / {samletTaeling.total}
+                                </span>
+                            )}
+                        </h2>
+                        <div className="flex items-center gap-1">
+                            <Tooltip content="Fold alle grupper ud">
+                                <button onClick={() => handleToggleAlleGrupper(true)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
+                                    <ChevronsDown size={20} />
                                 </button>
                             </Tooltip>
-                        )}
+                            <Tooltip content="Fold alle grupper sammen">
+                                <button onClick={() => handleToggleAlleGrupper(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
+                                    <ChevronsUp size={20} />
+                                </button>
+                            </Tooltip>
+                            <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                            {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
+                                <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
+                                    <button
+                                        onClick={handleSynkroniser}
+                                        disabled={isFetchingAll}
+                                        className={`
+                                            p-1.5 rounded-full transition-all border
+                                            ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
+                                        `}
+                                    >
+                                        <RefreshCw size={16} />
+                                    </button>
+                                </Tooltip>
+                            )}
+                        </div>
                     </div>
+                    {valgtSag?.fuld_adresse && (
+                        <div className="text-gray-500 flex items-center gap-1 text-sm">
+                            <span className="font-medium">{valgtSag.fuld_adresse}</span>
+                        </div>
+                    )}
                 </div>
-                <div className="relative min-w-64">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search className="h-5 w-5 text-gray-400" /></div>
-                    <input id="sag-soeg" type="text" value={søgning} onChange={(e) => setSøgning(e.target.value)} onKeyDown={handleKeyDown} placeholder="Skift sag..." className="w-full p-2 pl-10 border rounded-md" autoComplete="off" />
+
+                <div className="relative min-w-72">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Search className="h-4 w-4 text-gray-400" /></div>
+                    <input id="sag-soeg" type="text" value={søgning} onChange={(e) => setSøgning(e.target.value)} onKeyDown={handleKeyDown} placeholder="Skift sag..." className="w-full pl-9 pr-4 py-2 border border-slate-400 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" autoComplete="off" />
                     {søgeResultater.length > 0 && (
-                        <ul className="absolute z-20 w-full bg-white border rounded-md mt-1 max-h-60 overflow-auto shadow-lg">
+                        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-md mt-1 max-h-60 overflow-auto shadow-xl py-1">
                             {søgeResultater.map((sag, index) => (
-                                <li key={sag.id} onClick={() => handleSelectSag(sag)} onMouseEnter={() => setActiveIndex(index)} className={`p-2 cursor-pointer ${index === activeIndex ? 'bg-blue-100' : 'hover:bg-gray-100'}`}>
-                                    {sag.sags_nr} - {sag.alias}
+                                <li key={sag.id} onClick={() => handleSelectSag(sag)} onMouseEnter={() => setActiveIndex(index)} className={`px-4 py-2 text-sm cursor-pointer border-b last:border-0 border-gray-50 ${index === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                                    <span className="font-bold">{sag.sags_nr}</span>
+                                    <span className="mx-2 opacity-50">|</span>
+                                    <span>{sag.alias}</span>
                                 </li>
                             ))}
                         </ul>
@@ -594,7 +620,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                         ) : filteredGroups.map((gruppeSummary: any) => {
                             const gruppeKey = `${gruppeSummary.proces.id}-${gruppeSummary.gruppe.id}`;
                             const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
-                            const aktiviteter = groupedActivities[gruppeSummary.gruppe.id] || [];
+                            const aktiviteter = groupedActivities[gruppeKey] || [];
 
                             const harAktivtFilter = gruppeSummary.filtered_aktiv_count !== gruppeSummary.total_aktiv_count; // Simplificeret check for visuel indikator
 
@@ -656,7 +682,19 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="py-0.5 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-4`} value={aktivitet.ansvarlig} onSave={(val) => handleInlineSave(aktivitet, 'ansvarlig', val)} /></td>
+                                            <td className="py-0.5 px-2">
+                                                <select
+                                                    id={`cell-${aktivitet.id}-4`}
+                                                    value={aktivitet.ansvarlig || ''}
+                                                    onChange={(e) => handleInlineSave(aktivitet, 'ansvarlig', e.target.value)}
+                                                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0"
+                                                >
+                                                    <option value="">Ingen</option>
+                                                    {colleagues.map(u => (
+                                                        <option key={u.id} value={u.username}>{u.username}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
                                             <td className="py-0.5 px-2">
                                                 <SmartDateInput value={aktivitet.dato_intern} onSave={(val) => handleInlineSave(aktivitet, 'dato_intern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`} />
                                             </td>

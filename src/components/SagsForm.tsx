@@ -272,40 +272,42 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const erFormularGyldig = sagsData.alias && sagsData.hovedansvarlige;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
+    <div className="p-2 sm:p-4 max-w-5xl mx-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-800">
           {erRedigering ? `Rediger Sag: ${sagsData.alias}` : 'Opret Ny Sag'}
         </h2>
-        {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}
-        <div className="flex justify-end space-x-4">
-          <Button type="button" onClick={onCancel} variant="secondary">
-            Annuller (Esc)
+        <div className="flex justify-end space-x-2">
+          <Button type="button" onClick={onCancel} variant="secondary" className="py-1 px-3 text-sm">
+            Annuller
           </Button>
-          <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary">
+          <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary" className="py-1 px-4 text-sm font-semibold">
             Gem Sag
           </Button>
         </div>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="p-4 border rounded-md">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Generelt</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Generelt Sektion */}
+        <div className="p-3 border rounded-md bg-gray-50/30">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Generelt</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
             {erRedigering && (
               <div>
-                <label htmlFor="sags_nr" className="block text-sm font-medium text-gray-700">SagsNr</label>
-                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+                <label htmlFor="sags_nr" className="block text-xs font-medium text-gray-500">SagsNr</label>
+                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-100 text-sm" />
               </div>
             )}
+
             <div>
-              <label htmlFor="status_id" className="block text-sm font-medium text-gray-700">Status</label>
+              <label htmlFor="status_id" className="block text-xs font-medium text-gray-500">Status</label>
               <select
                 id="status_id"
                 name="status_id"
                 value={sagsData.status_id || ''}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
                 <option value="">Vælg status...</option>
                 {statusser.map(status => (
@@ -315,73 +317,110 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
                 ))}
               </select>
             </div>
+
             <div>
-              <label htmlFor="alias" className="block text-sm font-medium text-gray-700">Alias (Påkrævet)</label>
-              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+              <label htmlFor="alias" className="block text-xs font-medium text-gray-500">Alias (Påkrævet)</label>
+              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
+
             <div>
-              {/* @# 2025-11-10 19:20 - Rettet tastefejl </Lavel> til </label> */}
-              <label htmlFor="hovedansvarlige" className="block text-sm font-medium text-gray-700">Hovedansvarlig (Påkrævet)</label>
-              <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+              <label htmlFor="hovedansvarlige" className="block text-xs font-medium text-gray-500">Hovedansvarlig (Påkrævet)</label>
+              <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            {/* Nye Ejendomsfelter under Generelt */}
+            <div>
+              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
+              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_bfe" className="block text-xs font-medium text-gray-500">BFE Nummer</label>
+              <input type="text" id="bolig_bfe" name="bolig_bfe" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_type" className="block text-xs font-medium text-gray-500">Bolig Type</label>
+              <input type="text" id="bolig_type" name="bolig_type" value={sagsData.bolig_type || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
+              <select
+                id="bolig_anvendelse_id"
+                name="bolig_anvendelse_id"
+                value={sagsData.bolig_anvendelse_id || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">Vælg anvendelse...</option>
+                {bbrAnvendelser.map(anv => (
+                  <option key={anv.id} value={anv.id}>
+                    {anv.kode} - {anv.beskrivelse}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
+              <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
           </div>
         </div>
 
-        <div className="p-4 border rounded-md">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Adresse</h3>
-          <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
-          {isFetchingDetails && <div className="mt-2 text-sm text-gray-500">Henter detaljer...</div>}
+        {/* Adresse Sektion */}
+        <div className="p-3 border rounded-md">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">Adresse</h3>
+          <div className="mb-3">
+            <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
+            {isFetchingDetails && <div className="mt-1 text-xs text-blue-500 flex items-center"><div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div> Henter detaljer fra DAWA...</div>}
+          </div>
 
-          <div className="grid grid-cols-12 gap-4 mt-4">
+          <div className="grid grid-cols-12 gap-x-3 gap-y-2">
             <div className="col-span-12 sm:col-span-6">
-              <label htmlFor="adresse_vej_vis" className="block text-sm font-medium text-gray-700">Vejnavn</label>
-              <input type="text" id="adresse_vej_vis" value={sagsData.adresse_vej || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              <label htmlFor="adresse_vej_vis" className="block text-xs font-medium text-gray-500">Vejnavn</label>
+              <input type="text" id="adresse_vej_vis" value={sagsData.adresse_vej || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
             <div className="col-span-4 sm:col-span-2">
-              <label htmlFor="adresse_husnr_vis" className="block text-sm font-medium text-gray-700">Nr.</label>
-              <input type="text" id="adresse_husnr_vis" value={sagsData.adresse_husnr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              <label htmlFor="adresse_husnr_vis" className="block text-xs font-medium text-gray-500">Nr.</label>
+              <input type="text" id="adresse_husnr_vis" value={sagsData.adresse_husnr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
             <div className="col-span-4 sm:col-span-2">
-              <label htmlFor="adresse_etage_vis" className="block text-sm font-medium text-gray-700">Etage</label>
-              <input type="text" id="adresse_etage_vis" value={sagsData.adresse_etage || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              <label htmlFor="adresse_etage_vis" className="block text-xs font-medium text-gray-500">Etage</label>
+              <input type="text" id="adresse_etage_vis" value={sagsData.adresse_etage || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
             <div className="col-span-4 sm:col-span-2">
-              <label htmlFor="adresse_doer_vis" className="block text-sm font-medium text-gray-700">Dør</label>
-              <input type="text" id="adresse_doer_vis" value={sagsData.adresse_doer || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              <label htmlFor="adresse_doer_vis" className="block text-xs font-medium text-gray-500">Dør</label>
+              <input type="text" id="adresse_doer_vis" value={sagsData.adresse_doer || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
-          </div>
-          <div className="grid grid-cols-12 gap-4 mt-4">
+
             <div className="col-span-12 sm:col-span-4">
-              <label htmlFor="adresse_post_nr_vis" className="block text-sm font-medium text-gray-700">Postnr.</label>
-              <input type="text" id="adresse_post_nr_vis" value={sagsData.adresse_post_nr || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+              <label htmlFor="adresse_post_nr_vis" className="block text-xs font-medium text-gray-500">Postnr.</label>
+              <input type="text" id="adresse_post_nr_vis" value={sagsData.adresse_post_nr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
-            <div className="col-span-12 sm:col-span-8">
-              <label htmlFor="adresse_by_vis" className="block text-sm font-medium text-gray-700">By</label>
-              <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+            <div className="col-span-12 sm:col-span-6">
+              <label htmlFor="adresse_by_vis" className="block text-xs font-medium text-gray-500">By</label>
+              <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
-          </div>
-
-          {/* @# 2025-11-19 20:30 - Visning af kommunekode (skrivebeskyttet) */}
-          <div className="mt-4">
-            <label htmlFor="kommunekode_vis" className="block text-sm font-medium text-gray-700">Kommunekode</label>
-            <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-1 block w-1/4 px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm" />
+            <div className="col-span-12 sm:col-span-2">
+              <label htmlFor="kommunekode_vis" className="block text-xs font-medium text-gray-500">Kommune</label>
+              <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm text-center" />
+            </div>
           </div>
         </div>
 
-        {/* @ 2025-09-14 11:58 - Udkommenteret hele Bolig-blokken */}
-        {/* ... (bolig sektion udeladt for klarhed) ... */}
-
+        {/* Kommentar */}
         <div>
-          <label htmlFor="kommentar" className="block text-sm font-medium text-gray-700">Kommentar</label>
-          <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+          <label htmlFor="kommentar" className="block text-xs font-medium text-gray-500">Kommentar</label>
+          <textarea id="kommentar" name="kommentar" value={sagsData.kommentar || ''} onChange={handleChange} rows={2} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
         </div>
 
-        {/* @# 2025-11-15 12:30 - Udskiftet <button> med <Button> */}
-        <div className="flex justify-end space-x-4 pt-4">
+        <div className="flex justify-end space-x-3 pt-2 border-t mt-4">
           <Button type="button" onClick={onCancel} variant="secondary">
-            Annuller (Esc)
+            Annuller
           </Button>
-          <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary">
+          <Button type="submit" onClick={(e) => handleSubmit(e as any)} disabled={!erFormularGyldig} variant="primary" className="px-6">
             Gem Sag
           </Button>
         </div>

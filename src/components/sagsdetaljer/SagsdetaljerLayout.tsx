@@ -5,14 +5,14 @@ import React, { ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
-    ArrowLeft, Search, Loader2, FileText
+    ArrowLeft, Search, Loader2
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
 import { api } from '../../api';
 
-export type TabType = 'overblik' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning' | 'dokumenter';
+export type TabType = 'overblik' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
 interface SagsdetaljerLayoutProps {
     children: ReactNode;
@@ -33,7 +33,6 @@ const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'forening', label: 'Forening', icon: Building },
     { id: 'kommune', label: 'Kommune', icon: MapPin },
     { id: 'forsyning', label: 'Forsyning', icon: Waves },
-    { id: 'dokumenter', label: 'Dokumenter', icon: FileText },
 ];
 
 function SagsdetaljerLayout({

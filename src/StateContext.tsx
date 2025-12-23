@@ -9,6 +9,7 @@ import type {
   SkabDokument, DokumentskabelonerFilterState,
   Virksomhed, Kontakt,
   VirksomhedFilterState, KontaktFilterState,
+  SagsDokument, // @# Tilføj SagsDokument
   User // @# Husk at importere User
 } from './types';
 
@@ -84,6 +85,8 @@ interface AppState {
   dokumentskabelonerIsLoading: boolean;
   dokumentskabelonerError: string | null;
   erDokumentskabelonerHentet: boolean;
+  // @# Ny: Dokument cache
+  cachedDokumenter: { [sagId: number]: SagsDokument[] };
 }
 
 // --- 2. Definer de handlinger (actions) du kan udføre ---
@@ -106,7 +109,9 @@ type AppAction =
   | { type: 'SET_VIRKSOMHEDER_STATE'; payload: Partial<AppState> }
   | { type: 'SET_KONTAKTER_STATE'; payload: Partial<AppState> }
   | { type: 'SET_DOKUMENTSSKABELONER_STATE'; payload: Partial<AppState> }
-  | { type: 'SET_CACHED_AKTIVITETER'; payload: { sagId: number; aktiviteter: Aktivitet[] } };
+  | { type: 'SET_CACHED_AKTIVITETER'; payload: { sagId: number; aktiviteter: Aktivitet[] } }
+  | { type: 'SET_CACHED_DOKUMENTER'; payload: { sagId: number; dokumenter: SagsDokument[] } }
+  | { type: 'UPDATE_CACHED_DOKUMENT'; payload: { sagId: number; docId: number; updates: Partial<SagsDokument> } };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
   navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
@@ -141,6 +146,7 @@ const initialState: AppState = {
   aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false }),
   aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
   cachedAktiviteter: {},
+  cachedDokumenter: {}, // @# Initialiser tom cache
 
   // Sagsoversigt
   sager: [],
@@ -263,6 +269,28 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
           [action.payload.sagId]: action.payload.aktiviteter
         }
       };
+    case 'SET_CACHED_DOKUMENTER':
+      return {
+        ...state,
+        cachedDokumenter: {
+          ...state.cachedDokumenter,
+          [action.payload.sagId]: action.payload.dokumenter
+        }
+      };
+    case 'UPDATE_CACHED_DOKUMENT': {
+      const { sagId, docId, updates } = action.payload;
+      const currentDocs = state.cachedDokumenter[sagId] || [];
+      const newDocs = currentDocs.map(doc =>
+        doc.id === docId ? { ...doc, ...updates } : doc
+      );
+      return {
+        ...state,
+        cachedDokumenter: {
+          ...state.cachedDokumenter,
+          [sagId]: newDocs
+        }
+      };
+    }
     default:
       return state;
   }

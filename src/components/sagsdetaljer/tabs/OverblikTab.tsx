@@ -144,7 +144,18 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         </div>
                         <div>
                             <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</label>
-                            <p className="text-gray-900 text-sm">{sag.bolig_matrikel || '-'}</p>
+                            <p className="text-gray-900 text-sm font-medium">{sag.bolig_matrikel || '-'}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</label>
+                            <p className="text-gray-900 text-sm font-medium">{sag.bolig_bfe || '-'}</p>
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</label>
+                            <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
                         </div>
                     </div>
 
