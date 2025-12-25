@@ -188,8 +188,8 @@ export interface AktiviteterFilterState {
   dato_ekstern_efter: string;
   dato_ekstern_foer: string;
   overskredet: boolean;
+  vigtige: boolean;
 }
-
 export interface AktivitetGruppeSummary {
   proces: Blokinfo;
   gruppe: Blokinfo;

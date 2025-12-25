@@ -143,7 +143,7 @@ const initialState: AppState = {
   gruppeLoadingStatus: {},
   aktiviteterIsLoading: false,
   aktiviteterError: null,
-  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false }),
+  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
   aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
   cachedAktiviteter: {},
   cachedDokumenter: {}, // @# Initialiser tom cache

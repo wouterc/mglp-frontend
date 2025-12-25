@@ -29,6 +29,7 @@ interface DokumentFilterState {
     status: string; // "alle", "mangler_fil", "har_fil"
     aktiv_filter: string; // "kun_aktive", "alle"
     overskredet: boolean;
+    vigtige: boolean;
 }
 
 const DokumentRow = ({
@@ -117,21 +118,21 @@ const DokumentRow = ({
                     {doc.titel || doc.filnavn || 'Uden navn'}
                 </div>
             </td>
-            <td className="px-2 py-1.5 w-20 relative align-middle overflow-hidden">
+            <td className="px-2 py-1.5 w-20 relative align-middle">
                 <SmartDateInput
                     value={doc.dato_intern}
                     onSave={(val) => onInlineSave(doc.id, 'dato_intern', val)}
                     className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
-            <td className="px-2 py-1.5 w-20 relative align-middle overflow-hidden">
+            <td className="px-2 py-1.5 w-20 relative align-middle">
                 <SmartDateInput
                     value={doc.dato_ekstern}
                     onSave={(val) => onInlineSave(doc.id, 'dato_ekstern', val)}
                     className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
-            <td className="px-0 py-1.5 w-20 relative align-middle overflow-hidden">
+            <td className="px-0 py-1.5 w-20 relative align-middle">
                 {/* Combined Meta Column: Info, Link, Comment, Template */}
                 <div className="flex items-center justify-center gap-1.5 h-full">
                     {/* Slot 1: Skabelon Info */}
@@ -388,7 +389,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         ansvarlig: '',
         status: 'alle',
         aktiv_filter: 'kun_aktive',
-        overskredet: false
+        overskredet: false,
+        vigtige: false
     });
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -406,7 +408,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             ansvarlig: '',
             status: 'alle',
             aktiv_filter: 'kun_aktive',
-            overskredet: false
+            overskredet: false,
+            vigtige: false
         });
     };
 
@@ -726,6 +729,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
                 // Hvis ingen af datoerne er i fortiden, er den ikke overskredet
                 if (!internPast && !eksternPast) return false;
+            }
+
+            // Vigtige (Important comments) Filter
+            if (filters.vigtige && !doc.kommentar_vigtig) {
+                return false;
             }
 
             return true;
@@ -1089,6 +1097,16 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             />
                             <span>Vis kun overskredne</span>
                         </label>
+                        <label className="flex items-center space-x-2 text-sm cursor-pointer mt-1">
+                            <input
+                                type="checkbox"
+                                name="vigtige"
+                                checked={filters.vigtige}
+                                onChange={handleFilterChange}
+                                className="rounded text-red-600 focus:ring-red-500"
+                            />
+                            <span>Kun vigtige kommentarer</span>
+                        </label>
                     </div>
                 </div>
             </FilterSidebar>
@@ -1126,8 +1144,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 headerActions={
                     <button
                         onClick={handleSaveCommentFromModal}
-                        disabled={isSavingComment}
-                        className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                        disabled={isSavingComment || (editCommentText === (editingDoc?.kommentar || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false))}
+                        className={`p-2 rounded-full text-white transition-all shadow-md active:scale-95 disabled:opacity-30 ${editCommentText === (editingDoc?.kommentar || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false)
+                                ? 'bg-gray-400'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
                         title="Gem"
                     >
                         {isSavingComment ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
@@ -1143,7 +1164,29 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             <input
                                 type="checkbox"
                                 checked={editCommentImportant}
-                                onChange={(e) => setEditCommentImportant(e.target.checked)}
+                                onChange={async (e) => {
+                                    const val = e.target.checked;
+                                    setEditCommentImportant(val);
+                                    if (editingDoc) {
+                                        try {
+                                            // Auto-save immediately for the checkbox
+                                            await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, {
+                                                kommentar_vigtig: val
+                                            });
+                                            // Update local state and cache
+                                            const updatedDoc = { ...editingDoc, kommentar_vigtig: val };
+                                            setEditingDoc(updatedDoc);
+                                            dispatch({
+                                                type: 'UPDATE_CACHED_DOKUMENT',
+                                                payload: {
+                                                    sagId: sag.id, docId: editingDoc.id, updates: { kommentar_vigtig: val }
+                                                }
+                                            });
+                                        } catch (err) {
+                                            console.error("Auto-save error:", err);
+                                        }
+                                    }
+                                }}
                                 className="rounded text-red-600 focus:ring-red-500"
                             />
                             <span className={editCommentImportant ? "font-bold text-red-600" : ""}>Vigtig / Obs</span>

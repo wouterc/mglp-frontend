@@ -29,6 +29,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
         kommentar_vigtig: false,
         sag_id: sagId,
     });
+    const [baseAktivitet, setBaseAktivitet] = useState<Aktivitet | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const erRedigering = aktivitet != null;
 
@@ -41,15 +42,29 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                 kommentar_vigtig: aktivitet.kommentar_vigtig || false,
                 sag_id: sagId,
             });
+            setBaseAktivitet(aktivitet);
         }
     }, [aktivitet, erRedigering, sagId]);
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = async (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const target = e.target as HTMLInputElement;
         const value = target.type === 'checkbox' ? target.checked : target.value;
         const name = target.name;
 
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Auto-save logic for the "Important" flag
+        if (name === 'kommentar_vigtig' && erRedigering && aktivitet) {
+            try {
+                await api.patch(`/aktiviteter/${aktivitet.id}/`, {
+                    kommentar_vigtig: value
+                });
+                // Update baseAktivitet so the Save button dims again if no other changes
+                setBaseAktivitet(prev => prev ? { ...prev, kommentar_vigtig: value as boolean } : null);
+            } catch (err) {
+                console.error("Auto-save error:", err);
+            }
+        }
     };
 
     const handleSubmit = async (e?: FormEvent) => {
@@ -83,8 +98,19 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
             headerActions={
                 <button
                     onClick={() => handleSubmit()}
-                    disabled={isSaving}
-                    className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    disabled={isSaving || (
+                        formData.aktivitet === (baseAktivitet?.aktivitet || '') &&
+                        formData.kommentar === (baseAktivitet?.kommentar || '') &&
+                        formData.resultat === (baseAktivitet?.resultat || '') &&
+                        formData.kommentar_vigtig === (baseAktivitet?.kommentar_vigtig || false)
+                    )}
+                    className={`p-2 rounded-full text-white transition-all shadow-md active:scale-95 disabled:opacity-30 ${(formData.aktivitet === (baseAktivitet?.aktivitet || '') &&
+                            formData.kommentar === (baseAktivitet?.kommentar || '') &&
+                            formData.resultat === (baseAktivitet?.resultat || '') &&
+                            formData.kommentar_vigtig === (baseAktivitet?.kommentar_vigtig || false))
+                            ? 'bg-gray-400'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                     title="Gem"
                 >
                     {isSaving ? (
@@ -122,8 +148,8 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                         autoFocus
                         placeholder={placeholder}
                         className={`mt-1 w-full p-2 border rounded-md shadow-sm outline-none transition-all ${isComment && formData.kommentar_vigtig
-                                ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500'
-                                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500'
+                            : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
                             }`}
                     ></textarea>
                 </div>

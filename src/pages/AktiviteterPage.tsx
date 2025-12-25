@@ -102,6 +102,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (filters.dato_intern_efter) params.append('dato_intern_efter', filters.dato_intern_efter);
         if (filters.dato_intern_foer) params.append('dato_intern_foer', filters.dato_intern_foer);
         if (filters.overskredet) params.append('overskredet', 'true');
+        if (filters.vigtige) params.append('vigtige', 'true');
         return params.toString();
     }, []);
 
@@ -304,6 +305,11 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
                 // Hvis ingen af datoerne er i fortiden, er den ikke overskredet
                 if (!internPast && !eksternPast) return false;
+            }
+
+            // Vigtige (Important comments) Filter
+            if (filters.vigtige && !a.kommentar_vigtig) {
+                return false;
             }
 
             return true;

@@ -1,7 +1,5 @@
-// --- Fil: src/components/SmartDateInput.tsx ---
-// @# 2025-09-15 16:22 - Oprettet ny komponent til smart håndtering af dato-input.
-// @# 2025-09-15 16:35 - Ændret til <input type="text"> for at give fuld kontrol over smart-logik.
 import React, { useState, useEffect, FocusEvent, MouseEvent } from 'react';
+import Tooltip from './Tooltip';
 
 interface SmartDateInputProps {
   value: string | null; // Forventer altid YYYY-MM-DD format
@@ -9,7 +7,7 @@ interface SmartDateInputProps {
   className?: string;
 }
 
-// Hjælpefunktion til at formatere dato til DD-MM-YYYY for pænere visning
+// Hjælpefunktion til at formatere dato til DD-MM-YY for pænere visning
 const formatDateForDisplay = (isoDate: string | null): string => {
   if (!isoDate) return '';
   const parts = isoDate.split('-');
@@ -27,7 +25,7 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
   }, [value]);
 
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
-    const input = e.target.value.trim();
+    const input = e.target.value.trim().toLowerCase();
 
     // Hvis input er tomt, gem null
     if (input === '') {
@@ -41,7 +39,15 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
     }
 
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     let newDate: Date | null = null;
+
+    // Tjek for relative genveje (+2, -1 osv)
+    const relativeMatch = input.match(/^([+-])(\d+)$/);
+
+    // Tjek for ugedag (ma, ti, on, to, fr, lø, sø)
+    const weekdaysDk = ['sø', 'ma', 'ti', 'on', 'to', 'fr', 'lø'];
+    const weekdayIdx = weekdaysDk.indexOf(input);
 
     // Tjek for format "d/M" eller "d-M"
     const dayMonthMatch = input.match(/^(\d{1,2})[./-](\d{1,2})$/);
@@ -49,18 +55,38 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
     // Tjek for fuldt format "d-M-yyyy", "d/M/yyyy" eller "d.M.yyyy"
     const fullDateMatch = input.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
 
-    if (fullDateMatch) {
+    if (relativeMatch) {
+      const sign = relativeMatch[1] === '+' ? 1 : -1;
+      const days = parseInt(relativeMatch[2], 10);
+      newDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (sign * days));
+    }
+    else if (weekdayIdx !== -1) {
+      const currentDay = today.getDay(); // 0 = søndag
+      let diff = weekdayIdx - currentDay;
+      if (diff <= 0) diff += 7; // Altid næste forekomst
+      newDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
+    }
+    else if (input === 'i dag' || input === 'idag' || input === 'id') {
+      newDate = today;
+    }
+    else if (input === 'imorgen' || input === 'i morgen' || input === 'im') {
+      newDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    }
+    else if (fullDateMatch) {
       const day = parseInt(fullDateMatch[1], 10);
       const month = parseInt(fullDateMatch[2], 10) - 1;
       let year = parseInt(fullDateMatch[3], 10);
-      // Håndter 2-cifret årstal (antag 20xx)
       if (year < 100) year += 2000;
       newDate = new Date(year, month, day);
     }
     else if (dayMonthMatch) {
       const day = parseInt(dayMonthMatch[1], 10);
-      const month = parseInt(dayMonthMatch[2], 10) - 1; // JS months are 0-indexed
-      newDate = new Date(today.getFullYear(), month, day);
+      const month = parseInt(dayMonthMatch[2], 10) - 1;
+      let tempDate = new Date(today.getFullYear(), month, day);
+      if (tempDate < today) {
+        tempDate = new Date(today.getFullYear() + 1, month, day);
+      }
+      newDate = tempDate;
     }
     // Tjek for kun dag "d"
     else if (/^\d{1,2}$/.test(input)) {
@@ -71,8 +97,6 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
         newDate = new Date(today.getFullYear(), today.getMonth() + 1, day);
       }
     } else {
-      // Forsøg at parse input som en almindelig dato (hvis brugeren selv skriver)
-      // Bemærk: new Date("dd-mm-yyyy") virker ofte ikke, derfor er regex ovenfor vigtig
       const parsed = new Date(input);
       if (!isNaN(parsed.getTime())) {
         newDate = parsed;
@@ -80,44 +104,53 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
     }
 
     if (newDate && !isNaN(newDate.getTime())) {
-      // Formatér til YYYY-MM-DD for at gemme
       const year = newDate.getFullYear();
       const month = (newDate.getMonth() + 1).toString().padStart(2, '0');
       const day = newDate.getDate().toString().padStart(2, '0');
       const formattedToSave = `${year}-${month}-${day}`;
 
-      // Opdater kun hvis den nye dato er anderledes end den gamle
       if (formattedToSave !== value) {
         onSave(formattedToSave);
       }
       setDisplayValue(formatDateForDisplay(formattedToSave));
-
     } else {
-      // Hvis input ikke genkendes, nulstil til den oprindelige værdi
       setDisplayValue(formatDateForDisplay(value));
     }
   };
 
-  // Viser browserens datovælger, når man klikker på tekstfeltet
   const showPicker = (e: MouseEvent<HTMLInputElement>) => {
     try {
       (e.target as HTMLInputElement).showPicker();
     } catch (error) {
-      // Nogle browsere understøtter ikke showPicker()
       console.error("showPicker() is not supported by this browser.");
     }
   }
 
+  const tooltipHtml = (
+    <div className="text-[11px] leading-relaxed">
+      <div className="font-bold border-b border-gray-600 mb-1 pb-1">Smarte genveje:</div>
+      <ul className="space-y-0.5">
+        <li><span className="text-blue-300 font-mono">+n / -n:</span> n dage fra i dag (f.eks. +2)</li>
+        <li><span className="text-blue-300 font-mono">nn:</span> Næste d. nn (f.eks. 21)</li>
+        <li><span className="text-blue-300 font-mono">dd/mm:</span> Næste dd. mm. (f.eks. 21/12)</li>
+        <li><span className="text-blue-300 font-mono">ma, ti...:</span> Næste ugedag</li>
+        <li><span className="text-blue-300 font-mono">id / im:</span> I dag / I morgen</li>
+      </ul>
+    </div>
+  );
+
   return (
-    <input
-      type="text" // Ændret til text for fuld kontrol
-      value={displayValue}
-      placeholder="dd-mm-åå"
-      onChange={(e) => setDisplayValue(e.target.value)}
-      onBlur={handleBlur}
-      onClick={showPicker}
-      className={className}
-    />
+    <Tooltip content={tooltipHtml}>
+      <input
+        type="text"
+        value={displayValue}
+        placeholder="dd-mm-åå"
+        onChange={(e) => setDisplayValue(e.target.value)}
+        onBlur={handleBlur}
+        onClick={showPicker}
+        className={className}
+      />
+    </Tooltip>
   );
 }
 

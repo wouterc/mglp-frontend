@@ -65,7 +65,8 @@ function AktiviteterFilter() {
             dato_intern_foer: '',
             dato_ekstern_efter: '',
             dato_ekstern_foer: '',
-            overskredet: false
+            overskredet: false,
+            vigtige: false
         };
         dispatch({
             type: 'SET_AKTIVITETER_STATE',
@@ -107,8 +108,11 @@ function AktiviteterFilter() {
                 </div>
 
                 <div className="pt-2 border-t mt-2">
-                    <label className="flex items-center space-x-2 text-sm">
+                    <label className="flex items-center space-x-2 text-sm cursor-pointer">
                         <input type="checkbox" name="overskredet" checked={aktiviteterFilters.overskredet} onChange={handleFilterChange} /> <span>Vis kun overskredne</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm cursor-pointer mt-1">
+                        <input type="checkbox" name="vigtige" checked={aktiviteterFilters.vigtige} onChange={handleFilterChange} className="rounded text-red-600 focus:ring-red-500" /> <span>Kun vigtige kommentarer</span>
                     </label>
                 </div>
             </div>
