@@ -172,6 +172,7 @@ export interface Aktivitet {
   proces: Blokinfo | null;
   gruppe: Blokinfo | null;
   kommentar: string | null;
+  kommentar_vigtig?: boolean;
   note: string | null;
   skabelon_note: string | null;
   er_ny?: boolean;
@@ -309,7 +310,9 @@ export interface SagsDokument {
   link: string | null;
   aktiv: boolean;
   udgaaet: boolean;
+  status?: Status;
   kommentar: string | null;
+  kommentar_vigtig?: boolean;
   dato_intern: string | null;
   dato_ekstern: string | null;
   ansvarlig: number | null; // User ID

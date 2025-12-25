@@ -226,8 +226,8 @@ function SagsdetaljerLayout({
                 </nav>
 
                 {/* Højre Indhold (Aktiv Fane) */}
-                <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-                    <div className="max-w-5xl mx-auto">
+                <main className="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+                    <div className="w-full">
                         {children}
                     </div>
                 </main>

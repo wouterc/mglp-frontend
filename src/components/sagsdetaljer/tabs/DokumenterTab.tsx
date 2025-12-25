@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Sag, SagsDokument, Blokinfo } from '../../../types';
 import { api } from '../../../api';
-import { Loader2, FileText, RefreshCw, UploadCloud, CheckCircle, Upload, Trash2, Info, MessageSquare, Pencil, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Search, SlidersHorizontal, FunnelX, ExternalLink, PlusCircle } from 'lucide-react';
+import { Loader2, FileText, RefreshCw, UploadCloud, CheckCircle, Upload, Trash2, Info, MessageSquare, Pencil, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Search, SlidersHorizontal, FunnelX, ExternalLink, PlusCircle, Save, CheckCircle2 } from 'lucide-react';
 import { useAppState } from '../../../StateContext';
 import Modal from '../../Modal';
 import ConfirmModal from '../../ui/ConfirmModal';
@@ -40,7 +40,9 @@ const DokumentRow = ({
     onEditComment,
     onRename,
     onInlineSave,
-    onSaveToTemplate
+    onSaveToTemplate,
+    statusser,
+    onStatusToggle
 }: {
     doc: SagsDokument;
     sag: Sag;
@@ -51,6 +53,8 @@ const DokumentRow = ({
     onRename: (doc: SagsDokument) => void;
     onInlineSave: (docId: number, field: string, value: any) => Promise<void>;
     onSaveToTemplate: (doc: SagsDokument) => void;
+    statusser: any[];
+    onStatusToggle: (doc: SagsDokument) => void;
 }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -105,95 +109,111 @@ const DokumentRow = ({
                 />
             </td>
             {/* Nr Column: Left aligned to be close to checkbox */}
-            <td className="px-0 py-3 font-mono text-gray-500 text-xs text-left pl-1 w-10 whitespace-nowrap">
+            <td className="px-0 py-1.5 font-mono text-gray-500 text-[10px] text-left pl-1 w-10 whitespace-nowrap align-middle">
                 {doc.gruppe_nr}.{doc.dokument_nr}
             </td>
-            <td className="px-2 py-3 w-[20%]">
-                <div className="font-medium text-gray-800 truncate" title={doc.titel || doc.filnavn}>
+            <td className="px-2 py-1.5 w-52 align-middle overflow-hidden">
+                <div className="font-medium text-gray-800 truncate" title={doc.titel || doc.filnavn || ''}>
                     {doc.titel || doc.filnavn || 'Uden navn'}
                 </div>
             </td>
-            <td className="px-0 py-3 w-16 relative">
-                {/* Combined Meta Column: Info (Left), Link (Middle), Comment (Right), Template (Extra) */}
-                <div className="grid grid-cols-4 gap-0 items-center justify-items-center w-full">
-
+            <td className="px-2 py-1.5 w-20 relative align-middle overflow-hidden">
+                <SmartDateInput
+                    value={doc.dato_intern}
+                    onSave={(val) => onInlineSave(doc.id, 'dato_intern', val)}
+                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
+                />
+            </td>
+            <td className="px-2 py-1.5 w-20 relative align-middle overflow-hidden">
+                <SmartDateInput
+                    value={doc.dato_ekstern}
+                    onSave={(val) => onInlineSave(doc.id, 'dato_ekstern', val)}
+                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
+                />
+            </td>
+            <td className="px-0 py-1.5 w-20 relative align-middle overflow-hidden">
+                {/* Combined Meta Column: Info, Link, Comment, Template */}
+                <div className="flex items-center justify-center gap-1.5 h-full">
                     {/* Slot 1: Skabelon Info */}
-                    <div className="w-5 flex justify-center">
+                    <div className="w-4 flex justify-center">
                         {doc.skabelon_kommentar ? (
                             <div className="relative group/info inline-block">
-                                <Info size={14} className="text-blue-400 cursor-help" />
+                                <Info size={14} className="text-amber-500 cursor-help" />
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible z-50 transition-all pointer-events-none text-left">
                                     {doc.skabelon_kommentar}
                                 </div>
                             </div>
-                        ) : <div className="w-4 h-4" />} {/* Placeholder */}
+                        ) : <div className="w-4 h-4" />}
                     </div>
 
                     {/* Slot 2: Link */}
-                    <div className="w-5 flex justify-center">
+                    <div className="w-4 flex justify-center">
                         {processedLink ? (
                             <div className="relative group/extlink inline-block">
-                                <a
-                                    href={processedLink}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-blue-500 hover:text-blue-700 transition-colors"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
+                                <a href={processedLink} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700" onClick={(e) => e.stopPropagation()}>
                                     <ExternalLink size={14} />
                                 </a>
-                                {/* Tooltip for the link address */}
-                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-xs p-2 bg-gray-800 text-white text-[10px] rounded shadow-lg opacity-0 invisible group-hover/extlink:opacity-100 group-hover/extlink:visible z-50 transition-all pointer-events-none break-all">
-                                    {processedLink}
-                                </div>
                             </div>
-                        ) : <div className="w-4 h-4" />} {/* Placeholder */}
+                        ) : <div className="w-4 h-4" />}
                     </div>
 
                     {/* Slot 3: User Comment */}
                     <div className="w-5 flex justify-center">
-                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip content={doc.kommentar || "Tilføj kommentar"}>
                             <button
                                 onClick={() => onEditComment(doc)}
-                                className={`p-0.5 rounded transition-colors ${doc.kommentar ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
-                                title="Rediger kommentar"
+                                className={`p-0.5 rounded transition-colors ${doc.kommentar_vigtig
+                                    ? 'text-red-600 hover:bg-red-50'
+                                    : doc.kommentar
+                                        ? 'text-blue-600 hover:bg-blue-50'
+                                        : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
+                                    }`}
                             >
                                 <MessageSquare size={14} fill={doc.kommentar ? "currentColor" : "none"} />
                             </button>
-                            {/* Tooltip for existing comment on hover */}
-                            {doc.kommentar && (
-                                <div className="absolute right-full mr-2 top-0 w-48 p-2 bg-white text-gray-800 text-xs rounded border border-gray-200 shadow-lg opacity-0 hover:opacity-100 z-50 pointer-events-none whitespace-normal break-words text-left">
-                                    {doc.kommentar}
-                                </div>
-                            )}
-                        </div>
+                        </Tooltip>
                     </div>
 
-                    {/* Slot 4: Gem til skabelon (kun for 'nye' dokumenter uden skabelon-id) */}
-                    <div className="w-5 flex justify-center">
-                        {!doc.skabelon && (
-                            <div className="relative inline-block">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onSaveToTemplate(doc); }}
-                                    className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                                >
-                                    <UploadCloud size={14} />
-                                </button>
-                                <div className="absolute right-full mr-2 top-0 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 hover:opacity-100 z-50 pointer-events-none whitespace-normal break-words text-left">
-                                    Dette dokument er oprettet manuelt. Klik for at gemme det som en permanent skabelon.
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    {/* Slot 4: Template Upload */}
+                    {!doc.skabelon && (
+                        <div className="w-5 flex justify-center">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onSaveToTemplate(doc); }}
+                                className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                            >
+                                <UploadCloud size={14} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </td>
-            <td className="px-2 py-3 w-[25%] relative">
+            <td className={`px-2 py-1.5 w-40 relative transition-colors align-middle overflow-hidden ${doc.status?.status_nummer === 80 ? 'bg-green-50' : ''}`}>
+                <div className="flex items-center gap-1.5 h-7">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onStatusToggle(doc); }}
+                        className={`w-5 h-5 flex items-center justify-center flex-shrink-0 transition-colors ${doc.status?.status_nummer === 80 ? 'text-green-600' : 'text-gray-300 hover:text-gray-400'}`}
+                        title={doc.status?.status_nummer === 80 ? "Sæt til 'Oprettet'" : "Sæt til 'Udført'"}
+                    >
+                        <CheckCircle2 size={16} fill={doc.status?.status_nummer === 80 ? "currentColor" : "none"} strokeWidth={2.5} />
+                    </button>
+                    <select
+                        value={doc.status?.id || ''}
+                        onChange={(e) => onInlineSave(doc.id, 'status_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                        className={`flex-grow h-7 py-0 px-1 border border-slate-400 rounded text-[11px] bg-white focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'bg-green-50' : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <option value="">Vælg...</option>
+                        {statusser.map((s: any) => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
+                    </select>
+                </div>
+            </td>
+            <td className="px-2 py-1.5 w-auto relative align-middle overflow-hidden">
                 {/* Fil Column */}
                 {/* 
                     Requirement: "Make the border around equal, also for those where no document is connected to."
                     We use a consistent container style for both states.
                 */}
-                <div className={`flex items-center gap-2 border rounded px-1 py-1 transition-all shadow-sm min-h-[32px] bg-white
+                <div className={`flex items-center gap-2 border rounded px-1 py-1 transition-all shadow-sm min-h-[32px] bg-white overflow-hidden
                     ${isDragActive ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-400 hover:border-blue-400'}
                 `}>
                     <div className="flex-1 flex items-center min-w-0">
@@ -237,7 +257,7 @@ const DokumentRow = ({
                                 className="flex items-center gap-2 text-gray-500 text-xs cursor-pointer w-full"
                             >
                                 <Upload size={14} />
-                                <span>{isDragActive ? 'Slip filen for at uploade' : 'Træk fil herind eller klik for at vælge'}</span>
+                                <span className="truncate">{isDragActive ? 'Slip filen' : 'Klik / træk fil her'}</span>
                             </div>
                         )}
                     </div>
@@ -250,21 +270,7 @@ const DokumentRow = ({
                     </div>
                 )}
             </td>
-            <td className="px-2 py-3 w-24 relative">
-                <SmartDateInput
-                    value={doc.dato_intern}
-                    onSave={(val) => onInlineSave(doc.id, 'dato_intern', val)}
-                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-xs bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
-                />
-            </td>
-            <td className="px-2 py-3 w-24 relative">
-                <SmartDateInput
-                    value={doc.dato_ekstern}
-                    onSave={(val) => onInlineSave(doc.id, 'dato_ekstern', val)}
-                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-xs bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
-                />
-            </td>
-            <td className="px-2 py-3 w-28">
+            <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
                 <select
                     value={doc.ansvarlig || ''}
                     onChange={(e) => onInlineSave(doc.id, 'ansvarlig', e.target.value === '' ? null : parseInt(e.target.value))}
@@ -278,8 +284,7 @@ const DokumentRow = ({
                     ))}
                 </select>
             </td>
-            <td className="px-2 py-3 text-right w-10">
-                {doc.fil && <CheckCircle size={14} className="text-green-500 inline-block" />}
+            <td className="px-2 py-3 text-right w-8">
             </td>
         </tr>
     );
@@ -294,11 +299,17 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const [sagSearchResults, setSagSearchResults] = useState<SøgeResultat[]>([]);
     const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
     const [colleagues, setColleagues] = useState<UserType[]>([]);
+    const [statusser, setStatusser] = useState<any[]>([]);
 
-    // Fetch colleagues
+    // Fetch colleagues and statuses
     useEffect(() => {
         api.get<UserType[]>('/kerne/users/').then(data => {
             setColleagues(data.filter(u => u.is_active));
+        });
+        api.get<any[]>('/kerne/status/?formaal=3').then(data => {
+            // StatusViewSet supports pagination if using DefaultRouter, but here it might return .results
+            const statuses = (data as any).results || data;
+            setStatusser(statuses);
         });
     }, []);
 
@@ -402,6 +413,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // State for Comment Modal
     const [editingDoc, setEditingDoc] = useState<SagsDokument | null>(null);
     const [editCommentText, setEditCommentText] = useState('');
+    const [editCommentImportant, setEditCommentImportant] = useState(false);
     const [isSavingComment, setIsSavingComment] = useState(false);
 
     // State for Rename Modal
@@ -469,10 +481,16 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             fileToUpload = new File([file], newName, { type: file.type });
         }
 
-        const formData = new FormData();
-        formData.append('fil', fileToUpload);
-
         try {
+            const formData = new FormData();
+            formData.append('fil', fileToUpload);
+
+            // Auto-set status to 80 (Udført) when file is uploaded
+            const status80 = statusser.find(s => s.status_nummer === 80);
+            if (status80) {
+                formData.append('status_id', status80.id.toString());
+            }
+
             await api.patch(`/sager/sagsdokumenter/${docId}/`, formData);
             await fetchDokumenter(true);
         } catch (e) {
@@ -496,16 +514,25 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const openEditModal = (doc: SagsDokument) => {
         setEditingDoc(doc);
         setEditCommentText(doc.kommentar || '');
+        setEditCommentImportant(doc.kommentar_vigtig || false);
     };
 
     const handleSaveCommentFromModal = async () => {
         if (!editingDoc) return;
         setIsSavingComment(true);
         try {
-            await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, { kommentar: editCommentText });
+            await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, {
+                kommentar: editCommentText,
+                kommentar_vigtig: editCommentImportant
+            });
             dispatch({
                 type: 'UPDATE_CACHED_DOKUMENT',
-                payload: { sagId: sag.id, docId: editingDoc.id, updates: { kommentar: editCommentText } }
+                payload: {
+                    sagId: sag.id, docId: editingDoc.id, updates: {
+                        kommentar: editCommentText,
+                        kommentar_vigtig: editCommentImportant
+                    }
+                }
             });
             setEditingDoc(null);
         } catch (e) {
@@ -552,14 +579,25 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const handleInlineSave = async (docId: number, field: string, value: any) => {
         try {
-            await api.patch(`/sager/sagsdokumenter/${docId}/`, { [field]: value });
+            const response = await api.patch<any>(`/sager/sagsdokumenter/${docId}/`, { [field]: value });
             // Manual update in cache to avoid full reload
             dispatch({
                 type: 'UPDATE_CACHED_DOKUMENT',
-                payload: { sagId: sag.id, docId, updates: { [field]: value } }
+                payload: { sagId: sag.id, docId, updates: response }
             });
+            if (onUpdate) onUpdate();
         } catch (error) {
             console.error(`Fejl ved gem af ${field}:`, error);
+        }
+    };
+
+    const handleStatusToggle = async (doc: SagsDokument) => {
+        const isDone = doc.status?.status_nummer === 80;
+        const targetStatusNr = isDone ? 10 : 80;
+        const targetStatus = statusser.find((s: any) => s.status_nummer === targetStatusNr);
+
+        if (targetStatus) {
+            await handleInlineSave(doc.id, 'status_id', targetStatus.id);
         }
     };
 
@@ -580,9 +618,10 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 gruppe: gruppeId,
                 titel: navn,
                 dokument_nr: nextNr,
-                aktiv: true
+                aktiv: true,
+                status_id: statusser.find((s: any) => s.status_nummer === 10)?.id || null
             });
-            setQuickAddValues(prev => ({ ...prev, [gruppeId]: '' }));
+            setQuickAddValues((prev: any) => ({ ...prev, [gruppeId]: '' }));
             await fetchDokumenter(true);
         } catch (e: any) {
             console.error("Fejl ved hurtig-tilføj:", e);
@@ -590,7 +629,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             const errorMsg = e.response?.data ? JSON.stringify(e.response.data) : (e.message || "Ukendt fejl");
             alert("Fejl ved hurtig-tilføj: " + errorMsg);
         } finally {
-            setIsSavingNy(prev => ({ ...prev, [gruppeId]: false }));
+            setIsSavingNy((prev: any) => ({ ...prev, [gruppeId]: false }));
         }
     };
 
@@ -875,21 +914,22 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                     <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-gray-800 text-white font-medium">
                             <tr>
-                                <th className="px-0 py-3 w-8 text-right pr-1">Aktiv</th>
-                                <th className="px-0 py-3 w-10 text-left pl-1">Nr</th>
-                                <th className="px-2 py-3 w-[20%]">Dokument / Gruppe</th>
-                                <th className="px-0 py-3 w-16 text-center">Info</th>
-                                <th className="px-2 py-3 w-[25%]">Fil</th>
-                                <th className="px-2 py-3 w-24">Dato Int.</th>
-                                <th className="px-2 py-3 w-24">Dato Eks.</th>
-                                <th className="px-2 py-3 w-28">Ansvarlig</th>
-                                <th className="px-2 py-3 text-right w-10">Status</th>
+                                <th className="px-0 py-3 w-8 text-right pr-1 border-b border-gray-700">Akt</th>
+                                <th className="px-0 py-3 w-10 text-left pl-1 border-b border-gray-700">Nr</th>
+                                <th className="px-2 py-3 w-52 border-b border-gray-700">Dokument</th>
+                                <th className="px-2 py-3 w-20 border-b border-gray-700 text-center">Dato Int.</th>
+                                <th className="px-2 py-3 w-20 border-b border-gray-700 text-center">Dato Ekst.</th>
+                                <th className="px-1 py-3 w-20 border-b border-gray-700 text-center">Info</th>
+                                <th className="px-2 py-3 w-40 border-b border-gray-700">Status</th>
+                                <th className="px-2 py-3 w-auto border-b border-gray-700">Fil</th>
+                                <th className="px-2 py-3 w-24 text-left border-b border-gray-700">Ansvarlig</th>
+                                <th className="px-2 py-3 text-right w-8 border-b border-gray-700"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {processedGroups.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
                                         <div className="flex flex-col items-center">
                                             <FileText size={32} className="text-gray-300 mb-2" />
                                             <p>Ingen dokumenter fundet.</p>
@@ -908,7 +948,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                             className="bg-gray-100 hover:bg-gray-200 cursor-pointer transition-colors border-b border-gray-200"
                                             onClick={() => toggleGroup(group.name)}
                                         >
-                                            <td colSpan={9} className="px-4 py-2 text-gray-800">
+                                            <td colSpan={10} className="px-4 py-2 text-gray-800">
                                                 <div className="flex items-center gap-2 select-none">
                                                     {isGroupExpanded(group.name) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                     <span className="font-bold text-sm">{group.nr} - {group.name}</span>
@@ -929,6 +969,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 doc={doc}
                                                 sag={sag}
                                                 colleagues={colleagues}
+                                                statusser={statusser}
+                                                onStatusToggle={handleStatusToggle}
                                                 onUpload={handleUploadFile}
                                                 onDelete={handleDeleteFile}
                                                 onEditComment={openEditModal}
@@ -944,31 +986,29 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 <td className="px-0 py-1 text-center text-blue-300">
                                                     <PlusCircle size={14} className="mx-auto" />
                                                 </td>
-                                                {/* Input: Spans Nr, Dok, Info, Fil (4 cols) */}
-                                                <td colSpan={4} className="px-1 py-1">
+                                                {/* Input: Spans Nr, Dok, Datoer (5 cols total with icon) */}
+                                                <td colSpan={5} className="px-1 py-1">
                                                     <form onSubmit={(e) => handleQuickAdd(group.id!, e)}>
                                                         <input
                                                             type="text"
                                                             placeholder="Nyt dokument navn... (Enter for at gemme)"
                                                             value={quickAddValues[group.id!] || ''}
-                                                            onChange={(e) => setQuickAddValues(prev => ({ ...prev, [group.id!]: e.target.value }))}
+                                                            onChange={(e) => setQuickAddValues((prev: any) => ({ ...prev, [group.id!]: e.target.value }))}
                                                             className="w-full px-2 py-0.5 text-sm border border-blue-100 rounded focus:ring-1 focus:ring-blue-400 outline-none bg-white/50"
                                                         />
                                                     </form>
                                                 </td>
-                                                {/* Button: Spans Dato Int, Dato Eks (2 cols) */}
-                                                <td colSpan={2} className="px-2 py-1">
+                                                {/* Button: Spans Info, Status, Fil, Ansvarlig + Empty (5 cols) */}
+                                                <td colSpan={4} className="px-2 py-1">
                                                     <button
                                                         onClick={() => handleQuickAdd(group.id!)}
                                                         disabled={isSavingNy[group.id!] || !quickAddValues[group.id!]?.trim()}
                                                         className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors inline-flex items-center gap-1"
                                                     >
                                                         {isSavingNy[group.id!] ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
-                                                        Tilføj
+                                                        Hurtig-tilføj
                                                     </button>
                                                 </td>
-                                                {/* Filler: Spans Ansvarlig, Status (2 cols) */}
-                                                <td colSpan={2}></td>
                                             </tr>
                                         )}
                                     </React.Fragment>
@@ -1082,35 +1122,40 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 isOpen={!!editingDoc}
                 onClose={() => setEditingDoc(null)}
                 title="Rediger kommentar"
-                footer={
-                    <div className="flex justify-end gap-2">
-                        <button
-                            onClick={() => setEditingDoc(null)}
-                            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                            Annuller
-                        </button>
-                        <button
-                            onClick={handleSaveCommentFromModal}
-                            disabled={isSavingComment}
-                            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {isSavingComment ? 'Gemmer...' : 'Gem'}
-                        </button>
-                    </div>
+                maxWidth="max-w-lg"
+                headerActions={
+                    <button
+                        onClick={handleSaveCommentFromModal}
+                        disabled={isSavingComment}
+                        className="p-2 rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                        title="Gem"
+                    >
+                        {isSavingComment ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                    </button>
                 }
             >
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Kommentar til "{editingDoc?.titel || editingDoc?.filnavn}"
-                    </label>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-gray-700">
+                            Kommentar til "{editingDoc?.titel || editingDoc?.filnavn || 'Dokument'}"
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={editCommentImportant}
+                                onChange={(e) => setEditCommentImportant(e.target.checked)}
+                                className="rounded text-red-600 focus:ring-red-500"
+                            />
+                            <span className={editCommentImportant ? "font-bold text-red-600" : ""}>Vigtig / Obs</span>
+                        </label>
+                    </div>
                     <textarea
                         autoFocus
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        rows={6}
+                        className={`w-full border rounded-md shadow-sm p-2 text-sm outline-none transition-all ${editCommentImportant ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'}`}
                         value={editCommentText}
                         onChange={(e) => setEditCommentText(e.target.value)}
-                        placeholder="Skriv en kommentar her..."
+                        placeholder="Skriv din kommentar her..."
                     />
                 </div>
             </Modal>

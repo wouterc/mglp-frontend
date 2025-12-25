@@ -13,8 +13,10 @@ interface SmartDateInputProps {
 const formatDateForDisplay = (isoDate: string | null): string => {
   if (!isoDate) return '';
   const parts = isoDate.split('-');
-  if (parts.length !== 3) return isoDate; // Returner som den er, hvis formatet er uventet
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  if (parts.length !== 3) return isoDate;
+  // Get last 2 digits of year
+  const shortYear = parts[0].length === 4 ? parts[0].substring(2) : parts[0];
+  return `${parts[2]}-${parts[1]}-${shortYear}`;
 };
 
 function SmartDateInput({ value, onSave, className }: SmartDateInputProps): React.ReactElement {
@@ -110,7 +112,7 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
     <input
       type="text" // Ændret til text for fuld kontrol
       value={displayValue}
-      placeholder="dd-mm-åååå"
+      placeholder="dd-mm-åå"
       onChange={(e) => setDisplayValue(e.target.value)}
       onBlur={handleBlur}
       onClick={showPicker}

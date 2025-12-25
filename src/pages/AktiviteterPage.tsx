@@ -6,7 +6,7 @@
 // @# 2025-11-03 22:15 - Ændret dispatch til at bruge ny 'SET_GRUPPE_LOADING' action.
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, ChangeEvent, KeyboardEvent, useRef, useMemo } from 'react';
 import { api } from '../api';
-import { Edit, Search, ChevronDown, ChevronUp, MessageSquare, Info, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, UploadCloud, Loader2 } from 'lucide-react';
+import { Edit, Maximize2, Search, ChevronDown, ChevronUp, MessageSquare, Info, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, UploadCloud, Loader2, CheckCircle2 } from 'lucide-react';
 // @# 2025-11-03 21:45 - Fjernet useDebounce
 // import useDebounce from '../hooks/useDebounce'; 
 import { useAppState } from '../StateContext';
@@ -33,11 +33,33 @@ interface InlineEditorProps {
     id?: string;
 }
 
-const InlineTextEditor = ({ value, onSave, type = "text", id }: InlineEditorProps): ReactElement => {
+const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand }: InlineEditorProps & { onExpand?: () => void }): ReactElement => {
     const [text, setText] = useState(value);
     useEffect(() => { setText(value); }, [value]);
     const handleBlur = () => { if (text !== value) { onSave(text || ''); } };
-    return <input id={id} type={type} value={text || ''} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0" />;
+
+    return (
+        <div className="relative group/editor">
+            <input
+                id={id}
+                type={type}
+                value={text || ''}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={handleBlur}
+                className="w-full py-0.5 px-1 pr-7 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0 truncate"
+                title={text || ''}
+            />
+            {onExpand && (
+                <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onExpand(); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-blue-600 opacity-0 group-hover/editor:opacity-100 transition-opacity"
+                    title="Udvid (Modal)"
+                >
+                    <Maximize2 size={12} />
+                </button>
+            )}
+        </div>
+    );
 };
 
 
@@ -51,6 +73,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const [søgeResultater, setSøgeResultater] = useState<SøgeResultat[]>([]);
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState<Aktivitet | null>(null);
+    const [redigeringsMode, setRedigeringsMode] = useState<'kommentar' | 'resultat'>('kommentar');
     const [quickAddValues, setQuickAddValues] = useState<Record<number, string>>({});
     const [isSavingNy, setIsSavingNy] = useState<Record<number, boolean>>({});
 
@@ -460,6 +483,16 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
     };
 
+    const handleStatusToggle = async (aktivitet: Aktivitet) => {
+        const isDone = aktivitet.status?.status_nummer === 80;
+        const targetStatusNr = isDone ? 10 : 80;
+        const targetStatus = aktivitetStatusser.find(s => s.status_nummer === targetStatusNr);
+
+        if (targetStatus) {
+            await handleInlineSave(aktivitet, 'status', targetStatus.id.toString());
+        }
+    };
+
     const handleSynkroniser = async () => {
         if (!valgtSag) return;
         setIsFetchingAll(true);
@@ -526,6 +559,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 <SagsAktivitetForm
                     aktivitet={aktivitetTilRedigering}
                     sagId={valgtSag?.id || null}
+                    mode={redigeringsMode}
                     onSave={handleFormSave}
                     onCancel={() => setAktivitetTilRedigering(null)}
                 />
@@ -598,14 +632,14 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 <table className="min-w-full bg-white table-fixed" ref={tableRef}>
                     <thead className="bg-gray-800 text-white text-sm">
                         <tr>
-                            <th className="py-1 px-2 w-[5%]">Aktiv</th>
-                            <th className="py-1 px-2 w-[37%] text-left">GRUPPE / AKTIVITET</th>
-                            <th className="py-1 px-2 w-[15%]">Status</th>
-                            <th className="py-1 px-2 w-[5%]"><MessageSquare size={16} className="mx-auto" /></th>
-                            <th className="py-1 px-2 w-[8%]">Ansvarlig</th>
-                            <th className="py-1 px-2 w-[10%]">Dato Intern</th>
-                            <th className="py-1 px-2 w-[10%]">Dato Ekstern</th>
-                            <th className="py-1 px-2 w-[10%]">Resultat</th>
+                            <th className="py-1 px-2 w-[4%]">Aktiv</th>
+                            <th className="py-1 px-2 w-[28%] text-left">GRUPPE / AKTIVITET</th>
+                            <th className="py-1 px-2 w-[8%] text-center">Dato Intern</th>
+                            <th className="py-1 px-2 w-[8%] text-center">Dato Ekstern</th>
+                            <th className="py-1 px-2 w-[4%] text-center">Info</th>
+                            <th className="py-1 px-2 w-[14%] text-left">Status</th>
+                            <th className="py-1 px-2 w-[25%] text-left">Resultat</th>
+                            <th className="py-1 px-2 w-[9%] text-left">Ansvarlig</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -647,47 +681,95 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                             <td className="py-0.5 px-2 text-center">
                                                 <input id={`cell-${aktivitet.id}-0`} type="checkbox" checked={!!aktivitet.aktiv} onChange={(e) => handleInlineSave(aktivitet, 'aktiv', e.target.checked)} />
                                             </td>
-                                            <td className="py-0.5 px-2 pl-8 break-words text-sm">{aktivitet.aktivitet_nr} - {aktivitet.aktivitet}</td>
+                                            <td className="py-0.5 px-2 pl-8 break-words text-xs">{aktivitet.aktivitet_nr} - {aktivitet.aktivitet}</td>
                                             <td className="py-0.5 px-2">
-                                                <div className="flex items-center">
-                                                    <div className="w-5 flex-shrink-0 flex justify-center">
+                                                <SmartDateInput value={aktivitet.dato_intern} onSave={(val) => handleInlineSave(aktivitet, 'dato_intern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`} />
+                                            </td>
+                                            <td className="py-0.5 px-2">
+                                                <SmartDateInput value={aktivitet.dato_ekstern} onSave={(val) => handleInlineSave(aktivitet, 'dato_ekstern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`} />
+                                            </td>
+                                            <td className="py-0.5 px-2 text-center">
+                                                <div className="flex items-center justify-center gap-1.5 h-full">
+                                                    {/* Slot 1: Skabelon Info / Note */}
+                                                    <div className="w-4 flex justify-center">
                                                         {(aktivitet.skabelon_note || aktivitet.note) && (
                                                             <Tooltip content={aktivitet.skabelon_note || aktivitet.note}>
-                                                                <Info size={14} className="text-red-600 cursor-help" />
+                                                                <Info size={14} className="text-amber-500 cursor-help" />
                                                             </Tooltip>
                                                         )}
                                                     </div>
-                                                    <select id={`cell-${aktivitet.id}-2`} value={aktivitet.status?.id || ''} onChange={(e) => handleInlineSave(aktivitet, 'status', e.target.value)} className="flex-grow py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0">
+
+                                                    {/* Slot 2: Bruger Kommentar */}
+                                                    <div className="w-5 flex justify-center">
+                                                        <Tooltip content={aktivitet.kommentar || "Tilføj kommentar"}>
+                                                            <button
+                                                                id={`cell-${aktivitet.id}-3`}
+                                                                onClick={() => { setRedigeringsMode('kommentar'); setAktivitetTilRedigering(aktivitet); }}
+                                                                className={`p-0.5 rounded transition-colors ${aktivitet.kommentar_vigtig
+                                                                    ? 'text-red-600 hover:bg-red-50'
+                                                                    : aktivitet.kommentar
+                                                                        ? 'text-blue-600 hover:bg-blue-50'
+                                                                        : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
+                                                                    }`}
+                                                            >
+                                                                <MessageSquare size={16} fill={aktivitet.kommentar ? "currentColor" : "none"} />
+                                                            </button>
+                                                        </Tooltip>
+                                                    </div>
+
+                                                    {/* Slot 3: Ny (Skabelon Upload) */}
+                                                    <div className="w-5 flex justify-center">
+                                                        {aktivitet.er_ny && (
+                                                            <Tooltip content="Denne aktivitet er kun på denne sag. Klik for at gemme den som en global skabelon.">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleGemTilSkabelon(aktivitet); }}
+                                                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                                                                >
+                                                                    <UploadCloud size={16} />
+                                                                </button>
+                                                            </Tooltip>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className={`py-0.5 px-2 transition-colors ${aktivitet.status?.status_nummer === 80 ? 'bg-green-50' : ''}`}>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => handleStatusToggle(aktivitet)}
+                                                        className={`flex-shrink-0 transition-colors ${aktivitet.status?.status_nummer === 80
+                                                            ? 'text-green-600 hover:text-green-700'
+                                                            : 'text-gray-300 hover:text-gray-500'
+                                                            }`}
+                                                        title={aktivitet.status?.status_nummer === 80 ? "Sæt til 'Oprettet'" : "Sæt til 'Udført'"}
+                                                    >
+                                                        <CheckCircle2 size={16} fill={aktivitet.status?.status_nummer === 80 ? "currentColor" : "none"} />
+                                                    </button>
+                                                    <select
+                                                        id={`cell-${aktivitet.id}-2`}
+                                                        value={aktivitet.status?.id || ''}
+                                                        onChange={(e) => handleInlineSave(aktivitet, 'status', e.target.value)}
+                                                        className={`flex-grow py-0.5 px-1 border rounded-md text-xs bg-transparent focus:border-black focus:ring-0 ${aktivitet.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-gray-300'
+                                                            }`}
+                                                    >
                                                         <option value="">Vælg...</option>
                                                         {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                                                     </select>
                                                 </div>
                                             </td>
-                                            <td className="py-0.5 px-2 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <Tooltip content={aktivitet.kommentar}>
-                                                        <button id={`cell-${aktivitet.id}-3`} onClick={() => setAktivitetTilRedigering(aktivitet)} className="p-0.5">
-                                                            <Edit size={16} className={aktivitet.kommentar ? 'text-green-600' : 'text-blue-600'} />
-                                                        </button>
-                                                    </Tooltip>
-                                                    {aktivitet.er_ny && (
-                                                        <Tooltip content="Denne aktivitet er kun på denne sag. Klik for at gemme den som en global skabelon.">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleGemTilSkabelon(aktivitet); }}
-                                                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                                                            >
-                                                                <UploadCloud size={16} />
-                                                            </button>
-                                                        </Tooltip>
-                                                    )}
-                                                </div>
+                                            <td className="py-0.5 px-2">
+                                                <InlineTextEditor
+                                                    id={`cell-${aktivitet.id}-7`}
+                                                    value={aktivitet.resultat}
+                                                    onSave={(val) => handleInlineSave(aktivitet, 'resultat', val)}
+                                                    onExpand={() => { setRedigeringsMode('resultat'); setAktivitetTilRedigering(aktivitet); }}
+                                                />
                                             </td>
                                             <td className="py-0.5 px-2">
                                                 <select
                                                     id={`cell-${aktivitet.id}-4`}
                                                     value={aktivitet.ansvarlig || ''}
                                                     onChange={(e) => handleInlineSave(aktivitet, 'ansvarlig', e.target.value)}
-                                                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:border-black focus:ring-0"
+                                                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-xs bg-white focus:border-black focus:ring-0"
                                                 >
                                                     <option value="">Ingen</option>
                                                     {colleagues.map(u => (
@@ -695,13 +777,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                     ))}
                                                 </select>
                                             </td>
-                                            <td className="py-0.5 px-2">
-                                                <SmartDateInput value={aktivitet.dato_intern} onSave={(val) => handleInlineSave(aktivitet, 'dato_intern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`} />
-                                            </td>
-                                            <td className="py-0.5 px-2">
-                                                <SmartDateInput value={aktivitet.dato_ekstern} onSave={(val) => handleInlineSave(aktivitet, 'dato_ekstern', val)} className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-sm bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`} />
-                                            </td>
-                                            <td className="py-0.5 px-2"><InlineTextEditor id={`cell-${aktivitet.id}-7`} value={aktivitet.resultat} onSave={(val) => handleInlineSave(aktivitet, 'resultat', val)} /></td>
                                         </tr>
                                     ))}
 
@@ -711,7 +786,8 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                             <td className="py-1 px-2 text-center text-blue-300">
                                                 <PlusCircle size={14} className="mx-auto" />
                                             </td>
-                                            <td className="py-1 px-2 pl-8" colSpan={6}>
+                                            {/* Input: Spans Aktivitet, Datoer og Info (5 cols) */}
+                                            <td className="py-1 px-2" colSpan={5}>
                                                 <form onSubmit={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)}>
                                                     <input
                                                         type="text"
@@ -722,11 +798,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                     />
                                                 </form>
                                             </td>
-                                            <td className="py-1 px-2 text-center">
+                                            {/* Button: Spans Status, Resultat, Ansvarlig (3 cols) */}
+                                            <td className="py-1 px-2" colSpan={3}>
                                                 <button
                                                     onClick={() => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id)}
                                                     disabled={isSavingNy[gruppeSummary.gruppe.id] || !quickAddValues[gruppeSummary.gruppe.id]?.trim()}
-                                                    className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors flex items-center gap-1 mx-auto"
+                                                    className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors flex items-center gap-1"
                                                 >
                                                     {isSavingNy[gruppeSummary.gruppe.id] ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
                                                     Hurtig-tilføj

@@ -9,9 +9,11 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  headerActions?: ReactNode;
+  maxWidth?: string; // New prop
 }
 
-function Modal({ isOpen, onClose, title, children, footer }: ModalProps): React.ReactElement | null {
+function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWidth = 'max-w-md' }: ModalProps): React.ReactElement | null {
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -29,19 +31,22 @@ function Modal({ isOpen, onClose, title, children, footer }: ModalProps): React.
   }
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
       onClick={onClose} // Luk ved klik på baggrunden
     >
-      <div 
-        className="bg-white rounded-lg shadow-xl w-full max-w-md m-4"
+      <div
+        className={`bg-white rounded-lg shadow-xl w-full ${maxWidth} m-4`}
         onClick={(e) => e.stopPropagation()} // Forhindrer at klik inde i modalen lukker den
       >
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200">
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200" title="Annuller (Esc)">
+              <X size={24} />
+            </button>
+          </div>
         </div>
         <div className="p-6">
           {children}
