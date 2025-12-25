@@ -264,7 +264,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         value={formData.kommentar}
                         onChange={handleChange}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none resize-none text-[11px] placeholder-gray-400"
                     />
                 </div>
             </form>

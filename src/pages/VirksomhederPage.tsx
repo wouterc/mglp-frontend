@@ -382,7 +382,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                             <th className="text-center py-1 px-2 uppercase font-semibold w-[5%]">Kont.</th>
                         </tr>
                     </thead>
-                    <tbody className="text-gray-700 text-sm">
+                    <tbody className="text-gray-700 text-xs">
                         {filtreredeVirksomheder.map(v => (
                             <Fragment key={v.id}>
                                 <tr

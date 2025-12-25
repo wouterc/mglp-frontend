@@ -110,9 +110,9 @@ function App() {
   };
 
   let filterSidebarComponent: ReactNode = null;
-  if (location.pathname === '/aktiviteter') {
-    filterSidebarComponent = <AktiviteterFilter />;
-  }
+  // if (location.pathname === '/aktiviteter') {
+  //   filterSidebarComponent = <AktiviteterFilter />;
+  // }
 
   const aktivSideForLayout = location.pathname.substring(1) || 'sagsoversigt';
 

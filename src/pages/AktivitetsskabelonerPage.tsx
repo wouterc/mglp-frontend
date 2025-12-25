@@ -633,30 +633,31 @@ function AktivitetsskabelonerPage(): ReactElement {
 
                   {/* HURTIG OPRET RÆKKE (Vises kun hvis en gruppe er valgt) */}
                   {filters.gruppe_nr && (
-                    <tr className="bg-blue-50/30">
-                      <td colSpan={1} className="py-3 px-4">
-                        <span className="text-xs text-blue-400 font-bold uppercase">Ny:</span>
+                    <tr className="bg-blue-50/20 border-b border-blue-100">
+                      <td colSpan={1} className="py-2 px-4 text-center">
+                        <PlusCircle size={14} className="mx-auto text-blue-400" />
                       </td>
-                      <td colSpan={3} className="py-3 px-4">
-                        <form onSubmit={handleQuickAdd} className="flex gap-2">
+                      <td colSpan={3} className="py-2 px-4">
+                        <form onSubmit={handleQuickAdd} className="flex gap-2 items-center">
                           <input
                             type="text"
-                            placeholder="Indtast navnet på den nye aktivitet her..."
+                            placeholder="Indtast navnet på den nye aktivitet her... (Enter for at gemme)"
                             value={nyAktivitetNavn}
                             onChange={(e) => setNyAktivitetNavn(e.target.value)}
-                            className="flex-1 p-2 text-sm border-transparent bg-transparent border-b border-blue-200 focus:border-blue-500 focus:ring-0 placeholder-blue-300"
+                            className="flex-1 w-full bg-transparent border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 px-2 py-1 text-[11px] placeholder-gray-400"
                             disabled={isSavingNy}
                           />
                           <button
                             type="submit"
                             disabled={isSavingNy || !nyAktivitetNavn.trim()}
-                            className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-md hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center gap-2"
+                            className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors inline-flex items-center gap-1"
                           >
-                            {isSavingNy ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                            Tilføj
+                            {isSavingNy ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
+                            TILFØJ
                           </button>
                         </form>
                       </td>
+                      <td></td>{/* Empty cell for last column if needed, based on colspan */}
                     </tr>
                   )}
                 </tbody>

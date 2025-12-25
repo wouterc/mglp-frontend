@@ -105,11 +105,11 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                         formData.kommentar_vigtig === (baseAktivitet?.kommentar_vigtig || false)
                     )}
                     className={`p-2 rounded-full text-white transition-all shadow-md active:scale-95 disabled:opacity-30 ${(formData.aktivitet === (baseAktivitet?.aktivitet || '') &&
-                            formData.kommentar === (baseAktivitet?.kommentar || '') &&
-                            formData.resultat === (baseAktivitet?.resultat || '') &&
-                            formData.kommentar_vigtig === (baseAktivitet?.kommentar_vigtig || false))
-                            ? 'bg-gray-400'
-                            : 'bg-blue-600 hover:bg-blue-700'
+                        formData.kommentar === (baseAktivitet?.kommentar || '') &&
+                        formData.resultat === (baseAktivitet?.resultat || '') &&
+                        formData.kommentar_vigtig === (baseAktivitet?.kommentar_vigtig || false))
+                        ? 'bg-gray-400'
+                        : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                     title="Gem"
                 >
@@ -147,7 +147,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                         rows={6}
                         autoFocus
                         placeholder={placeholder}
-                        className={`mt-1 w-full p-2 border rounded-md shadow-sm outline-none transition-all ${isComment && formData.kommentar_vigtig
+                        className={`mt-1 w-full p-2 border rounded-md shadow-sm outline-none transition-all text-[11px] placeholder-gray-400 ${isComment && formData.kommentar_vigtig
                             ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
                             }`}

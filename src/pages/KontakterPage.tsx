@@ -1,31 +1,21 @@
+
 // --- Fil: src/pages/KontakterPage.tsx ---
-import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, MouseEvent, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, ChangeEvent, ReactElement, MouseEvent } from 'react';
 import { api } from '../api';
-import { PlusCircle, AlertCircle, Edit, Loader2, X, MessageSquare, Copy, Check, Building, FunnelX, UploadCloud, Download } from 'lucide-react';
+import { PlusCircle, AlertCircle, Loader2, X, Download, UploadCloud, FunnelX } from 'lucide-react';
 import { Kontakt, Rolle, Virksomhed } from '../types';
 import { useAppState } from '../StateContext';
 import KontaktForm from '../components/KontaktForm';
 import CsvImportModal from '../components/CsvImportModal';
 import useDebounce from '../hooks/useDebounce';
-import Tooltip from '../components/Tooltip';
-import * as XLSX from 'xlsx'; // <--- Bruges til Excel eksport
+import * as XLSX from 'xlsx';
+import KontaktRow from '../components/rows/KontaktRow';
 
 interface KontakterPageProps {
     navigateTo: (side: string, context?: any) => void;
 }
 
-const VisAdresse = ({ vej, postnr, by }: { vej?: string | null, postnr?: string | null, by?: string | null }) => {
-    const adresseLinje1 = (vej || '').trim();
-    const adresseLinje2 = [(postnr || '').trim(), (by || '').trim()].filter(Boolean).join(' ');
-    if (!adresseLinje1 && !adresseLinje2) return <span className="italic text-gray-500">Ingen adresse</span>;
-    return (
-        <>
-            {adresseLinje1 && <div>{adresseLinje1}</div>}
-            {adresseLinje2 && <div>{adresseLinje2}</div>}
-        </>
-    );
-};
-
+// Helpers for Export (simplified/duplicated from Row or just inline logic here because it's only for export string formatting)
 const formatVirksomhedsnavn = (v: Virksomhed | null | undefined): string => {
     if (!v) return '';
     return v.afdeling ? `${v.navn} - ${v.afdeling}` : v.navn;
@@ -57,8 +47,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
     const debouncedEmail = useDebounce(kontakterFilters.email, 300);
 
     const [roller, setRoller] = useState<Rolle[]>([]);
-    const [copiedEmailId, setCopiedEmailId] = useState<number | null>(null);
-    const [copiedAddressId, setCopiedAddressId] = useState<number | null>(null);
 
     const hentKontakter = useCallback(async () => {
         if (erKontakterHentet && !visImportModal) return;
@@ -130,7 +118,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         setVisForm(false);
         setKontaktTilRedigering(null);
         dispatch({ type: 'SET_KONTAKTER_STATE', payload: { erKontakterHentet: false } });
-        // Vi genhenter også virksomheder, da tællere kan have ændret sig
         dispatch({ type: 'SET_VIRKSOMHEDER_STATE', payload: { erVirksomhederHentet: false } });
         hentKontakter();
     };
@@ -142,30 +129,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
 
     const handleRaekkeKlik = (kontaktId: number) => {
         setUdfoldetKontaktId(udfoldetKontaktId === kontaktId ? null : kontaktId);
-    };
-
-    const handleCopyEmail = (email: string, kontaktId: number, e: MouseEvent) => {
-        e.stopPropagation();
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(email).then(() => {
-                setCopiedEmailId(kontaktId);
-                setTimeout(() => setCopiedEmailId(null), 2000);
-            }).catch(err => { console.error(err); });
-        }
-    };
-
-    const handleCopyAddress = (kontakt: Kontakt, e: MouseEvent) => {
-        e.stopPropagation();
-        const addressString = [
-            kontakt.adresse_vej,
-            `${kontakt.adresse_postnr || ''} ${kontakt.adresse_by || ''}`.trim()
-        ].filter(Boolean).join('\n');
-        if (addressString && navigator.clipboard) {
-            navigator.clipboard.writeText(addressString).then(() => {
-                setCopiedAddressId(kontakt.id);
-                setTimeout(() => setCopiedAddressId(null), 2000);
-            }).catch(err => { console.error(err); });
-        }
     };
 
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -183,11 +146,9 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
         });
     };
 
-    // <--- EKSPORT TIL EXCEL (.XLSX) --->
     const handleExport = () => {
         setIsExporting(true);
         try {
-            // Vi bruger den filtrerede liste direkte fra skærmen
             const dataToExport = filtreredeKontakter;
 
             if (dataToExport.length === 0) {
@@ -196,13 +157,11 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 return;
             }
 
-            // 1. Forbered data
             const excelData = dataToExport.map(k => ({
                 id: k.id,
                 fornavn: k.fornavn,
                 efternavn: k.efternavn,
                 fulde_navn: k.fulde_navn,
-                // Vi eksporterer virksomhed_id, så importen kan genskabe linket
                 virksomhed_id: k.virksomhed?.id,
                 virksomhed_navn: k.virksomhed ? formatVirksomhedsnavn(k.virksomhed) : '',
                 telefon: k.telefon,
@@ -211,16 +170,12 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 adresse_postnr: k.adresse_postnr,
                 adresse_by: k.adresse_by,
                 kommentar: k.kommentar,
-                // Vi lister roller som en tekststreng for læsbarhed
                 roller: k.roller.map(r => r.navn).join(', ')
             }));
 
-            // 2. Opret Workbook og Sheet
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Kontakter");
-
-            // 3. Download filen
             XLSX.writeFile(workbook, `kontakter_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
         } catch (e) {
@@ -253,7 +208,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                 />
             )}
 
-            {/* <--- IMPORT MODAL ---> */}
             <CsvImportModal
                 isOpen={visImportModal}
                 onClose={() => setVisImportModal(false)}
@@ -269,7 +223,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Kontakter</h2>
                 <div className="flex space-x-2">
-                    {/* <--- EKSPORT KNAP ---> */}
                     <button
                         onClick={handleExport}
                         disabled={isExporting}
@@ -279,7 +232,6 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                         {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                     </button>
 
-                    {/* <--- IMPORT KNAP ---> */}
                     <button
                         onClick={() => setVisImportModal(true)}
                         className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50"
@@ -394,98 +346,14 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
                     </thead>
                     <tbody className="text-gray-700 text-sm">
                         {filtreredeKontakter.map(k => (
-                            <Fragment key={k.id}>
-                                <tr
-                                    className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer"
-                                    onClick={() => handleRaekkeKlik(k.id)}
-                                >
-                                    <td className="py-1 px-2 font-medium">
-                                        <div className="flex items-center">
-                                            <span>{k.fulde_navn}</span>
-                                            {(k.kommentar || '').trim() && (
-                                                <Tooltip content={<div className="max-w-xs p-1">{k.kommentar}</div>}>
-                                                    <MessageSquare size={14} className="ml-2 text-green-600 flex-shrink-0" />
-                                                </Tooltip>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="py-1 px-2 truncate">
-                                        {k.roller.map(r => r.navn).join(', ')}
-                                    </td>
-                                    <td className="py-1 px-2">
-                                        {k.virksomhed && (
-                                            <button
-                                                className="flex items-center space-x-2 text-left text-blue-600 hover:underline"
-                                                onClick={(e) => handleNavToVirksomhed(e, k.virksomhed)}
-                                                title={`Gå til ${k.virksomhed.navn}`}
-                                            >
-                                                <Building size={16} className="text-gray-400 flex-shrink-0" />
-                                                <span>{formatVirksomhedsnavn(k.virksomhed)}</span>
-                                            </button>
-                                        )}
-                                    </td>
-                                    <td className="py-1 px-2">{k.telefon}</td>
-                                    <td className="py-1 px-2">
-                                        {k.email && (
-                                            <div className="flex items-center space-x-1">
-                                                <button
-                                                    onClick={(e) => handleCopyEmail(k.email!, k.id, e)}
-                                                    title="Kopier email"
-                                                    className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
-                                                >
-                                                    {copiedEmailId === k.id ? (
-                                                        <Check size={14} className="text-green-500" />
-                                                    ) : (
-                                                        <Copy size={14} className="text-blue-500 hover:text-blue-700" />
-                                                    )}
-                                                </button>
-                                                <a
-                                                    href={`mailto:${k.email}`}
-                                                    className="text-blue-600 hover:underline"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    title="Send email"
-                                                >
-                                                    {k.email}
-                                                </a>
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="py-1 px-2 text-center">
-                                        <button onClick={(e) => handleRediger(k, e)} title="Rediger">
-                                            <Edit size={16} className="text-blue-600 hover:text-blue-800" />
-                                        </button>
-                                    </td>
-                                </tr>
-                                {udfoldetKontaktId === k.id && (
-                                    <tr className="bg-gray-50 border-b border-gray-300">
-                                        <td colSpan={6} className="p-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                                                <div>
-                                                    <div className="flex items-center">
-                                                        <button
-                                                            onClick={(e) => handleCopyAddress(k, e)}
-                                                            title="Kopier adresse"
-                                                            className="p-1 rounded-md hover:bg-gray-200 flex-shrink-0 mr-2"
-                                                        >
-                                                            {copiedAddressId === k.id ? (
-                                                                <Check size={16} className="text-green-500" />
-                                                            ) : (
-                                                                <Copy size={16} className="text-blue-500 hover:text-blue-700" />
-                                                            )}
-                                                        </button>
-                                                        <h4 className="font-bold text-gray-700">Adresse</h4>
-                                                    </div>
-                                                    <VisAdresse vej={k.adresse_vej} postnr={k.adresse_postnr} by={k.adresse_by} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-gray-700">Kommentar</h4>
-                                                    <p className="whitespace-pre-wrap break-words">{k.kommentar || <span className="italic text-gray-500">Ingen kommentar</span>}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </Fragment>
+                            <KontaktRow
+                                key={k.id}
+                                kontakt={k}
+                                isExpanded={udfoldetKontaktId === k.id}
+                                onToggleExpand={() => handleRaekkeKlik(k.id)}
+                                onEdit={handleRediger}
+                                onNavToVirksomhed={handleNavToVirksomhed}
+                            />
                         ))}
                         {filtreredeKontakter.length === 0 && !isLoading && (
                             <tr><td colSpan={6} className="text-center py-4">Ingen kontakter matcher dit filter.</td></tr>

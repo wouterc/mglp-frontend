@@ -337,7 +337,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
 
           <div>
             <label htmlFor="note" className="block text-sm font-medium">Note</label>
-            <textarea name="note" value={formData.note} onChange={handleChange} rows={3} className="mt-1 w-full p-2 border rounded-md"></textarea>
+            <textarea name="note" value={formData.note} onChange={handleChange} rows={3} className="mt-1 w-full p-2 border rounded-md text-[11px] placeholder-gray-400"></textarea>
           </div>
 
           <div className="flex items-start space-x-4">

@@ -1,34 +1,32 @@
 // --- Fil: src/pages/SagsoversigtPage.tsx ---
 // @# 2025-11-22 17:00 - Opdateret til at sende filtrerede sags-ID'er til global state.
 // @# 2025-11-23 14:00 - Bruger nu globale 'statusser' i stedet for lokale, så de huskes ved tilbage-navigation.
-import { useNavigate } from 'react-router-dom'; // @#
-import React, { useState, useEffect, useMemo, ChangeEvent, MouseEvent, useCallback, ReactNode, useRef } from 'react';
+// @# 2025-12-25 21:00 - Refactored to use SagsRow component.
+import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, ChangeEvent, useCallback, ReactNode, useRef } from 'react';
 import { api } from '../api';
 import SagsForm from '../components/SagsForm';
-import { Edit, ArrowUp, ArrowDown, FileText, Folder, ListChecks, PlusCircle, FunnelX, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
-import type { Sag, Status, Virksomhed } from '../types';
+import { ArrowUp, ArrowDown, PlusCircle, FunnelX, Loader2, AlertCircle } from 'lucide-react';
+import type { Sag, Status } from '../types';
 import { useAppState } from '../StateContext';
 import Modal from '../components/Modal';
 import { useTableNavigation } from '../hooks/useTableNavigation';
 import Button from '../components/ui/Button';
+import SagsRow from '../components/rows/SagsRow';
+import useDebounce from '../hooks/useDebounce';
 
 interface SagsoversigtPageProps {
   navigateTo: (side: string, sag: Sag | null) => void;
 }
 
-const formatVirksomhedsnavn = (v: Virksomhed | null | undefined): string => {
-  if (!v) return '';
-  return v.afdeling ? `${v.navn} - ${v.afdeling}` : v.navn;
-};
-
 type SortKey = keyof Sag | `status.${keyof Status}`;
 
 function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
-  const navigate = useNavigate(); // @#
+  const navigate = useNavigate(); // Still used for internal navigation if needed, though props.navigateTo is often preferred
   const { state, dispatch } = useAppState();
   const {
     sager,
-    statusser, // @# Bruger global state
+    statusser,
     sagsoversigtError: error,
     sagsoversigtIsLoading: isLoading,
     sagsoversigtFilters: filter,
@@ -43,15 +41,15 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const [udfoldetSagId, setUdfoldetSagId] = useState<number | null>(null);
   const [visFlereFiltre, setVisFlereFiltre] = useState<boolean>(false);
   const [creatingActivitiesForSagId, setCreatingActivitiesForSagId] = useState<number | null>(null);
-  const [creatingDocumentsForSagId, setCreatingDocumentsForSagId] = useState<number | null>(null); // @# Ny state
+  const [creatingDocumentsForSagId, setCreatingDocumentsForSagId] = useState<number | null>(null);
   const [modalInfo, setModalInfo] = useState<{ isOpen: boolean; title: string; message: ReactNode }>({ isOpen: false, title: '', message: null });
-  const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
 
   const tableRef = useRef<HTMLTableElement>(null);
   useTableNavigation(tableRef);
 
+  const debouncedFilter = useDebounce(filter, 300);
+
   const hentData = useCallback(async () => {
-    // @# Hent kun hvis vi mangler sager ELLER statusser
     if (erSagerHentet && statusser.length > 0) return;
 
     dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: true, sagsoversigtError: null } });
@@ -97,18 +95,6 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
       dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
     } catch (error) {
       console.error("Fejl ved opdatering af status:", error);
-    }
-  };
-
-  const handleCopyEmail = (email: string, key: string, e: MouseEvent) => {
-    e.stopPropagation();
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(email).then(() => {
-        setCopiedEmailId(key);
-        setTimeout(() => setCopiedEmailId(null), 2000);
-      }).catch(err => {
-        console.error('Kunne ikke kopiere email:', err);
-      });
     }
   };
 
@@ -165,14 +151,14 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   };
 
   const sorteredeOgFiltreredeSager = useMemo(() => {
-    const getNestedValue = (obj: any, path: string) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
+    const getNestedValue = (obj: any, path: string) => path.split('.').reduce((acc: any, part: string) => acc && acc[part], obj);
     let filtreret = [...sager];
 
-    if (filter.sags_nr || filter.status) {
+    if (debouncedFilter.sags_nr || debouncedFilter.status) {
       filtreret = filtreret.filter(sag => {
-        if (filter.sags_nr && !sag.sags_nr?.toString().includes(filter.sags_nr)) return false;
-        if (filter.status) {
-          const searchLower = filter.status.toLowerCase();
+        if (debouncedFilter.sags_nr && !sag.sags_nr?.toString().includes(debouncedFilter.sags_nr)) return false;
+        if (debouncedFilter.status) {
+          const searchLower = debouncedFilter.status.toLowerCase();
           const statusMatch = sag.status?.beskrivelse.toLowerCase().includes(searchLower) || sag.status?.status_nummer.toString().includes(searchLower);
           if (!statusMatch) return false;
         }
@@ -184,9 +170,9 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
         const kategori = sag.status.status_kategori;
         const isVisibleStatus = (kategori === 0 && !visLukkede && !visAnnullerede) || (kategori === 1 && visLukkede) || (kategori === 9 && visAnnullerede);
         if (!isVisibleStatus) return false;
-        if (filter.alias && !sag.alias?.toLowerCase().includes(filter.alias.toLowerCase())) return false;
-        if (filter.hovedansvarlige && !(sag.hovedansvarlige || '').toLowerCase().includes(filter.hovedansvarlige.toLowerCase())) return false;
-        if (filter.adresse && !sag.fuld_adresse?.toLowerCase().includes(filter.adresse.toLowerCase())) return false;
+        if (debouncedFilter.alias && !sag.alias?.toLowerCase().includes(debouncedFilter.alias.toLowerCase())) return false;
+        if (debouncedFilter.hovedansvarlige && !(sag.hovedansvarlige || '').toLowerCase().includes(debouncedFilter.hovedansvarlige.toLowerCase())) return false;
+        if (debouncedFilter.adresse && !sag.fuld_adresse?.toLowerCase().includes(debouncedFilter.adresse.toLowerCase())) return false;
         return true;
       });
     }
@@ -201,7 +187,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
       });
     }
     return filtreret;
-  }, [sager, filter, sortConfig, visLukkede, visAnnullerede]);
+  }, [sager, debouncedFilter, sortConfig, visLukkede, visAnnullerede]);
 
   // Sync den filtrerede liste af ID'er til global state
   useEffect(() => {
@@ -307,141 +293,23 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
               ? (<tr><td colSpan={6} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>)
               : sorteredeOgFiltreredeSager.length === 0
                 ? (<tr><td colSpan={6} className="text-center py-4">Ingen sager fundet.</td></tr>)
-                : (sorteredeOgFiltreredeSager.map(sag => (<React.Fragment key={sag.id}>
-                  <tr onClick={() => handleRaekkeKlik(sag.id)} className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer">
-                    <td className="py-1 px-2">{sag.sags_nr}</td>
-                    <td className="py-1 px-2">{sag.alias}</td>
-                    <td className="py-1 px-2">
-                      <select
-                        id={`cell-${sag.id}-2`}
-                        value={sag.status ? sag.status.id : ''}
-                        onChange={(e) => handleStatusSave(sag.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 border border-gray-300 rounded-md bg-white w-full"
-                      >
-                        {statusser.map(s => (
-                          <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 px-2">{sag.hovedansvarlige}</td>
-                    <td className="py-1 px-2">{sag.fuld_adresse}</td>
-                    <td className="py-1 px-2">
-                      <div className="flex items-center space-x-3">
-                        <button id={`cell-${sag.id}-5`} onClick={(e: MouseEvent) => { e.stopPropagation(); handleRedigerSag(sag); }} title="Rediger sag"><Edit size={18} className="text-gray-500 hover:text-blue-600" /></button>
-                        <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('sagsdetaljer', sag); }} title="Vis sagsdetaljer"><FileText size={18} className="text-gray-500 hover:text-green-600" /></button>
-                        {creatingActivitiesForSagId === sag.id ? (
-                          <Loader2 size={18} className="text-gray-500 animate-spin" />
-                        ) : sag.opgaver_oprettet ? (
-                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); navigateTo('aktiviteter', sag); }} title="Vis aktiviteter">
-                            <ListChecks size={18} className="text-gray-500 hover:text-purple-600" />
-                          </button>
-                        ) : (
-                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); handleOpretAktiviteter(sag.id); }} title="Opret Aktiviteter">
-                            <ListChecks size={18} className="text-red-500 hover:text-red-700" />
-                          </button>
-                        )}
-                        {creatingDocumentsForSagId === sag.id ? (
-                          <Loader2 size={18} className="text-gray-500 animate-spin" />
-                        ) : sag.mappen_oprettet ? (
-                          <button onClick={(e: MouseEvent) => {
-                            e.stopPropagation();
-                            // Sæt valgt sag
-                            dispatch({ type: 'SET_VALGT_SAG', payload: sag });
-                            navigate('/dokumenter');
-                          }} title="Vis dokumenter">
-                            <Folder size={18} className="text-gray-500 hover:text-yellow-600" />
-                          </button>
-                        ) : (
-                          <button onClick={(e: MouseEvent) => { e.stopPropagation(); handleOpretDokumenter(sag.id); }} title="Opret Dokumentstruktur">
-                            <Folder size={18} className="text-red-500 hover:text-red-700" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-
-                  {udfoldetSagId === sag.id && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={6} className="p-4">
-
-                        {/* Original række */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <h4 className="font-bold text-gray-700">Adresse</h4>
-                            <p>{sag.fuld_adresse || "Ikke angivet"}</p>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-700">Boliginformation</h4>
-                            <p><span className="font-semibold">Type:</span> {sag.bolig_type || "N/A"}</p>
-                            <p><span className="font-semibold">Matrikel:</span> {sag.bolig_matrikel || "N/A"}</p>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-700">Hovedansvarlig (Intern)</h4>
-                            <p>{sag.hovedansvarlige || "Ikke angivet"}</p>
-                          </div>
-                        </div>
-
-                        {/* Ny Mægler-række */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
-                          <div>
-                            <h4 className="font-bold text-gray-700">Mægler Virksomhed</h4>
-                            <div className="flex items-center space-x-1">
-                              <span>{formatVirksomhedsnavn(sag.maegler_virksomhed) || <span className="italic text-gray-500">Ikke valgt</span>}</span>
-                              {sag.maegler_virksomhed?.email && (
-                                <button
-                                  onClick={(e) => handleCopyEmail(sag.maegler_virksomhed!.email!, `v-${sag.id}`, e)}
-                                  title={`Kopier ${sag.maegler_virksomhed.email}`}
-                                  className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
-                                >
-                                  {copiedEmailId === `v-${sag.id}` ? (
-                                    <Check size={14} className="text-green-500" />
-                                  ) : (
-                                    <Copy size={14} className="text-blue-500 hover:text-blue-700" />
-
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-700">Mægler Kontakt</h4>
-                            <p>{sag.maegler_kontakt?.fulde_navn || <span className="italic text-gray-500">Ikke valgt</span>}</p>
-                            {sag.maegler_kontakt?.email && (
-                              <div className="flex items-center space-x-1 text-xs">
-                                <button
-                                  onClick={(e) => handleCopyEmail(sag.maegler_kontakt!.email!, `k-${sag.id}`, e)}
-                                  title={`Kopier ${sag.maegler_kontakt.email}`}
-                                  className="p-0.5 rounded-md hover:bg-gray-200 flex-shrink-0"
-                                >
-                                  {copiedEmailId === `k-${sag.id}` ? (
-                                    <Check size={14} className="text-green-500" />
-                                  ) : (
-                                    <Copy size={14} className="text-blue-500 hover:text-blue-700" />
-                                  )}
-                                </button>
-                                <a
-                                  href={`mailto:${sag.maegler_kontakt.email}`}
-                                  className="text-blue-600 hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                  title="Send email"
-                                >
-                                  {sag.maegler_kontakt.email}
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Kommentar-række */}
-                        <div className="mt-4 pt-4 border-t">
-                          <h4 className="font-bold text-gray-700">Kommentar</h4>
-                          <p>{sag.kommentar || <span className="italic text-gray-500">Ingen kommentar</span>}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>)))}
+                : (sorteredeOgFiltreredeSager.map(sag => (
+                  <SagsRow
+                    key={sag.id}
+                    sag={sag}
+                    statusser={statusser}
+                    isExpanded={udfoldetSagId === sag.id}
+                    isCreatingActivities={creatingActivitiesForSagId === sag.id}
+                    isCreatingDocuments={creatingDocumentsForSagId === sag.id}
+                    onToggleExpand={() => handleRaekkeKlik(sag.id)}
+                    onStatusChange={handleStatusSave}
+                    onEdit={handleRedigerSag}
+                    onOpretAktiviteter={handleOpretAktiviteter}
+                    onOpretDokumenter={handleOpretDokumenter}
+                    navigateTo={navigateTo}
+                    dispatch={dispatch}
+                  />
+                )))}
           </tbody>
         </table>
       </div>

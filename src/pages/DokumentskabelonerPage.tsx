@@ -519,9 +519,9 @@ function DokumentskabelonerPage(): ReactElement {
 
                       {/* Hurtig-opret række */}
                       {filters.gruppe_nr && (
-                        <tr className="bg-blue-50/30 border-t-2 border-blue-100">
+                        <tr className="bg-blue-50/20 border-t border-blue-100">
                           <td className="py-2 px-3 text-center">
-                            <PlusCircle size={18} className="mx-auto text-blue-400" />
+                            <PlusCircle size={14} className="mx-auto text-blue-400" />
                           </td>
                           <td className="py-1 px-2">
                             <input
@@ -529,7 +529,7 @@ function DokumentskabelonerPage(): ReactElement {
                               value={filters.gruppe_nr ? `${filters.gruppe_nr}.${nyDokumentNr}` : nyDokumentNr}
                               readOnly
                               placeholder="Nr"
-                              className="w-full px-2 py-1 text-sm border border-blue-200 rounded bg-gray-100 text-gray-500 cursor-not-allowed font-medium"
+                              className="w-full px-2 py-1 text-[11px] bg-transparent border-0 border-b border-blue-200 text-gray-500 cursor-not-allowed font-medium"
                               title="Nummeret tildeles automatisk"
                             />
                           </td>
@@ -539,23 +539,23 @@ function DokumentskabelonerPage(): ReactElement {
                                 type="text"
                                 value={nyDokumentNavn}
                                 onChange={(e) => setNyDokumentNavn(e.target.value)}
-                                placeholder="Nyt dokumentnavn..."
-                                className="w-full px-3 py-1 text-sm border border-blue-200 rounded focus:ring-1 focus:ring-blue-400 outline-none"
+                                placeholder="Nyt dokumentnavn... (Enter for at gemme)"
+                                className="w-full px-2 py-1 text-[11px] bg-transparent border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 placeholder-gray-400 outline-none"
                               />
                             </form>
                           </td>
-                          <td className="py-1 px-2"></td> {/* Link kolonne tom */}
-                          <td className="py-1 px-2"></td> {/* Filnavn kolonne tom */}
-                          <td className="py-1 px-2 text-center" colSpan={2}>
-                            <Button
+                          <td className="py-1 px-2">
+                            <button
                               onClick={handleQuickAdd}
-                              variant="primary"
                               disabled={isSavingNy || !nyDokumentNavn.trim()}
-                              className="!py-1 !px-4 !text-xs w-full"
+                              className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors inline-flex items-center gap-1 w-full justify-start whitespace-nowrap"
                             >
-                              {isSavingNy ? <Loader2 className="animate-spin" size={14} /> : 'Hurtig-tilføj'}
-                            </Button>
+                              {isSavingNy ? <Loader2 size={12} className="animate-spin" /> : <PlusCircle size={12} />}
+                              TILFØJ
+                            </button>
                           </td>
+                          <td className="py-1 px-2"></td> {/* Filnavn kolonne tom */}
+                          <td className="py-1 px-2 text-center" colSpan={2}></td>
                         </tr>
                       )}
                     </>
