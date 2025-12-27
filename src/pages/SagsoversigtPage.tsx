@@ -278,7 +278,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
 
       <div className="overflow-x-auto rounded-lg shadow-md">
         <table className="min-w-full bg-white table-fixed" ref={tableRef}>
-          <thead className="bg-gray-800 text-white text-sm">
+          <thead className="bg-gray-800 text-white text-xs">
             <tr>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[7%]" onClick={() => requestSort('sags_nr')}>SagsNr{getSortIcon('sags_nr')}</th>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[15%]" onClick={() => requestSort('alias')}>Alias{getSortIcon('alias')}</th>
@@ -288,7 +288,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
               <th className="text-left py-1 px-2 uppercase font-semibold w-[18%]" >Handlinger</th>
             </tr>
           </thead>
-          <tbody className="text-gray-700 text-sm">
+          <tbody className="text-gray-700 text-xs">
             {isLoading
               ? (<tr><td colSpan={6} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>)
               : sorteredeOgFiltreredeSager.length === 0

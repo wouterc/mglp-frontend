@@ -4,7 +4,7 @@
 import React, { useState, ReactNode } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
 import { Link } from 'react-router-dom';
-import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert } from 'lucide-react';
+import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox } from 'lucide-react';
 import { useAppState } from '../StateContext';
 
 interface LayoutProps {
@@ -27,6 +27,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         { id: 'sagsdetaljer', navn: 'Sagsdetaljer', ikon: FileText },
         { id: 'aktiviteter', navn: 'Aktiviteter', ikon: ListChecks },
         { id: 'dokumenter', navn: 'Dokumenter', ikon: Folder },
+        { id: 'sags_mail', navn: 'Sags Mail', ikon: Inbox },
       ],
     },
     {
@@ -47,9 +48,9 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       ],
     },
     {
-      titel: 'KOMMUNIKATION',  // <--- NY SEKTION
+      titel: 'KOMMUNIKATION',
       items: [
-        { id: 'emails', navn: 'E-mail Test', ikon: Mail },
+        { id: 'mail', navn: 'Mail', ikon: Mail },
       ],
     },
     // @# SYSTEM sektion fjernet fra scrollable liste, da den nu ligger i bunden

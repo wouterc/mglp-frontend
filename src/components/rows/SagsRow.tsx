@@ -1,6 +1,6 @@
 
 import React, { useState, MouseEvent } from 'react';
-import { Edit, FileText, ListChecks, Folder, Loader2, Copy, Check } from 'lucide-react';
+import { Edit, FileText, ListChecks, Folder, Loader2, Copy, Check, Inbox } from 'lucide-react';
 import { Sag, Status, Virksomhed } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -64,7 +64,7 @@ export default function SagsRow({
                         value={sag.status ? sag.status.id : ''}
                         onChange={(e) => onStatusChange(sag.id, e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        className="p-1 border border-gray-300 rounded-md bg-white w-full text-sm"
+                        className="p-1 border border-gray-300 rounded-md bg-white w-full text-xs"
                     >
                         {statusser.map(s => (
                             <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
@@ -107,6 +107,13 @@ export default function SagsRow({
                                 <Folder size={18} className="text-red-500 hover:text-red-700" />
                             </button>
                         )}
+                        <button onClick={(e: MouseEvent) => {
+                            e.stopPropagation();
+                            dispatch({ type: 'SET_VALGT_SAG', payload: sag });
+                            navigate('/sags_mail');
+                        }} title="Vis postkasse">
+                            <Inbox size={18} className="text-gray-500 hover:text-blue-600" />
+                        </button>
                     </div>
                 </td>
             </tr>

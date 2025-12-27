@@ -29,7 +29,8 @@ import NulstilAdgangskodePage from './pages/NulstilAdgangskodePage';
 import LandingPage from './pages/LandingPage';
 import UserListPage from './pages/admin/UserListPage';
 import MedarbejderePage from './pages/MedarbejderePage'; // @# Import
-import EmailsPage from './pages/EmailsPage';
+import MailPage from './pages/MailPage';
+import SagsMailPage from './pages/SagsMailPage';
 import type { Sag } from './types';
 import { useAppState, StateContext } from './StateContext';
 
@@ -142,6 +143,7 @@ function App() {
         <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />
         <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
         <Route path="/dokumenter" element={<DokumenterPage sagId={valgtSag?.id ?? null} />} />
+        <Route path="/sags_mail" element={<SagsMailPage sagId={valgtSag?.id ?? null} />} />
         <Route path="/virksomheder" element={<VirksomhederPage navigateTo={navigateTo} />} />
         <Route path="/kontakter" element={<KontakterPage navigateTo={navigateTo} />} />
         <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />
@@ -156,7 +158,7 @@ function App() {
         {/* @# Admin Routes */}
         <Route path="/admin/users" element={<UserListPage />} />
 
-        <Route path="/emails" element={<EmailsPage />} />
+        <Route path="/mail" element={<MailPage />} />
         <Route path="*" element={<SagsoversigtPage navigateTo={navigateTo} />} />
       </Routes>
       <ConfirmModal

@@ -30,7 +30,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
             // Optimistically we might want to fetch the case details to show the label correctly
             // But usually this component is used where we might already know it, or we fetch it.
             // For now, let's just fetch it if we don't have a label.
-            api.get<any>(`/sager/sager/${value}/`).then(res => {
+            api.get<any>(`/sager/${value}/`).then(res => {
                 setSelectedCaseLabel(`${res.sags_nr}${res.alias ? ' - ' + res.alias : ''}`);
             }).catch(() => {
                 setSelectedCaseLabel(`Sag #${value}`);
