@@ -70,7 +70,13 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     <div className="grid grid-cols-[auto_1fr_auto] h-screen bg-gray-100">
       {/* @# 2025-09-15 18:20 - Ændret fra w-20 til w-16 for lukket tilstand. */}
       <aside className={`bg-gray-800 text-white flex flex-col transition-all duration-300 ${erMenuAaben ? 'w-56' : 'w-16'}`}>
-        <div className="flex items-center justify-center p-4 border-b border-gray-700 h-16">
+        <div className={`flex items-center ${erMenuAaben ? 'justify-between px-3' : 'justify-center'} p-4 border-b border-gray-700 h-16 transition-all`}>
+          {erMenuAaben && (
+            <div className="flex items-center gap-3 overflow-hidden">
+              <img src="/LogoMGLP.svg" alt="MGLP" className="w-8 h-8 brightness-0 invert" />
+              <span className="font-semibold text-lg whitespace-nowrap">MGLP admin</span>
+            </div>
+          )}
           <button onClick={() => setErMenuAaben(!erMenuAaben)} className="p-2 rounded-md hover:bg-gray-700" title={erMenuAaben ? "Luk menu" : "Åbn menu"}>
             {erMenuAaben ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
