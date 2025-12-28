@@ -11,6 +11,12 @@ export interface Blokinfo {
   beskrivelse: string | null;
 }
 
+export interface InformationsKilde {
+  id: number;
+  navn: string;
+  beskrivelse: string | null;
+}
+
 export interface SkabAktivitet {
   id: number;
   proces: Blokinfo | null;
@@ -22,6 +28,8 @@ export interface SkabAktivitet {
   note: string | null;
   ansvarlig: string | null;
   frist: number | null;
+  informations_kilde?: InformationsKilde | null;
+  mail_titel?: string | null;
   er_ny?: boolean;
 }
 
@@ -175,6 +183,8 @@ export interface Aktivitet {
   kommentar_vigtig?: boolean;
   note: string | null;
   skabelon_note: string | null;
+  informations_kilde?: InformationsKilde | null;
+  mail_titel?: string | null;
   er_ny?: boolean;
 }
 
@@ -269,6 +279,8 @@ export interface SkabDokument {
   aktiv: boolean | null;
   udgaaet: boolean | null;
   kommentar: string | null;
+  informations_kilde?: InformationsKilde | null;
+  mail_titel?: string | null;
   er_ny?: boolean;
 }
 
@@ -318,5 +330,7 @@ export interface SagsDokument {
   ansvarlig: number | null; // User ID
   ansvarlig_navn?: string;
   ansvarlig_username?: string;
+  informations_kilde?: InformationsKilde | null;
+  mail_titel?: string | null;
   oprettet_dato: string;
 }

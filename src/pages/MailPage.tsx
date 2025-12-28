@@ -77,18 +77,7 @@ export default function MailPage() {
         }
     };
 
-    const handleSync = async () => {
-        setIsSyncing(true);
-        try {
-            await api.post('/emails/sync/');
-            await fetchAccounts();
-            setRefreshKey(prev => prev + 1);
-        } catch (e) {
-            console.error("Sync failed", e);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
+
 
     // Calculate latest sync time
     const latestSync = accounts
@@ -214,14 +203,6 @@ export default function MailPage() {
                     {!isJournalizing && (
                         <div className="flex items-center justify-between w-full">
                             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Postkasser</h2>
-                            <button
-                                onClick={handleSync}
-                                disabled={isSyncing}
-                                title={latestSyncDate ? `Sidst checket: ${latestSyncDate.toLocaleString('da-DK')}` : "Synkroniser nu"}
-                                className={`text-gray-400 hover:text-blue-600 transition-colors ${isSyncing ? 'animate-spin text-blue-600' : ''}`}
-                            >
-                                <RefreshCw size={14} />
-                            </button>
                         </div>
                     )}
                     {/* Toggle Button for Journaliser Mode */}

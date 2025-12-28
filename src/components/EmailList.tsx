@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
+import { API_BASE_URL } from '../config';
 import { Mail, Search, Paperclip, Calendar, User, FileText, ChevronRight, X, Filter, ListFilter, Check, Sparkles } from 'lucide-react';
 
 interface IncomingEmail {
@@ -23,9 +24,18 @@ interface IncomingEmail {
     } | null;
 }
 
+interface Attachment {
+    id: number;
+    filename: string;
+    file_size: number;
+    is_inline: boolean;
+    saved_document_id?: number;
+}
+
 interface IncomingEmailDetail extends IncomingEmail {
     body_text: string;
     sender_email: string;
+    attachments: Attachment[];
 }
 
 interface EmailListProps {
@@ -75,6 +85,20 @@ export default function EmailList({ accountId, hideReadingPane, onUnlink, select
             console.error("Failed to fetch detail", e);
         } finally {
             setIsLoadingDetail(false);
+        }
+    };
+
+    const handleDeleteAttachment = async (attId: number) => {
+        if (!window.confirm("Vil du slette denne fil?")) return;
+        try {
+            await api.delete(`/emails/attachment/${attId}/delete/`);
+            setSelectedEmail(prev => prev ? {
+                ...prev,
+                attachments: prev.attachments.filter(a => a.id !== attId)
+            } : null);
+        } catch (e) {
+            console.error("Fejl ved sletning", e);
+            alert("Kunne ikke slette filen.");
         }
     };
 
@@ -259,9 +283,42 @@ export default function EmailList({ accountId, hideReadingPane, onUnlink, select
 
 
 
-                            {/* Body */}
-                            <div className="flex-1 overflow-y-auto p-6 bg-white text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-sans">
-                                {selectedEmail.body_text}
+                            <div className="flex-1 overflow-y-auto">
+                                {/* Attachments */}
+                                {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                    <div className="px-6 py-2 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-2 sticky top-0 z-10">
+                                        {selectedEmail.attachments.map(att => (
+                                            !att.is_inline && (
+                                                <div key={att.id} className="flex items-center bg-white border border-gray-200 rounded px-2 py-1 text-xs group hover:border-blue-300 transition-colors shadow-sm">
+                                                    <Paperclip size={12} className="text-gray-400 mr-2" />
+                                                    <a
+                                                        href={`${API_BASE_URL}/emails/attachment/${att.id}/`}
+                                                        target="_blank" rel="noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 hover:underline mr-2 truncate max-w-[200px]"
+                                                        title={att.filename}
+                                                    >
+                                                        {att.filename}
+                                                    </a>
+                                                    <span className="text-gray-400 mr-2 text-[10px]">
+                                                        {Math.round(att.file_size / 1024)} KB
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleDeleteAttachment(att.id)}
+                                                        className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-100"
+                                                        title="Slet vedhæftning"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Body */}
+                                <div className="p-6 bg-white text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-sans">
+                                    {selectedEmail.body_text}
+                                </div>
                             </div>
                         </>
                     ) : (
