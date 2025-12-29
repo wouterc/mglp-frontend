@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2 } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
-import { Aktivitet, User, Status } from '../../types';
+import { Aktivitet, User, Status, InformationsKilde } from '../../types';
 
 interface AktivitetRowProps {
     aktivitet: Aktivitet;
@@ -14,6 +14,7 @@ interface AktivitetRowProps {
     onEditComment: (aktivitet: Aktivitet) => void;
     onEditResultat?: (aktivitet: Aktivitet) => void;
     onGemTilSkabelon?: (aktivitet: Aktivitet) => void;
+    informationsKilder: InformationsKilde[];
 }
 
 interface InlineEditorProps {
@@ -40,7 +41,7 @@ const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand }: Inline
                 value={text || ''}
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleBlur}
-                className="w-full py-0.5 px-1 pr-7 border border-gray-300 rounded-md text-xs bg-white focus:border-black focus:ring-0 truncate"
+                className="w-full py-0.5 px-1 pr-7 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0 truncate"
                 title={text || ''}
             />
             {onExpand && (
@@ -64,7 +65,8 @@ export default function AktivitetRow({
     onStatusToggle,
     onEditComment,
     onEditResultat,
-    onGemTilSkabelon
+    onGemTilSkabelon,
+    informationsKilder
 }: AktivitetRowProps) {
 
     return (
@@ -78,7 +80,7 @@ export default function AktivitetRow({
                     className="rounded text-blue-600 focus:ring-blue-500"
                 />
             </td>
-            <td className="py-0.5 px-2 pl-8 break-words text-xs">
+            <td className="py-0.5 px-2 pl-8 break-words text-[12px]">
                 {aktivitet.aktivitet_nr} - {aktivitet.aktivitet}
             </td>
             <td className="py-0.5 px-2">
@@ -155,7 +157,7 @@ export default function AktivitetRow({
                         id={`cell-${aktivitet.id}-2`}
                         value={aktivitet.status?.id || ''}
                         onChange={(e) => onInlineSave(aktivitet, 'status', e.target.value)}
-                        className={`flex-grow py-0.5 px-1 border rounded-md text-xs bg-transparent focus:border-black focus:ring-0 ${aktivitet.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-gray-300'
+                        className={`flex-grow py-0.5 px-1 border rounded-md text-[12px] bg-transparent focus:border-black focus:ring-0 ${aktivitet.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-gray-300'
                             }`}
                     >
                         <option value="">Vælg...</option>
@@ -171,12 +173,35 @@ export default function AktivitetRow({
                     onExpand={onEditResultat ? () => onEditResultat(aktivitet) : undefined}
                 />
             </td>
+            <td className="py-0.5 px-0.5 text-center">
+                <input
+                    type="checkbox"
+                    checked={!!aktivitet.skal_mailes}
+                    onChange={(e) => onInlineSave(aktivitet, 'skal_mailes', e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 mt-1"
+                    title="Vælg til næste mail"
+                />
+            </td>
+            <td className="py-0.5 px-2">
+                <select
+                    value={aktivitet.informations_kilde?.id || ''}
+                    onChange={(e) => onInlineSave(aktivitet, 'informations_kilde_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
+                >
+                    <option value="">Ingen</option>
+                    {informationsKilder.map(k => (
+                        <option key={k.id} value={k.id}>
+                            {k.navn}
+                        </option>
+                    ))}
+                </select>
+            </td>
             <td className="py-0.5 px-2">
                 <select
                     id={`cell-${aktivitet.id}-4`}
                     value={aktivitet.ansvarlig || ''}
                     onChange={(e) => onInlineSave(aktivitet, 'ansvarlig', e.target.value)}
-                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-xs bg-white focus:border-black focus:ring-0"
+                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
                 >
                     <option value="">Ingen</option>
                     {colleagues.map(u => (

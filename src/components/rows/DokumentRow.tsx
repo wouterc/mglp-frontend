@@ -4,7 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
-import { SagsDokument, Sag, User } from '../../types';
+import { SagsDokument, Sag, User, InformationsKilde } from '../../types';
 
 interface DokumentRowProps {
     doc: SagsDokument;
@@ -18,6 +18,7 @@ interface DokumentRowProps {
     onSaveToTemplate: (doc: SagsDokument) => void;
     statusser: any[];
     onStatusToggle: (doc: SagsDokument) => void;
+    informationsKilder: InformationsKilde[];
 }
 
 export default function DokumentRow({
@@ -31,7 +32,8 @@ export default function DokumentRow({
     onInlineSave,
     onSaveToTemplate,
     statusser,
-    onStatusToggle
+    onStatusToggle,
+    informationsKilder
 }: DokumentRowProps) {
     const [isUploading, setIsUploading] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -90,7 +92,7 @@ export default function DokumentRow({
                 {doc.gruppe_nr}.{doc.dokument_nr}
             </td>
             <td className="px-2 py-1.5 w-52 align-middle overflow-hidden">
-                <div className="font-medium text-gray-800 truncate" title={doc.titel || doc.filnavn || ''}>
+                <div className="font-medium text-gray-800 truncate text-[12px]" title={doc.titel || doc.filnavn || ''}>
                     {doc.titel || doc.filnavn || 'Uden navn'}
                 </div>
             </td>
@@ -176,7 +178,7 @@ export default function DokumentRow({
                     <select
                         value={doc.status?.id || ''}
                         onChange={(e) => onInlineSave(doc.id, 'status_id', e.target.value === '' ? null : parseInt(e.target.value))}
-                        className={`flex-grow h-7 py-0 px-1 border rounded text-xs bg-transparent focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-slate-400'}`}
+                        className={`flex-grow h-7 py-0 px-1 border rounded text-[12px] bg-transparent focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-slate-400'}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <option value="">Vælg...</option>
@@ -227,7 +229,7 @@ export default function DokumentRow({
                         ) : (
                             <div
                                 onClick={open}
-                                className="flex items-center gap-2 text-gray-500 text-xs cursor-pointer w-full"
+                                className="flex items-center gap-2 text-gray-500 text-[12px] cursor-pointer w-full"
                             >
                                 <Upload size={14} />
                                 <span className="truncate">{isDragActive ? 'Slip filen' : 'Klik / træk fil her'}</span>
@@ -243,17 +245,38 @@ export default function DokumentRow({
                     </div>
                 )}
             </td>
+            <td className="px-0 py-1.5 align-middle text-center w-8">
+                <input
+                    type="checkbox"
+                    checked={!!doc.skal_mailes}
+                    onChange={(e) => onInlineSave(doc.id, 'skal_mailes', e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 mt-1"
+                    title="Vælg til næste mail"
+                />
+            </td>
+            <td className="px-2 py-1.5 w-20 align-middle overflow-hidden">
+                <select
+                    value={doc.informations_kilde?.id || ''}
+                    onChange={(e) => onInlineSave(doc.id, 'informations_kilde_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                    className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
+                >
+                    <option value="">Ingen</option>
+                    {informationsKilder.map(k => (
+                        <option key={k.id} value={k.id}>
+                            {k.navn}
+                        </option>
+                    ))}
+                </select>
+            </td>
             <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
                 <select
                     value={doc.ansvarlig || ''}
                     onChange={(e) => onInlineSave(doc.id, 'ansvarlig', e.target.value === '' ? null : parseInt(e.target.value))}
-                    className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-xs bg-white focus:border-black focus:ring-0"
+                    className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
                 >
-                    <option value="">Ingen</option>
-                    {colleagues.map(u => (
-                        <option key={u.id} value={u.id}>
-                            {u.username}
-                        </option>
+                    <option value="">Alle</option>
+                    {colleagues.map(user => (
+                        <option key={user.id} value={user.id}>{user.first_name || user.username}</option>
                     ))}
                 </select>
             </td>

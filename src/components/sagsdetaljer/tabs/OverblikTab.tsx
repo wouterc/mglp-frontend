@@ -121,8 +121,9 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2.5">
-                    <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
+                    {/* Rad 1: Adresse og Sagsnr */}
+                    <div className="md:col-span-2">
                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Adresse</label>
                         <div className="flex items-center">
                             {sag.fuld_adresse && <CopyButton text={sag.fuld_adresse} id="adresse" />}
@@ -133,38 +134,35 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Sagsnummer & Alias</label>
                         <div className="flex items-center">
                             <CopyButton text={`${sag.sags_nr}`} id="sagsnr" />
-                            <p className="text-gray-900 text-base font-medium">{sag.sags_nr} - {sag.alias}</p>
+                            <p className="text-gray-900 text-base font-medium truncate">{sag.sags_nr} - {sag.alias}</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Boligtype</label>
-                            <p className="text-gray-900 text-sm">{sag.bolig_type || '-'}</p>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</label>
-                            <p className="text-gray-900 text-sm font-medium">{sag.bolig_matrikel || '-'}</p>
-                        </div>
+                    {/* Rad 2: Property Basic */}
+                    <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Boligtype</label>
+                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_type || '-'}</p>
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</label>
+                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_matrikel || '-'}</p>
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</label>
+                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_bfe || '-'}</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</label>
-                            <p className="text-gray-900 text-sm font-medium">{sag.bolig_bfe || '-'}</p>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</label>
-                            <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
-                        </div>
-                    </div>
-
+                    {/* Rad 3: Ansvarlig, Mail, Status */}
                     <div>
                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Hovedansvarlig</label>
-                        <p className="text-gray-900 text-sm">{sag.hovedansvarlige || '-'}</p>
+                        <p className="text-gray-900 text-sm font-medium">{sag.hovedansvarlige || '-'}</p>
                     </div>
-
-                    {/* Status (Nu redigerbar) - Fylder hele bredden på mobil, men passer ind i grid på desktop */}
+                    <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Standard mail-konto</label>
+                        <p className="text-gray-900 text-sm font-medium truncate" title={sag.standard_outlook_account_details?.email_address || ''}>
+                            {sag.standard_outlook_account_details ? `${sag.standard_outlook_account_details.account_name}` : '-'}
+                        </p>
+                    </div>
                     <div>
                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Nuværende Status</label>
                         <div className="mt-0.5">
@@ -172,7 +170,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                                 value={sag.status?.id || ''}
                                 onChange={handleSelectChange}
                                 className={`
-                                    w-full p-1 border rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none
+                                    w-full p-0.5 border rounded text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none
                                     ${sag.status?.status_kategori === 9 ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200'}
                                 `}
                             >
@@ -181,6 +179,16 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                                 ))}
                             </select>
                         </div>
+                    </div>
+
+                    {/* Rad 4: BBR og Anpart */}
+                    <div className="md:col-span-2">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</label>
+                        <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Anpart</label>
+                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_anpart || '-'}</p>
                     </div>
 
                     {/* Sagsnumre sektion - Samlet på én række (3 kolonner) */}

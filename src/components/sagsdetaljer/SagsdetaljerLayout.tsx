@@ -5,7 +5,7 @@ import React, { ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
-    ArrowLeft, Search, Loader2
+    ArrowLeft, Search, Loader2, MailPlus
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';

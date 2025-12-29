@@ -163,6 +163,10 @@ export interface Sag {
   varme_virksomhed: Virksomhed | null;
   spildevand_virksomhed: Virksomhed | null;
 
+  // @# 2025-12-28 23:21 - Standard afsender konto
+  standard_outlook_account_id: number | null;
+  standard_outlook_account_details: OutlookAccount | null;
+
   // Tillad andre felter
   [key: string]: any;
 }
@@ -185,7 +189,9 @@ export interface Aktivitet {
   skabelon_note: string | null;
   informations_kilde?: InformationsKilde | null;
   mail_titel?: string | null;
+  skabelon_mail_titel?: string | null;
   er_ny?: boolean;
+  skal_mailes?: boolean;
 }
 
 export interface AktiviteterFilterState {
@@ -312,6 +318,7 @@ export interface SagsDokument {
   skabelon: number | null; // ID reference
   skabelon_navn?: string;
   skabelon_kommentar?: string;
+  skabelon_mail_titel?: string; // Add this line
   gruppe: Blokinfo | null;
   gruppe_navn?: string;
   gruppe_nr?: number;
@@ -333,4 +340,43 @@ export interface SagsDokument {
   informations_kilde?: InformationsKilde | null;
   mail_titel?: string | null;
   oprettet_dato: string;
+  skal_mailes?: boolean;
+}
+
+export interface MailSkabelon {
+  id: number;
+  navn: string;
+  emne?: string;
+  indhold?: string;
+  formaal?: string;
+  informations_kilde?: InformationsKilde;
+  informations_kilde_id?: number | null;
+  sidst_opdateret: string;
+  oprettet: string;
+}
+
+export interface OutlookAccount {
+  id: number;
+  account_name: string;
+  email_address: string;
+  is_active: boolean;
+  last_synced?: string;
+  machine_name?: string;
+  os_user?: string;
+}
+
+export interface OutgoingEmail {
+  id: number;
+  recipient: string;
+  subject: string;
+  body_html: string;
+  outlook_account: number | null;
+  outlook_account_details?: OutlookAccount;
+  sag: number | null;
+  informations_kilde?: number | null;
+  informations_kilde_navn?: string;
+  status: 'Draft' | 'InOutlook' | 'Completed' | 'Error';
+  error_message?: string;
+  created_at: string;
+  sent_at?: string;
 }

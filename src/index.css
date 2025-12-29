@@ -61,3 +61,27 @@ table td select {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
 }
+
+/* Quill Editor Customization */
+.quill-editor {
+    display: flex;
+    flex-direction: column;
+}
+
+.quill-editor .ql-container {
+    flex: 1;
+    font-size: 0.875rem !important;
+    border-bottom-left-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+    min-height: 300px;
+}
+
+.quill-editor .ql-toolbar {
+    border-top-left-radius: 0.375rem;
+    border-top-right-radius: 0.375rem;
+    background-color: #f8fafc;
+}
+
+.quill-editor .ql-editor {
+    min-height: 300px;
+}

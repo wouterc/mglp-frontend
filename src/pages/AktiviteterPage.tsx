@@ -5,9 +5,9 @@
 // @# 2025-12-25 20:30 - Refactoring: Added internal FilterSidebar, CaseSelector, and AktivitetRow.
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, useRef, useMemo } from 'react';
 import { api } from '../api';
-import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail } from 'lucide-react';
 import { useAppState } from '../StateContext';
-import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState, User } from '../types';
+import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState, User, InformationsKilde } from '../types';
 import SagsAktivitetForm from '../components/SagsAktivitetForm';
 import Tooltip from '../components/Tooltip';
 import { useTableNavigation } from '../hooks/useTableNavigation';
@@ -15,6 +15,7 @@ import AktiviteterFilter from '../components/AktiviteterFilter';
 import AktivitetRow from '../components/rows/AktivitetRow';
 import CaseSelector from '../components/ui/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
+
 
 interface AktiviteterPageProps {
     sagId: number | null;
@@ -37,6 +38,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const [confirmTemplateActivity, setConfirmTemplateActivity] = useState<Aktivitet | null>(null);
     const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean; title: string; message: string; type?: 'info' | 'success' | 'error' } | null>(null);
 
+
     const tableRef = useRef<HTMLTableElement>(null);
     useTableNavigation(tableRef);
 
@@ -46,6 +48,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
     const [colleagues, setColleagues] = useState<User[]>([]);
+    const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
 
     useEffect(() => {
         api.get<User[]>('/kerne/users/').then(data => {
@@ -56,6 +59,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             const statuses = (data as any).results || data;
             setAktivitetStatusser(statuses);
         });
+        api.get<InformationsKilde[]>('/kerne/informationskilder/').then(setInformationsKilder).catch(console.error);
     }, []);
 
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -88,34 +92,34 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             setAllActivities([]); // Ryd hvis ingen cache
         }
 
-        const fetchAll = async () => {
-            // Kun vis loading-spinner hvis vi ikke har data i cachen
-            const hasCachedData = !!cachedAktiviteter[valgtSag.id];
-
-            setIsFetchingAll(true);
-            if (!hasCachedData) {
-                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
-            }
-
-            try {
-                const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
-                setAllActivities(data);
-                // Opdater cachen i global state
-                dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
-
-                // Tjek også global synk-status
-                const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
-                setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
-            } catch (e: any) {
-                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
-            } finally {
-                setIsFetchingAll(false);
-                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
-            }
-        };
-
-        fetchAll();
+        fetchAktiviteterPåSag(valgtSag.id);
     }, [valgtSag, dispatch]);
+
+    const fetchAktiviteterPåSag = async (sagId: number) => {
+        // Kun vis loading-spinner hvis vi ikke har data i cachen
+        const hasCachedData = !!cachedAktiviteter[sagId];
+
+        setIsFetchingAll(true);
+        if (!hasCachedData) {
+            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
+        }
+
+        try {
+            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${sagId}`);
+            setAllActivities(data);
+            // Opdater cachen i global state
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: sagId, aktiviteter: data } });
+
+            // Tjek også global synk-status
+            const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
+            setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
+        } catch (e: any) {
+            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
+        } finally {
+            setIsFetchingAll(false);
+            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
+        }
+    };
 
     const handleSelectSag = async (sagId: number) => {
         try {
@@ -448,11 +452,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                 )}
                             </div>
                         </div>
-                        {valgtSag?.fuld_adresse && (
-                            <div className="text-gray-500 flex items-center gap-1 text-sm">
-                                <span className="font-medium">{valgtSag.fuld_adresse}</span>
-                            </div>
-                        )}
+
                     </div>
 
                     <div className="min-w-72">
@@ -461,8 +461,8 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-md overflow-hidden flex-1">
-                    <table className="w-full text-sm text-left table-fixed" ref={tableRef}>
-                        <thead className="bg-gray-800 text-white font-medium">
+                    <table className="w-full text-[12px] text-left table-fixed" ref={tableRef}>
+                        <thead className="bg-gray-800 text-white font-medium uppercase text-[11px]">
                             <tr>
                                 <th className="py-2 px-2 w-[4%] text-center">Aktiv</th>
                                 <th className="py-2 px-2 w-[28%] text-left">GRUPPE / AKTIVITET</th>
@@ -470,19 +470,21 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                 <th className="py-2 px-2 w-[8%] text-center">Dato Ekstern</th>
                                 <th className="py-2 px-2 w-[6%] text-center">Info</th>
                                 <th className="py-2 px-2 w-[14%] text-left">Status</th>
-                                <th className="py-2 px-2 w-[23%] text-left">Resultat</th>
+                                <th className="py-2 px-2 w-[18%] text-left">Resultat</th>
+                                <th className="py-2 px-0.5 w-[3%] text-center"><Mail className="inline h-4 w-4" /></th>
+                                <th className="py-2 px-2 w-[7%] text-left">Kilde</th>
                                 <th className="py-2 px-2 w-[9%] text-left">Ansvarlig</th>
                             </tr>
                         </thead>
                         <tbody>
                             {aktiviteterIsLoading || isFetchingAll ? (
-                                <tr><td colSpan={8} className="text-center p-4">Henter aktiviteter...</td></tr>
+                                <tr><td colSpan={9} className="text-center p-4">Henter aktiviteter...</td></tr>
                             ) : state.aktiviteterError ? (
-                                <tr><td colSpan={8} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
+                                <tr><td colSpan={9} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
                             ) : !valgtSag ? (
-                                <tr><td colSpan={8} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
+                                <tr><td colSpan={9} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
                             ) : filteredGroups.length === 0 ? (
-                                <tr><td colSpan={8} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
+                                <tr><td colSpan={10} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
                             ) : filteredGroups.map((gruppeSummary: any) => {
                                 const gruppeKey = `${gruppeSummary.proces.id}-${gruppeSummary.gruppe.id}`;
                                 const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
@@ -495,7 +497,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                             <td className="py-2 px-4 text-center">
                                                 {erUdvidet ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                             </td>
-                                            <td className="py-2 px-4 font-bold text-gray-700 break-words" colSpan={7}>
+                                            <td className="py-2 px-4 font-bold text-gray-700 break-words" colSpan={9}>
                                                 {gruppeSummary.proces.nr}.{gruppeSummary.gruppe.nr} - {gruppeSummary.proces.titel_kort} / {gruppeSummary.gruppe.titel_kort}
                                                 <span className="font-normal ml-4 text-gray-600">
                                                     ({gruppeSummary.total_faerdig_count}/{gruppeSummary.total_aktiv_count})
@@ -518,6 +520,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 onEditComment={(a) => { setRedigeringsMode('kommentar'); setAktivitetTilRedigering(a); }}
                                                 onEditResultat={(a) => { setRedigeringsMode('resultat'); setAktivitetTilRedigering(a); }}
                                                 onGemTilSkabelon={handleGemTilSkabelon}
+                                                informationsKilder={informationsKilder}
                                             />
                                         ))}
 
@@ -551,7 +554,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                         TILFØJ
                                                     </button>
                                                 </td>
-                                                {/* Resultat, Ansvarlig: Empty */}
+                                                {/* Resultat, Mail, Kilde, Ansvarlig: Empty */}
+                                                <td className="py-1 px-2"></td>
+                                                <td className="py-1 px-2"></td>
                                                 <td className="py-1 px-2"></td>
                                                 <td className="py-1 px-2"></td>
                                             </tr>
@@ -587,7 +592,8 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 cancelText={undefined} // Hide cancel button
                 isDestructive={feedbackModal?.type === 'error'}
             />
-        </div>
+
+        </div >
     );
 }
 

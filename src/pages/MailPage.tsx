@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Mail, Settings, Inbox, Loader2, ChevronRight, User, Folder, Layout, RefreshCw } from 'lucide-react';
+import { Mail, Settings, Inbox, Loader2, ChevronRight, User, Folder, Layout, RefreshCw, FileText } from 'lucide-react';
 import OutlookAccountSettings, { OutlookAccount } from '../components/OutlookAccountSettings';
 import EmailList from '../components/EmailList';
 import CaseSelector from '../components/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import MailTemplatesSettings from '../components/MailTemplatesSettings';
 import axios from 'axios';
 import { Sag } from '../types';
 
@@ -12,6 +13,7 @@ export default function MailPage() {
     const [accounts, setAccounts] = useState<OutlookAccount[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<OutlookAccount | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [showTemplates, setShowTemplates] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isJournalizing, setIsJournalizing] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -60,11 +62,19 @@ export default function MailPage() {
     const handleAccountClick = (acc: OutlookAccount) => {
         setSelectedAccount(acc);
         setShowSettings(false);
+        setShowTemplates(false);
     };
 
     const handleSettingsClick = () => {
         setSelectedAccount(null);
         setShowSettings(true);
+        setShowTemplates(false);
+    };
+
+    const handleTemplatesClick = () => {
+        setSelectedAccount(null);
+        setShowSettings(false);
+        setShowTemplates(true);
     };
 
     const activeAccounts = accounts.filter(a => a.is_active);
@@ -233,7 +243,14 @@ export default function MailPage() {
                 </div>
 
                 {/* Settings Button */}
-                <div className="p-2 border-t border-gray-200 bg-[#e8e8e8]">
+                <div className="p-2 border-t border-gray-200 bg-[#e8e8e8] space-y-1">
+                    <button
+                        onClick={handleTemplatesClick}
+                        className={`w-full text-left px-3 py-2 text-xs flex items-center rounded-md ${showTemplates ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-white/50'} ${isJournalizing ? 'justify-center' : ''}`}
+                    >
+                        <FileText size={18} className={!isJournalizing ? "mr-2.5" : ""} />
+                        {!isJournalizing && <span>Mailskabeloner</span>}
+                    </button>
                     <button
                         onClick={handleSettingsClick}
                         className={`w-full text-left px-3 py-2 text-xs flex items-center rounded-md ${showSettings ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-white/50'} ${isJournalizing ? 'justify-center' : ''}`}
@@ -253,7 +270,7 @@ export default function MailPage() {
             {/* --- Main Content Area --- */}
             <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
                 {/*  Toolbar for Journalizing Toggle if not in sidebar? */}
-                {selectedAccount && !showSettings && (
+                {selectedAccount && !showSettings && !showTemplates && (
                     <div className="absolute right-4 top-3 z-10 flex space-x-2">
                         <button
                             onClick={() => setIsJournalizing(!isJournalizing)}
@@ -271,7 +288,11 @@ export default function MailPage() {
                     </div>
                 )}
 
-                {showSettings ? (
+                {showTemplates ? (
+                    <div className="flex-1 overflow-hidden relative">
+                        <MailTemplatesSettings />
+                    </div>
+                ) : showSettings ? (
                     <div className="flex-1 p-6 overflow-hidden">
                         <OutlookAccountSettings />
                     </div>

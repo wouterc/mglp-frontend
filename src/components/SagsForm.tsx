@@ -33,6 +33,7 @@ interface SagsDataState {
   sags_nr?: string; // Tilføjet
   alias: string;
   hovedansvarlige: string;
+  standard_outlook_account_id: string;
   status_id: string;
   adresse_vej: string;
   adresse_husnr: string;
@@ -63,6 +64,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const [sagsData, setSagsData] = useState<SagsDataState>({
     alias: '',
     hovedansvarlige: '',
+    standard_outlook_account_id: '',
     status_id: '',
     adresse_vej: '',
     adresse_husnr: '',
@@ -88,6 +90,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     raadgiver_kontakt_id: '',
   });
   const [statusser, setStatusser] = useState<Status[]>([]);
+  const [outlookAccounts, setOutlookAccounts] = useState<any[]>([]);
   const [bbrAnvendelser, setBbrAnvendelser] = useState<BbrAnvendelse[]>([]);
   const [isFetchingDetails, setIsFetchingDetails] = useState<boolean>(false);
   const erRedigering = sagTilRedigering != null;
@@ -104,6 +107,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         sags_nr: sagTilRedigering.sags_nr || '',
         alias: sagTilRedigering.alias || '',
         hovedansvarlige: sagTilRedigering.hovedansvarlige || '',
+        standard_outlook_account_id: sagTilRedigering.standard_outlook_account_id ? String(sagTilRedigering.standard_outlook_account_id) : '',
         status_id: sagTilRedigering.status ? String(sagTilRedigering.status.id) : '',
 
         adresse_vej: sagTilRedigering.adresse_vej || '',
@@ -142,6 +146,17 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       }
     };
     fetchStatusser();
+
+    const fetchAccounts = async () => {
+      try {
+        const data = await api.get<any>('/emails/accounts/');
+        const allAccounts = Array.isArray(data) ? data : data.results || [];
+        setOutlookAccounts(allAccounts.filter((a: any) => a.is_active));
+      } catch (error) {
+        console.error('Fejl ved hentning af konti:', error);
+      }
+    };
+    fetchAccounts();
   }, []);
 
   useEffect(() => {
@@ -239,6 +254,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       ...sagsData,
       bolig_anvendelse_id: sagsData.bolig_anvendelse_id === '' ? null : sagsData.bolig_anvendelse_id,
       status_id: sagsData.status_id === '' ? null : sagsData.status_id,
+      standard_outlook_account_id: sagsData.standard_outlook_account_id === '' ? null : parseInt(sagsData.standard_outlook_account_id, 10),
       // @# 2025-11-19 20:30 - Konverter kommunekode til int eller null
       kommunekode: sagsData.kommunekode ? parseInt(sagsData.kommunekode, 10) : null,
       raadgiver_kontakt_id: sagsData.raadgiver_kontakt_id === '' ? null : parseInt(sagsData.raadgiver_kontakt_id, 10),
@@ -301,6 +317,11 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             )}
 
             <div>
+              <label htmlFor="alias" className="block text-xs font-medium text-gray-500">Alias (Påkrævet)</label>
+              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
               <label htmlFor="status_id" className="block text-xs font-medium text-gray-500">Status</label>
               <select
                 id="status_id"
@@ -319,19 +340,26 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             </div>
 
             <div>
-              <label htmlFor="alias" className="block text-xs font-medium text-gray-500">Alias (Påkrævet)</label>
-              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
               <label htmlFor="hovedansvarlige" className="block text-xs font-medium text-gray-500">Hovedansvarlig (Påkrævet)</label>
               <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
 
-            {/* Nye Ejendomsfelter under Generelt */}
             <div>
-              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
-              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+              <label htmlFor="standard_outlook_account_id" className="block text-xs font-medium text-gray-500">Standard mail-konto (Afsender)</label>
+              <select
+                id="standard_outlook_account_id"
+                name="standard_outlook_account_id"
+                value={sagsData.standard_outlook_account_id || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">Vælg konto...</option>
+                {outlookAccounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.account_name} ({acc.email_address})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -345,6 +373,16 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             </div>
 
             <div>
+              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
+              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
+              <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div className="md:col-span-2">
               <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
               <select
                 id="bolig_anvendelse_id"
@@ -360,11 +398,6 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
-              <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 // @# 2025-11-23 19:50 - Forenklet logik: Bruger lokal filtrering af grupper i stedet for API-kald.
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent, ReactElement } from 'react';
 import { Save, X, Loader2 } from 'lucide-react';
-import type { Blokinfo, SkabAktivitet } from '../types.ts';
+import type { Blokinfo, SkabAktivitet, InformationsKilde, User } from '../types.ts';
 import { api } from '../api';
 
 type AktivitetTilRedigering = SkabAktivitet;
@@ -28,6 +28,8 @@ interface FormDataState {
   note: string;
   ansvarlig: string;
   frist: string;
+  informations_kilde_id: string;
+  mail_titel: string;
 }
 
 function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList, initialFilters }: AktivitetFormProps): ReactElement {
@@ -41,7 +43,17 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
     note: '',
     ansvarlig: '',
     frist: '',
+    informations_kilde_id: '',
+    mail_titel: '',
   });
+
+  const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
+  const [colleagues, setColleagues] = useState<User[]>([]);
+
+  useEffect(() => {
+    api.get<InformationsKilde[]>('/kerne/informationskilder/').then(setInformationsKilder).catch(console.error);
+    api.get<User[]>('/kerne/users/').then(data => setColleagues(data.filter(u => u.is_active))).catch(console.error);
+  }, []);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
@@ -65,6 +77,8 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
         note: aktivitetTilRedigering.note || '',
         ansvarlig: aktivitetTilRedigering.ansvarlig || '',
         frist: aktivitetTilRedigering.frist?.toString() || '',
+        informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id.toString() || '',
+        mail_titel: aktivitetTilRedigering.mail_titel || '',
       });
     } else if (!erRedigering && initialFilters) {
       // Forudfyld fra filtre hvis muligt
@@ -197,6 +211,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
       ...dataToSend,
       proces_id: dataToSend.proces ? parseInt(dataToSend.proces) : null,
       gruppe_id: dataToSend.gruppe ? parseInt(dataToSend.gruppe) : null,
+      informations_kilde_id: dataToSend.informations_kilde_id ? parseInt(dataToSend.informations_kilde_id) : null,
     };
 
     if (!payload.proces_id || !payload.gruppe_id) {
@@ -282,14 +297,14 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
                 name="aktivitet_nr"
                 value={formData.aktivitet_nr}
                 onChange={handleChange}
-                className={`mt-1 w-full p-2 border rounded-md ${!erRedigering ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                className={`mt-1 w-full p-2 border rounded-md text-[12px] ${!erRedigering ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                 readOnly={!erRedigering}
                 title={!erRedigering ? "Nummeret tildeles automatisk" : ""}
               />
             </div>
             <div className="flex-grow">
               <label htmlFor="aktivitet" className="block text-sm font-medium">Aktivitet</label>
-              <input type="text" name="aktivitet" value={formData.aktivitet} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" name="aktivitet" value={formData.aktivitet} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />
             </div>
           </div>
 
@@ -313,7 +328,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
           <div className="flex items-start space-x-4">
             <div className="w-1/2">
               <label htmlFor="proces" className="block text-sm font-medium">Proces <span className="text-red-500">*</span></label>
-              <select name="proces" value={formData.proces} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md bg-white border-blue-200">
+              <select name="proces" value={formData.proces} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md bg-white border-blue-200 text-[12px]">
                 <option value="">Vælg proces...</option>
                 {procesList.map(p => <option key={p.id} value={p.id}>{p.nr} - {p.titel_kort}</option>)}
               </select>
@@ -325,7 +340,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
                 value={formData.gruppe}
                 onChange={handleChange}
                 required
-                className="mt-1 w-full p-2 border rounded-md bg-white border-blue-200"
+                className="mt-1 w-full p-2 border rounded-md bg-white border-blue-200 text-[12px]"
               >
                 <option value="">Vælg gruppe...</option>
                 {gruppeList.map(g => (
@@ -340,14 +355,40 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
             <textarea name="note" value={formData.note} onChange={handleChange} rows={3} className="mt-1 w-full p-2 border rounded-md text-[11px] placeholder-gray-400"></textarea>
           </div>
 
+          <div className="flex items-start space-x-4 pt-4 border-t border-gray-100">
+            <div className="w-1/4">
+              <label htmlFor="informations_kilde_id" className="block text-sm font-medium">Informationskilde</label>
+              <select name="informations_kilde_id" value={formData.informations_kilde_id} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md bg-white text-[12px]">
+                <option value="">Ingen</option>
+                {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
+              </select>
+            </div>
+            <div className="flex-grow">
+              <label htmlFor="mail_titel" className="block text-sm font-medium">Mail Titel</label>
+              <textarea
+                name="mail_titel"
+                value={formData.mail_titel}
+                onChange={handleChange}
+                className="mt-1 w-full p-2 border rounded-md text-[12px] resize-y min-h-[38px]"
+                placeholder="Titel til eksterne mails"
+                rows={2}
+              />
+            </div>
+          </div>
+
           <div className="flex items-start space-x-4">
             <div className="w-1/2">
               <label htmlFor="ansvarlig" className="block text-sm font-medium">Ansvarlig</label>
-              <input type="text" name="ansvarlig" value={formData.ansvarlig} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <select name="ansvarlig" value={formData.ansvarlig} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md bg-white text-[12px]">
+                <option value="">Ingen</option>
+                {colleagues.map(u => (
+                  <option key={u.id} value={u.username}>{u.username}</option>
+                ))}
+              </select>
             </div>
             <div className="w-1/2">
               <label htmlFor="frist" className="block text-sm font-medium">Frist (dage)</label>
-              <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />
             </div>
           </div>
 

@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Sag, SagsDokument, Blokinfo } from '../../../types';
+import { Sag, SagsDokument, Blokinfo, InformationsKilde } from '../../../types';
 import { api } from '../../../api';
-import { Loader2, FileText, RefreshCw, UploadCloud, CheckCircle, Upload, Trash2, Info, MessageSquare, Pencil, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Search, SlidersHorizontal, FunnelX, ExternalLink, PlusCircle, Save, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw, FileText, CheckCircle2, AlertCircle, PlusCircle, Mail, Loader2, ChevronsDown, ChevronsUp, ChevronRight, Save } from 'lucide-react';
 import DokumentRow from '../../rows/DokumentRow';
 import { useAppState } from '../../../StateContext';
 import Modal from '../../Modal';
@@ -37,17 +38,26 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const [colleagues, setColleagues] = useState<UserType[]>([]);
     const [statusser, setStatusser] = useState<any[]>([]);
+    const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
 
-    // Fetch colleagues and statuses
+    // Fetch colleagues, statuses and info sources
     useEffect(() => {
-        api.get<UserType[]>('/kerne/users/').then(data => {
-            setColleagues(data.filter(u => u.is_active));
-        });
-        api.get<any[]>('/kerne/status/?formaal=3').then(data => {
-            // StatusViewSet supports pagination if using DefaultRouter, but here it might return .results
-            const statuses = (data as any).results || data;
-            setStatusser(statuses);
-        });
+        const loadMetaData = async () => {
+            try {
+                const [users, stats, kilder] = await Promise.all([
+                    api.get<UserType[]>('/kerne/users/'),
+                    api.get<any[]>('/kerne/status/?formaal=3'),
+                    api.get<InformationsKilde[]>('/kerne/informationskilder/')
+                ]);
+
+                setColleagues(users.filter(u => u.is_active));
+                setStatusser((stats as any).results || stats);
+                setInformationsKilder(kilder);
+            } catch (error) {
+                console.error("Fejl ved hentning af metadata", error);
+            }
+        };
+        loadMetaData();
     }, []);
 
     // Master Groups State (to ensure we have IDs for Quick Add even if docs are missing it)
@@ -63,7 +73,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     }, []);
 
     const handleSelectSag = (id: number) => {
-        navigate(`/dokumenter/${id}`);
+        navigate(`/ dokumenter / ${id} `);
     };
 
     const cachedDocs = state.cachedDokumenter[sag.id];
@@ -118,6 +128,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // State for Comment Modal
     const [editingDoc, setEditingDoc] = useState<SagsDokument | null>(null);
     const [editCommentText, setEditCommentText] = useState('');
+    const [editMailTitle, setEditMailTitle] = useState('');
     const [editCommentImportant, setEditCommentImportant] = useState(false);
     const [isSavingComment, setIsSavingComment] = useState(false);
 
@@ -135,7 +146,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const [confirmTemplateDoc, setConfirmTemplateDoc] = useState<SagsDokument | null>(null);
     const [feedbackModal, setFeedbackModal] = useState<{ title: string, message: string, type: 'success' | 'error' } | null>(null);
 
-    const fetchDokumenter = useCallback(async (force = false) => {
+
+    const fetchDokumenter = useCallback(async (arg?: boolean | number) => {
+        const force = typeof arg === 'boolean' ? arg : false;
         if (!force && state.cachedDokumenter[sag.id]) {
             setLoading(false);
             return;
@@ -161,7 +174,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            await api.post(`/sager/${sag.id}/synkroniser_dokumenter/`);
+            await api.post(`/ sager / ${sag.id} /synkroniser_dokumenter/`);
             await fetchDokumenter(true);
             setNyeDokumenterFindes(false);
             if (onUpdate) onUpdate();
@@ -182,7 +195,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             const extension = file.name.split('.').pop();
             // The backend handles prefixing with sags_nr, so we just provide the clean descriptive name
             const baseName = (doc.titel || 'Dokument').trim();
-            const newName = `${baseName}.${extension}`;
+            const newName = `${baseName}.${extension} `;
             fileToUpload = new File([file], newName, { type: file.type });
         }
 
@@ -196,7 +209,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 formData.append('status_id', status80.id.toString());
             }
 
-            await api.patch(`/sager/sagsdokumenter/${docId}/`, formData);
+            await api.patch(`/ sager / sagsdokumenter / ${docId}/`, formData);
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Upload fejl:", e);
@@ -219,6 +232,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const openEditModal = (doc: SagsDokument) => {
         setEditingDoc(doc);
         setEditCommentText(doc.kommentar || '');
+        setEditMailTitle(doc.mail_titel || '');
         setEditCommentImportant(doc.kommentar_vigtig || false);
     };
 
@@ -228,6 +242,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         try {
             await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, {
                 kommentar: editCommentText,
+                mail_titel: editMailTitle,
                 kommentar_vigtig: editCommentImportant
             });
             dispatch({
@@ -235,6 +250,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 payload: {
                     sagId: sag.id, docId: editingDoc.id, updates: {
                         kommentar: editCommentText,
+                        mail_titel: editMailTitle,
                         kommentar_vigtig: editCommentImportant
                     }
                 }
@@ -580,11 +596,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                 )}
                             </div>
                         </div>
-                        {sag.fuld_adresse && (
-                            <div className="text-gray-500 flex items-center gap-1 text-sm">
-                                <span className="font-medium">{sag.fuld_adresse}</span>
-                            </div>
-                        )}
+
                     </div>
 
                     {/* Sag Search Box (Skift sag) */}
@@ -593,10 +605,14 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                     </div>
                 </div>
 
+
+                {/* Mail Basket Reset Button */}
+
+
                 {/* Dokument Liste */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex-1">
-                    <table className="w-full text-sm text-left table-fixed">
-                        <thead className="bg-gray-800 text-white font-medium">
+                    <table className="w-full text-[12px] text-left table-fixed">
+                        <thead className="bg-gray-800 text-white font-medium text-[11px] uppercase">
                             <tr>
                                 <th className="px-0 py-3 w-8 text-right pr-1 border-b border-gray-700">Akt</th>
                                 <th className="px-0 py-3 w-10 text-left pl-1 border-b border-gray-700">Nr</th>
@@ -606,6 +622,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                 <th className="px-1 py-3 w-20 border-b border-gray-700 text-center">Info</th>
                                 <th className="px-2 py-3 w-40 border-b border-gray-700">Status</th>
                                 <th className="px-2 py-3 w-auto border-b border-gray-700">Fil</th>
+                                <th className="px-0 py-3 w-8 text-center border-b border-gray-700"><Mail className="inline h-4 w-4" /></th>
+                                <th className="px-2 py-3 w-20 text-left border-b border-gray-700">Kilde</th>
                                 <th className="px-2 py-3 w-24 text-left border-b border-gray-700">Ansvarlig</th>
                                 <th className="px-2 py-3 text-right w-8 border-b border-gray-700"></th>
                             </tr>
@@ -661,6 +679,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 onRename={openRenameModal}
                                                 onInlineSave={handleInlineSave}
                                                 onSaveToTemplate={handleGemTilSkabelon}
+                                                informationsKilder={informationsKilder}
                                             />
                                         ))}
 
@@ -693,7 +712,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                         TILFØJ
                                                     </button>
                                                 </td>
-                                                {/* Fil, Ansvarlig, Action: Empty */}
+                                                {/* Fil, Kilde, Ansvarlig, Action: Empty */}
+                                                <td className="px-2 py-1"></td>
                                                 <td className="px-2 py-1"></td>
                                                 <td className="px-2 py-1"></td>
                                                 <td className="px-2 py-1"></td>
@@ -824,8 +844,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 headerActions={
                     <button
                         onClick={handleSaveCommentFromModal}
-                        disabled={isSavingComment || (editCommentText === (editingDoc?.kommentar || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false))}
-                        className={`p-2 rounded-full text-white transition-all shadow-md active:scale-95 disabled:opacity-30 ${editCommentText === (editingDoc?.kommentar || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false)
+                        disabled={isSavingComment || (editCommentText === (editingDoc?.kommentar || '') && editMailTitle === (editingDoc?.mail_titel || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false))}
+                        className={`p-2 rounded-full text-white transition-all shadow-md active:scale-95 disabled:opacity-30 ${editCommentText === (editingDoc?.kommentar || '') && editMailTitle === (editingDoc?.mail_titel || '') && editCommentImportant === (editingDoc?.kommentar_vigtig || false)
                             ? 'bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                             }`}
@@ -880,6 +900,19 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         onChange={(e) => setEditCommentText(e.target.value)}
                         placeholder="Skriv din kommentar her..."
                     />
+
+                    <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Mail Titel (til eksterne mails)
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm placeholder-gray-400 outline-none focus:ring-blue-500 focus:border-blue-500"
+                            value={editMailTitle}
+                            onChange={(e) => setEditMailTitle(e.target.value)}
+                            placeholder="F.eks. BBR-Meddelelse"
+                        />
+                    </div>
                 </div>
             </Modal>
 
@@ -929,6 +962,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                     </p>
                 </div>
             </Modal>
-        </div>
+
+
+
+        </div >
     );
 }

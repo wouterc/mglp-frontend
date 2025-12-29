@@ -1,7 +1,7 @@
 // --- Fil: src/components/DokumentSkabelonForm.tsx ---
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { SkabDokument, Blokinfo } from '../types';
+import type { SkabDokument, Blokinfo, InformationsKilde } from '../types';
 import { Save, X, Loader2 } from 'lucide-react';
 
 interface DokumentSkabelonFormProps {
@@ -16,6 +16,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
+    const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
 
     const [formData, setFormData] = useState({
         dokument_nr: '',
@@ -30,19 +31,25 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
         login: '',
         kommentar: '',
         aktiv: true,
-        udgaaet: false
+        udgaaet: false,
+        informations_kilde_id: '',
+        mail_titel: ''
     });
 
     useEffect(() => {
-        const fetchBlokinfo = async () => {
+        const fetchData = async () => {
             try {
-                const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
-                setBlokinfo(data.filter(b => b.formaal === 3));
+                const [blokData, infoData] = await Promise.all([
+                    api.get<Blokinfo[]>('/skabeloner/blokinfo/'),
+                    api.get<InformationsKilde[]>('/kerne/informationskilder/')
+                ]);
+                setBlokinfo(blokData.filter(b => b.formaal === 3));
+                setInformationsKilder(infoData);
             } catch (e) {
-                console.error("Fejl ved hentning af blokinfo", e);
+                console.error("Fejl ved hentning af data", e);
             }
         };
-        fetchBlokinfo();
+        fetchData();
     }, []);
 
     useEffect(() => {
@@ -60,7 +67,9 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                 login: dokument.login || '',
                 kommentar: dokument.kommentar || '',
                 aktiv: dokument.aktiv ?? true,
-                udgaaet: dokument.udgaaet ?? false
+                udgaaet: dokument.udgaaet ?? false,
+                informations_kilde_id: dokument.informations_kilde?.id.toString() || '',
+                mail_titel: dokument.mail_titel || ''
             });
         } else if (initialFilters?.gruppe_nr) {
             // Find ID baseret på nummer
@@ -122,6 +131,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
             ...formData,
             dokument_nr: formData.dokument_nr ? parseInt(formData.dokument_nr) : null,
             gruppe_id: formData.gruppe_id ? parseInt(formData.gruppe_id) : null,
+            informations_kilde_id: formData.informations_kilde_id ? parseInt(formData.informations_kilde_id) : null,
         };
 
         try {
@@ -176,7 +186,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                             name="gruppe_id"
                             value={formData.gruppe_id}
                             onChange={handleChange}
-                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:ring-1 focus:ring-black outline-none bg-white font-medium"
+                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:ring-1 focus:ring-black outline-none bg-white font-medium text-[12px]"
                             required
                         >
                             <option value="">Vælg gruppe...</option>
@@ -193,7 +203,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                                 return g ? `${g.nr}.${formData.dokument_nr}` : formData.dokument_nr;
                             })()}
                             readOnly
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed font-medium"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed font-medium text-[12px]"
                             title="Nummeret tildeles automatisk baseret på gruppe og næste ledige nr."
                         />
                     </div>
@@ -206,7 +216,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         name="dokument"
                         value={formData.dokument}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
                         required
                     />
                 </div>
@@ -218,7 +228,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         name="link"
                         value={formData.link}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
                     />
                 </div>
                 <div>
@@ -228,7 +238,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         name="filnavn"
                         value={formData.filnavn}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
                     />
                 </div>
 
@@ -255,6 +265,32 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         />
                         <span className="text-sm font-medium text-gray-700">Udgået skabelon</span>
                     </label>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Informationskilde</label>
+                        <select
+                            name="informations_kilde_id"
+                            value={formData.informations_kilde_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none bg-white text-[12px]"
+                        >
+                            <option value="">Ingen</option>
+                            {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
+                        </select>
+                    </div>
+                    <div className="col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mail Titel</label>
+                        <textarea
+                            name="mail_titel"
+                            value={formData.mail_titel}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px] resize-y"
+                            placeholder="Titel til eksterne mails"
+                            rows={2}
+                        />
+                    </div>
                 </div>
 
                 <div>

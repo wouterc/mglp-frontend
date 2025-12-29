@@ -17,6 +17,7 @@ interface FormDataState {
     aktivitet: string;
     kommentar: string;
     resultat: string;
+    mail_titel: string;
     kommentar_vigtig: boolean;
     sag_id: number | null;
 }
@@ -26,6 +27,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
         aktivitet: '',
         kommentar: '',
         resultat: '',
+        mail_titel: '',
         kommentar_vigtig: false,
         sag_id: sagId,
     });
@@ -39,6 +41,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                 aktivitet: aktivitet.aktivitet || '',
                 kommentar: aktivitet.kommentar || '',
                 resultat: aktivitet.resultat || '',
+                mail_titel: aktivitet.mail_titel || '',
                 kommentar_vigtig: aktivitet.kommentar_vigtig || false,
                 sag_id: sagId,
             });
@@ -138,8 +141,22 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                                 />
                                 <span className={formData.kommentar_vigtig ? "font-bold text-red-600" : ""}>Vigtig / Obs</span>
                             </label>
+
                         )}
                     </div>
+                    {isComment && (
+                        <div className="mb-2">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Mail Titel</label>
+                            <input
+                                type="text"
+                                name="mail_titel"
+                                value={formData.mail_titel}
+                                onChange={handleChange}
+                                placeholder="F.eks. Husk bankgaranti"
+                                className="w-full p-2 border border-blue-200 rounded-md shadow-sm outline-none text-sm"
+                            />
+                        </div>
+                    )}
                     <textarea
                         name={fieldName}
                         value={fieldValue}
@@ -154,7 +171,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
                     ></textarea>
                 </div>
             </form>
-        </Modal>
+        </Modal >
     );
 }
 

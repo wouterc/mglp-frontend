@@ -31,6 +31,7 @@ import UserListPage from './pages/admin/UserListPage';
 import MedarbejderePage from './pages/MedarbejderePage'; // @# Import
 import MailPage from './pages/MailPage';
 import SagsMailPage from './pages/SagsMailPage';
+import MailKurvPage from './pages/MailKurvPage';
 import type { Sag } from './types';
 import { useAppState, StateContext } from './StateContext';
 
@@ -144,6 +145,7 @@ function App() {
         <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
         <Route path="/dokumenter" element={<DokumenterPage sagId={valgtSag?.id ?? null} />} />
         <Route path="/sags_mail" element={<SagsMailPage sagId={valgtSag?.id ?? null} />} />
+        <Route path="/mail_kurv" element={<MailKurvPage />} />
         <Route path="/virksomheder" element={<VirksomhederPage navigateTo={navigateTo} />} />
         <Route path="/kontakter" element={<KontakterPage navigateTo={navigateTo} />} />
         <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />

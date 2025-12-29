@@ -87,6 +87,7 @@ interface AppState {
   erDokumentskabelonerHentet: boolean;
   // @# Ny: Dokument cache
   cachedDokumenter: { [sagId: number]: SagsDokument[] };
+  mailBasketCache: { [sagId: number]: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } };
 }
 
 // --- 2. Definer de handlinger (actions) du kan udføre ---
@@ -111,7 +112,8 @@ type AppAction =
   | { type: 'SET_DOKUMENTSSKABELONER_STATE'; payload: Partial<AppState> }
   | { type: 'SET_CACHED_AKTIVITETER'; payload: { sagId: number; aktiviteter: Aktivitet[] } }
   | { type: 'SET_CACHED_DOKUMENTER'; payload: { sagId: number; dokumenter: SagsDokument[] } }
-  | { type: 'UPDATE_CACHED_DOKUMENT'; payload: { sagId: number; docId: number; updates: Partial<SagsDokument> } };
+  | { type: 'UPDATE_CACHED_DOKUMENT'; payload: { sagId: number; docId: number; updates: Partial<SagsDokument> } }
+  | { type: 'SET_MAIL_BASKET_CACHE'; payload: { sagId: number; data: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } } };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
   navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
@@ -146,7 +148,8 @@ const initialState: AppState = {
   aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
   aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
   cachedAktiviteter: {},
-  cachedDokumenter: {}, // @# Initialiser tom cache
+  cachedDokumenter: {},
+  mailBasketCache: {},
 
   // Sagsoversigt
   sager: [],
@@ -291,6 +294,14 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         }
       };
     }
+    case 'SET_MAIL_BASKET_CACHE':
+      return {
+        ...state,
+        mailBasketCache: {
+          ...state.mailBasketCache,
+          [action.payload.sagId]: action.payload.data
+        }
+      };
     default:
       return state;
   }
