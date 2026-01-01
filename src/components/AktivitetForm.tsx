@@ -77,7 +77,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
         note: aktivitetTilRedigering.note || '',
         ansvarlig: aktivitetTilRedigering.ansvarlig || '',
         frist: aktivitetTilRedigering.frist?.toString() || '',
-        informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id.toString() || '',
+        informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id?.toString() || '',
         mail_titel: aktivitetTilRedigering.mail_titel || '',
       });
     } else if (!erRedigering && initialFilters) {

@@ -2,13 +2,78 @@
 import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeEvent } from 'react';
 import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
-import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon } from 'lucide-react';
+import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2 } from 'lucide-react';
 import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
 import { api } from '../api';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
+
+interface InlineEditorProps {
+  value: string | null | undefined;
+  onSave: (value: string) => void;
+  onEdit?: () => void;
+  onBlur?: () => void;
+  onExpand?: () => void;
+  placeholder?: string;
+}
+
+const InlineTextEditor = ({ value, onSave, onEdit, onBlur, onExpand, placeholder }: InlineEditorProps) => {
+  const [text, setText] = useState(value || '');
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => { setText(value || ''); }, [value]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (text !== (value || '')) onSave(text);
+    if (onBlur) onBlur();
+  };
+
+  if (!isEditing) {
+    return (
+      <div
+        className="cursor-text py-1 px-2 rounded hover:bg-blue-50/50 group/editor relative min-h-[24px] flex items-center"
+        onClick={() => {
+          setIsEditing(true);
+          if (onEdit) onEdit();
+        }}
+      >
+        <span className={`truncate flex-1 ${!text ? 'text-gray-300 italic' : 'text-gray-700'}`}>
+          {text || placeholder || 'Klik for at skrive...'}
+        </span>
+        {onExpand && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onExpand(); }}
+            className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover/editor:opacity-100 transition-opacity"
+          >
+            <Maximize2 size={12} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 w-full bg-white rounded border border-blue-400 p-0.5">
+      <input
+        autoFocus
+        type="text"
+        value={text}
+        className="flex-1 text-xs px-1 py-0.5 outline-none text-black bg-transparent"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+      />
+      {onExpand && (
+        <button onMouseDown={(e) => { e.preventDefault(); onExpand(); }} className="p-1 text-blue-500">
+          <Maximize2 size={12} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 interface PaginatedDokumenterResponse {
   results: SkabDokument[];
@@ -23,7 +88,8 @@ function DokumentskabelonerPage(): ReactElement {
     dokumentskabelonerIsLoading: isLoading,
     dokumentskabelonerVisUdgaaede: visUdgaaede,
     dokumentskabelonerError: error,
-    erDokumentskabelonerHentet
+    erDokumentskabelonerHentet,
+    informationsKilder,
   } = state;
 
   const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
@@ -31,6 +97,9 @@ function DokumentskabelonerPage(): ReactElement {
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
   const [visForm, setVisForm] = useState<boolean>(false);
   const [dokumentTilRedigering, setDokumentTilRedigering] = useState<SkabDokument | null>(null);
+
+  // State til den celle der lige nu redigeres
+  const [activeCell, setActiveCell] = useState<{ id: number; field: string; value: any } | null>(null);
 
   // State til hurtig-opret
   const [nyDokumentNr, setNyDokumentNr] = useState('');
@@ -129,7 +198,7 @@ function DokumentskabelonerPage(): ReactElement {
   // Beregn næste dokument_nr ved valg af gruppe
   useEffect(() => {
     if (filters.gruppe_nr) {
-      const gruppeDoks = dokumenter.filter(d => d.gruppe?.nr.toString() === filters.gruppe_nr);
+      const gruppeDoks = dokumenter.filter(d => d.gruppe?.nr?.toString() === filters.gruppe_nr);
       if (gruppeDoks.length > 0) {
         const maxNr = Math.max(...gruppeDoks.map(d => d.dokument_nr || 0));
         setNyDokumentNr((maxNr + 1).toString());
@@ -293,17 +362,19 @@ function DokumentskabelonerPage(): ReactElement {
     setVisForm(true);
   };
 
+  const handleQuickUpdate = async (dok: SkabDokument, updates: Partial<SkabDokument>) => {
+    try {
+      const updated = await api.put<SkabDokument>(`/skabeloner/dokumenter/${dok.id}/`, { ...dok, ...updates });
+      const opdaterede = dokumenter.map(d => d.id === dok.id ? updated : d);
+      dispatch({ type: 'SET_DOKUMENTSSKABELONER_STATE', payload: { dokumentskabeloner: opdaterede } });
+    } catch (err) {
+      alert("Kunne ikke opdatere feltet.");
+    }
+  };
+
   const handleToggleAktiv = async (dok: SkabDokument) => {
     const nyStatus = !dok.aktiv;
-    const opdaterede = dokumenter.map(d => d.id === dok.id ? { ...d, aktiv: nyStatus } : d);
-    dispatch({ type: 'SET_DOKUMENTSSKABELONER_STATE', payload: { dokumentskabeloner: opdaterede } });
-
-    try {
-      await api.patch(`/skabeloner/dokumenter/${dok.id}/`, { aktiv: nyStatus });
-    } catch (e: any) {
-      hentData(filters);
-      alert(`Kunne ikke opdatere: ${e.message}`);
-    }
+    handleQuickUpdate(dok, { aktiv: nyStatus });
   };
 
   return (
@@ -403,6 +474,10 @@ function DokumentskabelonerPage(): ReactElement {
               <FunnelX size={20} />
             </button>
 
+            <button onClick={() => hentData(filters)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Opdater data">
+              <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+            </button>
+
             <button
               onClick={() => dispatch({ type: 'SET_DOKUMENTSSKABELONER_STATE', payload: { dokumentskabelonerVisUdgaaede: !visUdgaaede } })}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${visUdgaaede ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -430,14 +505,15 @@ function DokumentskabelonerPage(): ReactElement {
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[25%] border-b text-left">Dokument</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Link</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
+                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="">
                   {isLoading && dokumenter.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center">
+                      <td colSpan={8} className="py-12 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <Loader2 className="animate-spin text-blue-500" size={32} />
                           <p className="text-gray-500">Henter dokument skabeloner...</p>
@@ -446,76 +522,206 @@ function DokumentskabelonerPage(): ReactElement {
                     </tr>
                   ) : dokumenter.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-gray-500">
+                      <td colSpan={8} className="py-12 text-center text-gray-500">
                         Ingen dokument skabeloner fundet.
                       </td>
                     </tr>
                   ) : (
                     <>
-                      {dokumenter.map((dok) => (
-                        <tr
-                          key={dok.id}
-                          className={`hover:bg-gray-50 transition-colors ${dok.udgaaet ? 'bg-gray-50/80 opacity-60' : ''}`}
-                        >
-                          <td className="py-2 px-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={!!dok.aktiv}
-                              onChange={() => handleToggleAktiv(dok)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-sm text-gray-600">
-                            {dok.gruppe?.nr ? `${dok.gruppe.nr}.${dok.dokument_nr}` : dok.dokument_nr}
-                          </td>
-                          <td className="py-2 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              <span className="truncate">{dok.dokument}</span>
-                              {manglerSync[dok.id] && (
-                                <Tooltip content="Dette dokument er nyt og mangler at blive tilføjet på sagerne.">
-                                  <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <PlusCircleIcon size={10} />
-                                    NY
+                      {dokumenter.map((dok) => {
+                        const isCellActive = (field: string) => activeCell?.id === dok.id && activeCell?.field === field;
+                        const isRowActive = activeCell?.id === dok.id;
+
+                        return (
+                          <tr
+                            key={dok.id}
+                            className={`border-b transition-all group ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'} ${dok.udgaaet ? 'opacity-60' : ''}`}
+                          >
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!dok.aktiv}
+                                onChange={() => handleToggleAktiv(dok)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-sm text-gray-600">
+                              {isCellActive('dokument_nr') ? (
+                                <input
+                                  autoFocus
+                                  type="number"
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full text-black px-2 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    if (activeCell?.value !== undefined) {
+                                      handleQuickUpdate(dok, { dokument_nr: Number(activeCell.value) });
+                                    }
+                                    setActiveCell(null);
+                                  }}
+                                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                />
+                              ) : (
+                                <div
+                                  className="cursor-text py-1 rounded hover:bg-blue-50/50"
+                                  onClick={() => setActiveCell({ id: dok.id, field: 'dokument_nr', value: dok.dokument_nr })}
+                                >
+                                  {dok.gruppe?.nr ? `${dok.gruppe.nr}.${dok.dokument_nr}` : dok.dokument_nr}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                {isCellActive('dokument') ? (
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={activeCell?.value ?? ''}
+                                    className="w-full text-black px-2 py-1 text-sm rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
+                                    onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                    onBlur={() => {
+                                      if (activeCell?.value !== undefined) {
+                                        handleQuickUpdate(dok, { dokument: activeCell.value });
+                                      }
+                                      setActiveCell(null);
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                  />
+                                ) : (
+                                  <span
+                                    className="truncate cursor-text py-1 px-1 rounded hover:bg-blue-50/50 block w-full"
+                                    onClick={() => setActiveCell({ id: dok.id, field: 'dokument', value: dok.dokument })}
+                                  >
+                                    {dok.dokument}
                                   </span>
-                                </Tooltip>
-                              )}
-                              {dok.udgaaet && (
-                                <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold flex-shrink-0">
-                                  Udgået
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2 px-3 text-sm text-blue-600 truncate">
-                            {dok.link && (
-                              <a href={dok.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">
-                                <ExternalLink size={12} />
-                                <span className="truncate">{dok.link}</span>
-                              </a>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-sm text-gray-600 truncate">
-                            {dok.filnavn && (
-                              <div className="flex items-center gap-1">
-                                <FileText size={12} className="text-gray-400" />
-                                <span className="truncate">{dok.filnavn}</span>
+                                )}
+                                {manglerSync[dok.id] && (
+                                  <Tooltip content="Dette dokument er nyt og mangler at blive tilføjet på sagerne.">
+                                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                      <PlusCircleIcon size={10} />
+                                      NY
+                                    </span>
+                                  </Tooltip>
+                                )}
+                                {dok.udgaaet && (
+                                  <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold flex-shrink-0">
+                                    Udgået
+                                  </span>
+                                )}
                               </div>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            {dok.kommentar && (
-                              <Tooltip content={dok.kommentar}>
-                                <Info size={16} className="text-blue-500 cursor-help" />
+                            </td>
+                            <td className="py-2 px-3 text-sm text-blue-600 max-w-0">
+                              <InlineTextEditor
+                                value={dok.link}
+                                placeholder="Tilføj link..."
+                                onEdit={() => setActiveCell({ id: dok.id, field: 'link', value: dok.link })}
+                                onBlur={() => setActiveCell(null)}
+                                onSave={(val) => handleQuickUpdate(dok, { link: val })}
+                                onExpand={() => setActiveCell({ id: dok.id, field: 'link_expanded', value: dok.link })}
+                              />
+                              {isCellActive('link_expanded') && (
+                                <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-40 min-w-[400px]">
+                                  <label className="block text-xs font-bold mb-1 text-gray-500">Link:</label>
+                                  <textarea
+                                    autoFocus
+                                    value={activeCell?.value ?? ''}
+                                    className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
+                                    onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                    onBlur={() => {
+                                      handleQuickUpdate(dok, { link: activeCell?.value });
+                                      setActiveCell(null);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-sm text-gray-600 max-w-0">
+                              <InlineTextEditor
+                                value={dok.filnavn}
+                                placeholder="Navne-mønster..."
+                                onEdit={() => setActiveCell({ id: dok.id, field: 'filnavn', value: dok.filnavn })}
+                                onBlur={() => setActiveCell(null)}
+                                onSave={(val) => handleQuickUpdate(dok, { filnavn: val })}
+                                onExpand={() => setActiveCell({ id: dok.id, field: 'filnavn_expanded', value: dok.filnavn })}
+                              />
+                              {isCellActive('filnavn_expanded') && (
+                                <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-1/3 min-w-[400px]">
+                                  <label className="block text-xs font-bold mb-1 text-gray-500">Filnavn mønster:</label>
+                                  <textarea
+                                    autoFocus
+                                    value={activeCell?.value ?? ''}
+                                    className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
+                                    onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                    onBlur={() => {
+                                      handleQuickUpdate(dok, { filnavn: activeCell?.value });
+                                      setActiveCell(null);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-sm text-gray-600 truncate">
+                              {isCellActive('informations_kilde_id') ? (
+                                <select
+                                  autoFocus
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full text-black px-1 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none bg-white font-sans"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    if (activeCell?.value !== undefined) {
+                                      handleQuickUpdate(dok, { informations_kilde_id: activeCell.value ? Number(activeCell.value) : null });
+                                    }
+                                    setActiveCell(null);
+                                  }}
+                                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                >
+                                  <option value="">Vælg kilde...</option>
+                                  {informationsKilder.map(k => (
+                                    <option key={k.id} value={k.id}>{k.navn}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div
+                                  className="cursor-text py-1 rounded hover:bg-blue-50/50"
+                                  onClick={() => setActiveCell({ id: dok.id, field: 'informations_kilde_id', value: dok.informations_kilde?.id })}
+                                >
+                                  {dok.informations_kilde?.navn || <span className="text-gray-300 italic">Vælg kilde...</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <Tooltip content={dok.kommentar || 'Ingen kommentar'}>
+                                <div
+                                  className="cursor-pointer p-1 hover:bg-gray-100 rounded inline-block"
+                                  onClick={() => setActiveCell({ id: dok.id, field: 'kommentar', value: dok.kommentar })}
+                                >
+                                  <Info size={16} className={`${dok.kommentar ? 'text-blue-500' : 'text-gray-300'}`} />
+                                </div>
                               </Tooltip>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <button onClick={() => handleRediger(dok)} className="text-gray-400 hover:text-blue-600 transition-colors">
-                              <Edit size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                              {isCellActive('kommentar') && (
+                                <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-2 right-10 min-w-[350px]">
+                                  <label className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</label>
+                                  <textarea
+                                    autoFocus
+                                    value={activeCell?.value ?? ''}
+                                    className="w-full p-2 text-xs border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
+                                    onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                    onBlur={() => {
+                                      handleQuickUpdate(dok, { kommentar: activeCell?.value });
+                                      setActiveCell(null);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <button onClick={() => handleRediger(dok)} className="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100">
+                                <Edit size={18} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
 
                       {/* Hurtig-opret række */}
                       {filters.gruppe_nr && (
@@ -555,6 +761,7 @@ function DokumentskabelonerPage(): ReactElement {
                             </button>
                           </td>
                           <td className="py-1 px-2"></td> {/* Filnavn kolonne tom */}
+                          <td className="py-1 px-2"></td> {/* Kilde kolonne tom */}
                           <td className="py-1 px-2 text-center" colSpan={2}></td>
                         </tr>
                       )}

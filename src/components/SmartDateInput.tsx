@@ -5,6 +5,8 @@ interface SmartDateInputProps {
   value: string | null; // Forventer altid YYYY-MM-DD format
   onSave: (value: string | null) => void;
   className?: string;
+  id?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 // Hjælpefunktion til at formatere dato til DD-MM-YY for pænere visning
@@ -17,7 +19,7 @@ const formatDateForDisplay = (isoDate: string | null): string => {
   return `${parts[2]}-${parts[1]}-${shortYear}`;
 };
 
-function SmartDateInput({ value, onSave, className }: SmartDateInputProps): React.ReactElement {
+function SmartDateInput({ value, onSave, className, id, onKeyDown }: SmartDateInputProps): React.ReactElement {
   const [displayValue, setDisplayValue] = useState(formatDateForDisplay(value));
 
   useEffect(() => {
@@ -142,11 +144,13 @@ function SmartDateInput({ value, onSave, className }: SmartDateInputProps): Reac
   return (
     <Tooltip content={tooltipHtml}>
       <input
+        id={id}
         type="text"
         value={displayValue}
         placeholder="dd-mm-åå"
         onChange={(e) => setDisplayValue(e.target.value)}
         onBlur={handleBlur}
+        onKeyDown={onKeyDown}
         onClick={showPicker}
         className={className}
       />

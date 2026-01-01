@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, Fragment, ReactElement, ChangeEvent } from 'react';
 import AktivitetForm from '../components/AktivitetForm.tsx';
 import useDebounce from '../hooks/useDebounce.ts';
-import { PlusCircle, AlertCircle, Edit, FunnelX, Loader2, UploadCloud, Download, ChevronLeft, ChevronRight, Info, RefreshCw } from 'lucide-react';
+import { PlusCircle, AlertCircle, Edit, FunnelX, Loader2, UploadCloud, Download, ChevronLeft, ChevronRight, Info, RefreshCw, Maximize2 } from 'lucide-react';
 import type { Blokinfo, SkabAktivitet, AktivitetsskabelonerFilterState } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
@@ -12,6 +12,72 @@ import { api } from '../api';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
+
+interface InlineEditorProps {
+  value: string | null | undefined;
+  onSave: (value: string) => void;
+  onEdit?: () => void;
+  onBlur?: () => void;
+  onExpand?: () => void;
+  placeholder?: string;
+  isTextarea?: boolean;
+}
+
+const InlineTextEditor = ({ value, onSave, onEdit, onBlur, onExpand, placeholder, isTextarea }: InlineEditorProps) => {
+  const [text, setText] = useState(value || '');
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => { setText(value || ''); }, [value]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (text !== (value || '')) onSave(text);
+    if (onBlur) onBlur();
+  };
+
+  if (!isEditing) {
+    return (
+      <div
+        className="cursor-text py-1 px-2 rounded hover:bg-blue-50/50 group/editor relative min-h-[24px] flex items-center"
+        onClick={() => {
+          setIsEditing(true);
+          if (onEdit) onEdit();
+        }}
+      >
+        <span className={`truncate flex-1 ${!text ? 'text-gray-300 italic' : 'text-gray-700'}`}>
+          {text || placeholder || 'Klik for at skrive...'}
+        </span>
+        {onExpand && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onExpand(); }}
+            className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover/editor:opacity-100 transition-opacity"
+          >
+            <Maximize2 size={12} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 w-full bg-white rounded border border-blue-400 p-0.5">
+      <input
+        autoFocus
+        type="text"
+        value={text}
+        className="flex-1 text-sm px-1 py-0.5 outline-none text-black bg-transparent"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+      />
+      {onExpand && (
+        <button onMouseDown={(e) => { e.preventDefault(); onExpand(); }} className="p-1 text-blue-500">
+          <Maximize2 size={12} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 interface PaginatedAktiviteterResponse {
   results: SkabAktivitet[];
@@ -27,6 +93,7 @@ function AktivitetsskabelonerPage(): ReactElement {
     aktivitetsskabelonerIsLoading: isLoading,
     aktivitetsskabelonerError: error,
     aktivitetsskabelonerNextPageUrl: nextPageUrl,
+    informationsKilder,
   } = state;
 
   const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
@@ -50,6 +117,9 @@ function AktivitetsskabelonerPage(): ReactElement {
   // State til Import/Export
   const [visImportModal, setVisImportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // State til den celle der lige nu redigeres
+  const [activeCell, setActiveCell] = useState<{ id: number; field: string; value: any } | null>(null);
 
   // Synkroniserings-state
   const [manglerSync, setManglerSync] = useState<Record<number, boolean>>({});
@@ -170,7 +240,7 @@ function AktivitetsskabelonerPage(): ReactElement {
   useEffect(() => {
     const fetchGrupperForFilter = async () => {
       if (filters.proces_nr) {
-        const selectedProces = procesList.find(p => p.nr.toString() === filters.proces_nr);
+        const selectedProces = procesList.find(p => p.nr?.toString() === filters.proces_nr);
         if (selectedProces) {
           setIsFilterGrupperLoading(true);
           try {
@@ -326,25 +396,20 @@ function AktivitetsskabelonerPage(): ReactElement {
     setVisForm(false);
   };
 
+  const handleQuickUpdate = async (aktivitet: SkabAktivitet, updates: Partial<SkabAktivitet>) => {
+    try {
+      const updated = await api.put<SkabAktivitet>(`/skabeloner/aktiviteter/${aktivitet.id}/`, { ...aktivitet, ...updates });
+
+      const opdaterede = aktiviteter.map(a => a.id === aktivitet.id ? updated : a);
+      dispatch({ type: 'SET_AKTIVITETSSKABELONER_STATE', payload: { aktivitetsskabeloner: opdaterede } });
+    } catch (err) {
+      dispatch({ type: 'SET_AKTIVITETSSKABELONER_STATE', payload: { aktivitetsskabelonerError: "Kunne ikke opdatere feltet." } });
+    }
+  };
+
   const handleToggleAktiv = async (aktivitet: SkabAktivitet) => {
     const nyStatus = !aktivitet.aktiv;
-    const opdateredeAktiviteter = aktiviteter.map(a =>
-      a.id === aktivitet.id ? { ...a, aktiv: nyStatus } : a
-    );
-    dispatch({
-      type: 'SET_AKTIVITETSSKABELONER_STATE',
-      payload: { aktivitetsskabeloner: opdateredeAktiviteter }
-    });
-
-    try {
-      await api.patch(`/skabeloner/aktiviteter/${aktivitet.id}/`, {
-        aktiv: nyStatus
-      });
-    } catch (e: any) {
-      console.error("Fejl ved toggle af aktiv:", e);
-      hentData(filters);
-      alert(`Kunne ikke opdatere: ${e.message}`);
-    }
+    handleQuickUpdate(aktivitet, { aktiv: nyStatus });
   };
 
   const handleQuickAdd = async (e: React.FormEvent) => {
@@ -481,6 +546,9 @@ function AktivitetsskabelonerPage(): ReactElement {
               {isSyncingAlle ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
             </button>
           )}
+          <button onClick={() => hentData(filters)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Opdater data">
+            <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+          </button>
           <button onClick={handleOpret} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Aktivitetsskabelon">
             <PlusCircle size={20} />
           </button>
@@ -573,71 +641,204 @@ function AktivitetsskabelonerPage(): ReactElement {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <table className="min-w-full table-fixed">
-                <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
+                <thead className="bg-gray-50 text-gray-600 text-[10px] uppercase font-semibold border-b border-gray-200">
                   <tr>
-                    <th className="text-left py-3 px-4 w-[8%]">Nr.</th>
-                    <th className="text-left py-3 px-4 w-[67%]">Aktivitet</th>
-                    <th className="text-center py-3 px-4 w-[5%]"></th>
-                    <th className="text-center py-3 px-4 w-[10%]">Aktiv</th>
-                    <th className="text-center py-3 px-4 w-[10%]"></th>
+                    <th className="text-center py-3 px-1 w-[5%]">Nr.</th>
+                    <th className="text-left py-3 px-4 w-[25%]">Aktivitet</th>
+                    <th className="text-left py-3 px-4 w-[25%]">Kommentar</th>
+                    <th className="text-left py-3 px-2 w-[10%]">Kilde</th>
+                    <th className="text-left py-3 px-4 w-[25%]">Mail Titel</th>
+                    <th className="text-center py-3 px-2 w-[10%]">Status</th>
                   </tr>
                 </thead>
-                <tbody className="text-sm divide-y divide-gray-100">
+                <tbody className="text-sm">
                   {isLoading && aktiviteter.length === 0 ? (
-                    <tr><td colSpan={4} className="text-center py-12 text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" size={24} /> Indlæser...</td></tr>
+                    <tr><td colSpan={6} className="text-center py-12 text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" size={24} /> Indlæser...</td></tr>
                   ) : (
-                    aktiviteter.map(a => (
-                      <tr key={a.id} className="hover:bg-gray-50 group">
-                        <td className="py-2 px-4 text-gray-500 font-mono text-xs">{a.aktivitet_nr}</td>
-                        <td className="py-2 px-4 font-medium text-gray-700">{a.aktivitet}</td>
-                        <td className="py-2 px-4 text-center">
-                          <div className="flex justify-center items-center gap-1">
-                            {a.note && (
-                              <Tooltip content={a.note}>
-                                <Info size={14} className="text-red-600 cursor-help" />
-                              </Tooltip>
+                    aktiviteter.map(a => {
+                      const isCellActive = (field: string) => activeCell?.id === a.id && activeCell?.field === field;
+                      const isRowActive = activeCell?.id === a.id;
+
+                      return (
+                        <tr key={a.id} className={`border-b transition-all group ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'}`}>
+                          {/* NR FELT */}
+                          <td className="py-2 px-1 text-center">
+                            {isCellActive('aktivitet_nr') ? (
+                              <input
+                                autoFocus
+                                type="number"
+                                value={activeCell?.value ?? ''}
+                                className="w-8 text-center text-black px-1 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
+                                onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                onBlur={() => {
+                                  if (activeCell?.value !== undefined) {
+                                    handleQuickUpdate(a, { aktivitet_nr: Number(activeCell.value) });
+                                  }
+                                  setActiveCell(null);
+                                }}
+                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                              />
+                            ) : (
+                              <div
+                                className="font-mono text-xs text-gray-500 cursor-text py-1 rounded hover:bg-blue-50/50"
+                                onClick={() => setActiveCell({ id: a.id, field: 'aktivitet_nr', value: a.aktivitet_nr })}
+                              >
+                                {a.aktivitet_nr}
+                              </div>
                             )}
-                            {manglerSync[a.id] && (
-                              <Tooltip content="Denne aktivitet er ny og mangler at blive tilføjet på sagerne.">
-                                <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                                  <PlusCircle size={10} />
-                                  NY
-                                </span>
-                              </Tooltip>
+                          </td>
+
+                          {/* AKTIVITET FELT */}
+                          <td className="py-2 px-2 max-w-0">
+                            <InlineTextEditor
+                              value={a.aktivitet}
+                              onEdit={() => setActiveCell({ id: a.id, field: 'aktivitet', value: a.aktivitet })}
+                              onBlur={() => setActiveCell(null)}
+                              onSave={(val) => handleQuickUpdate(a, { aktivitet: val })}
+                              onExpand={() => setActiveCell({ id: a.id, field: 'aktivitet_expanded', value: a.aktivitet })}
+                            />
+                            {isCellActive('aktivitet_expanded') && (
+                              <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-20 min-w-[400px]">
+                                <label className="block text-xs font-bold mb-1 text-gray-500">Aktivitet Titel:</label>
+                                <textarea
+                                  autoFocus
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    handleQuickUpdate(a, { aktivitet: activeCell?.value });
+                                    setActiveCell(null);
+                                  }}
+                                />
+                              </div>
                             )}
-                          </div>
-                        </td>
-                        <td className="py-2 px-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={a.aktiv || false}
-                            onChange={() => handleToggleAktiv(a)}
-                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2 px-4 text-center">
-                          <button
-                            onClick={() => handleRediger(a)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
-                            title="Rediger"
-                          >
-                            <Edit size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                  {!isLoading && aktiviteter.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-12 text-gray-400 italic">Vælg en gruppe eller juster filtrene</td></tr>
+                          </td>
+
+                          {/* KOMMENTAR (NOTE) FELT */}
+                          <td className="py-2 px-2 max-w-0">
+                            <InlineTextEditor
+                              value={a.note}
+                              placeholder="Tilføj note/kommentar..."
+                              onEdit={() => setActiveCell({ id: a.id, field: 'note', value: a.note })}
+                              onBlur={() => setActiveCell(null)}
+                              onSave={(val) => handleQuickUpdate(a, { note: val })}
+                              onExpand={() => setActiveCell({ id: a.id, field: 'note_expanded', value: a.note })}
+                            />
+                            {isCellActive('note_expanded') && (
+                              <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-40 min-w-[400px]">
+                                <label className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</label>
+                                <textarea
+                                  autoFocus
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full p-2 text-sm border rounded h-48 focus:ring-1 focus:ring-blue-400 outline-none"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    handleQuickUpdate(a, { note: activeCell?.value });
+                                    setActiveCell(null);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </td>
+
+                          {/* KILDE FELT */}
+                          <td className="py-2 px-2 text-xs text-gray-500">
+                            {isCellActive('informations_kilde_id') ? (
+                              <select
+                                autoFocus
+                                value={activeCell?.value ?? ''}
+                                className="w-full text-black px-1 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none bg-white font-sans"
+                                onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                onBlur={() => {
+                                  if (activeCell?.value !== undefined) {
+                                    handleQuickUpdate(a, { informations_kilde_id: activeCell.value ? Number(activeCell.value) : null });
+                                  }
+                                  setActiveCell(null);
+                                }}
+                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                              >
+                                <option value="">Vælg kilde...</option>
+                                {informationsKilder.map(k => (
+                                  <option key={k.id} value={k.id}>{k.navn}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div
+                                className="cursor-text py-1 rounded hover:bg-blue-50/50 truncate max-w-full px-1"
+                                onClick={() => setActiveCell({ id: a.id, field: 'informations_kilde_id', value: a.informations_kilde?.id })}
+                              >
+                                {a.informations_kilde?.navn || <span className="text-gray-300 italic">Vælg kilde...</span>}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* MAIL TITEL FELT */}
+                          <td className="py-2 px-2 max-w-0">
+                            <InlineTextEditor
+                              value={a.mail_titel}
+                              placeholder="Tilføj mail titel..."
+                              onEdit={() => setActiveCell({ id: a.id, field: 'mail_titel', value: a.mail_titel })}
+                              onBlur={() => setActiveCell(null)}
+                              onSave={(val) => handleQuickUpdate(a, { mail_titel: val })}
+                              onExpand={() => setActiveCell({ id: a.id, field: 'mail_expanded', value: a.mail_titel })}
+                            />
+                            {isCellActive('mail_expanded') && (
+                              <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 right-20 min-w-[400px]">
+                                <label className="block text-xs font-bold mb-1 text-gray-500">Mail Titel:</label>
+                                <textarea
+                                  autoFocus
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    handleQuickUpdate(a, { mail_titel: activeCell?.value });
+                                    setActiveCell(null);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={a.aktiv || false}
+                                onChange={() => handleToggleAktiv(a)}
+                                className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                title="Aktiv / Deaktiver"
+                              />
+                              <div className="flex items-center gap-1 min-w-[32px] justify-center">
+                                {manglerSync[a.id] && (
+                                  <Tooltip content="Denne aktivitet er ny og mangler at blive tilføjet på sagerne.">
+                                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1 py-0.5 rounded">
+                                      NY
+                                    </span>
+                                  </Tooltip>
+                                )}
+                                <button
+                                  onClick={() => handleRediger(a)}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                                  title="Rediger Avanceret"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}  {!isLoading && aktiviteter.length === 0 && (
+                    <tr><td colSpan={6} className="text-center py-12 text-gray-400 italic">Vælg en gruppe eller juster filtrene</td></tr>
                   )}
 
                   {/* HURTIG OPRET RÆKKE (Vises kun hvis en gruppe er valgt) */}
                   {filters.gruppe_nr && (
-                    <tr className="bg-blue-50/20 border-b border-blue-100">
-                      <td colSpan={1} className="py-2 px-4 text-center">
+                    <tr className="bg-blue-50/20 border-b border-blue-100 italic">
+                      <td colSpan={1} className="py-2 px-1 text-center">
                         <PlusCircle size={14} className="mx-auto text-blue-400" />
                       </td>
-                      <td colSpan={3} className="py-2 px-4">
+                      <td colSpan={5} className="py-2 px-4">
                         <form onSubmit={handleQuickAdd} className="flex gap-2 items-center">
                           <input
                             type="text"
@@ -657,7 +858,6 @@ function AktivitetsskabelonerPage(): ReactElement {
                           </button>
                         </form>
                       </td>
-                      <td></td>{/* Empty cell for last column if needed, based on colspan */}
                     </tr>
                   )}
                 </tbody>

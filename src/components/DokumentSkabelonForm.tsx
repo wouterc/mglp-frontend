@@ -68,7 +68,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                 kommentar: dokument.kommentar || '',
                 aktiv: dokument.aktiv ?? true,
                 udgaaet: dokument.udgaaet ?? false,
-                informations_kilde_id: dokument.informations_kilde?.id.toString() || '',
+                informations_kilde_id: dokument.informations_kilde?.id?.toString() || '',
                 mail_titel: dokument.mail_titel || ''
             });
         } else if (initialFilters?.gruppe_nr) {

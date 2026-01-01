@@ -2,6 +2,7 @@
 // @# ... (Behold tidligere historik) ...
 // @# 2025-11-23 20:00 - Tilføjet 'currentUser' til global state.
 import React, { createContext, useReducer, Dispatch, ReactNode, useContext } from 'react';
+import { api } from './api';
 import type {
   Aktivitet, Sag, SagsoversigtFilterState, SagsoversigtSortConfig, Status,
   AktiviteterFilterState, Blokinfo, SkabAktivitet, BlokinfoSkabelonerFilterState,
@@ -9,8 +10,9 @@ import type {
   SkabDokument, DokumentskabelonerFilterState,
   Virksomhed, Kontakt,
   VirksomhedFilterState, KontaktFilterState,
-  SagsDokument, // @# Tilføj SagsDokument
-  User // @# Husk at importere User
+  SagsDokument,
+  User,
+  InformationsKilde
 } from './types';
 
 // --- 1. Definer formen på din globale state ---
@@ -88,6 +90,19 @@ interface AppState {
   // @# Ny: Dokument cache
   cachedDokumenter: { [sagId: number]: SagsDokument[] };
   mailBasketCache: { [sagId: number]: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } };
+
+  // Common Lookups
+  users: User[];
+  aktivitetStatusser: Status[];
+  sagsStatusser: Status[]; // @# Tilføjet sags-statusser
+  dokumentStatusser: Status[]; // @# Tilføjet dokument-statusser
+  informationsKilder: InformationsKilde[];
+
+  // Chat / Kommunikation
+  chatTeams: any[];
+  chatMessages: any[];
+  chatActiveRecipient: any | undefined;
+  chatActiveType: 'user' | 'team' | undefined;
 }
 
 // --- 2. Definer de handlinger (actions) du kan udføre ---
@@ -113,7 +128,9 @@ type AppAction =
   | { type: 'SET_CACHED_AKTIVITETER'; payload: { sagId: number; aktiviteter: Aktivitet[] } }
   | { type: 'SET_CACHED_DOKUMENTER'; payload: { sagId: number; dokumenter: SagsDokument[] } }
   | { type: 'UPDATE_CACHED_DOKUMENT'; payload: { sagId: number; docId: number; updates: Partial<SagsDokument> } }
-  | { type: 'SET_MAIL_BASKET_CACHE'; payload: { sagId: number; data: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } } };
+  | { type: 'SET_MAIL_BASKET_CACHE'; payload: { sagId: number; data: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } } }
+  | { type: 'SET_LOOKUPS'; payload: Partial<AppState> }
+  | { type: 'SET_CHAT_STATE'; payload: Partial<AppState> };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
   navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
@@ -145,11 +162,20 @@ const initialState: AppState = {
   gruppeLoadingStatus: {},
   aktiviteterIsLoading: false,
   aktiviteterError: null,
-  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
+  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', informations_kilde: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
   aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
   cachedAktiviteter: {},
   cachedDokumenter: {},
   mailBasketCache: {},
+  users: [],
+  aktivitetStatusser: [],
+  sagsStatusser: [],
+  dokumentStatusser: [],
+  informationsKilder: [],
+  chatTeams: [],
+  chatMessages: [],
+  chatActiveRecipient: undefined,
+  chatActiveType: undefined,
 
   // Sagsoversigt
   sager: [],
@@ -302,6 +328,9 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
           [action.payload.sagId]: action.payload.data
         }
       };
+    case 'SET_LOOKUPS':
+    case 'SET_CHAT_STATE':
+      return { ...state, ...action.payload };
     default:
       return state;
   }
@@ -331,6 +360,35 @@ export const StateProvider = ({ children }: StateProviderProps) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   // Persistence effects
+  React.useEffect(() => {
+    const fetchLookups = async () => {
+      try {
+        const [users, actStatuses, sagStatuses, docStatuses, sources, groups] = await Promise.all([
+          api.get<User[]>('/kerne/users/'),
+          api.get<any>('/kerne/status/?formaal=2'),
+          api.get<any>('/kerne/status/?formaal=1'),
+          api.get<any>('/kerne/status/?formaal=3'),
+          api.get<InformationsKilde[]>('/kerne/informationskilder/'),
+          api.get<Blokinfo[]>('/skabeloner/blokinfo/')
+        ]);
+        dispatch({
+          type: 'SET_LOOKUPS',
+          payload: {
+            users: users.filter((u: User) => u.is_active),
+            aktivitetStatusser: actStatuses.results || actStatuses,
+            sagsStatusser: sagStatuses.results || sagStatuses,
+            dokumentStatusser: docStatuses.results || docStatuses,
+            informationsKilder: sources,
+            blokinfoSkabeloner: groups
+          }
+        });
+      } catch (e) {
+        console.error("Fejl ved hentning af globale lookups:", e);
+      }
+    };
+    fetchLookups();
+  }, [dispatch]);
+
   React.useEffect(() => {
     localStorage.setItem('mglp_valgtSag', JSON.stringify(state.valgtSag));
   }, [state.valgtSag]);

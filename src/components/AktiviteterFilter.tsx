@@ -13,28 +13,7 @@ import Button from './ui/Button'; // Importer den nye knap
 
 function AktiviteterFilter() {
     const { state, dispatch } = useAppState();
-    const { aktiviteterFilters } = state;
-
-    const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
-    const [colleagues, setColleagues] = useState<User[]>([]);
-
-    useEffect(() => {
-        api.get<User[]>('/kerne/users/').then(data => {
-            setColleagues(data.filter(u => u.is_active));
-        });
-    }, []);
-
-    useEffect(() => {
-        const fetchAktivitetStatusser = async () => {
-            try {
-                const data = await api.get<any>('/kerne/status/?formaal=2');
-                setAktivitetStatusser(data.results || data);
-            } catch (error) {
-                console.error("Kunne ikke hente statusser til filter:", error);
-            }
-        };
-        fetchAktivitetStatusser();
-    }, []);
+    const { aktiviteterFilters, users: colleagues, aktivitetStatusser, informationsKilder } = state;
 
     // @# 2025-12-21 - Opdaterer nu direkte den GLOBALE state for instant respons.
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,9 +38,9 @@ function AktiviteterFilter() {
             aktivitet: '',
             ansvarlig: '',
             status: '',
+            informations_kilde: '',
             aktiv_filter: 'kun_aktive',
             dato_intern_efter: '',
-
             dato_intern_foer: '',
             dato_ekstern_efter: '',
             dato_ekstern_foer: '',
@@ -98,6 +77,12 @@ function AktiviteterFilter() {
                     {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                 </select>
 
+                <select name="informations_kilde" value={aktiviteterFilters.informations_kilde} onChange={handleFilterChange}
+                    className="p-2 w-full border rounded-md text-sm bg-white">
+                    <option value="">Alle informationskilder</option>
+                    {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
+                </select>
+
                 <div className="pt-2">
                     <label className="flex items-center space-x-2 text-sm">
                         <input type="radio" name="aktiv_filter" value="kun_aktive" checked={aktiviteterFilters.aktiv_filter === 'kun_aktive'} onChange={handleFilterChange} /> <span>Kun aktive</span>
@@ -109,7 +94,7 @@ function AktiviteterFilter() {
 
                 <div className="pt-2 border-t mt-2">
                     <label className="flex items-center space-x-2 text-sm cursor-pointer">
-                        <input type="checkbox" name="overskredet" checked={aktiviteterFilters.overskredet} onChange={handleFilterChange} /> <span>Vis kun overskredne</span>
+                        <input type="checkbox" name="overskredet" checked={aktiviteterFilters.overskredet} onChange={handleFilterChange} /> <span>Overskredne & Snart</span>
                     </label>
                     <label className="flex items-center space-x-2 text-sm cursor-pointer mt-1">
                         <input type="checkbox" name="vigtige" checked={aktiviteterFilters.vigtige} onChange={handleFilterChange} className="rounded text-red-600 focus:ring-red-500" /> <span>Kun vigtige kommentarer</span>

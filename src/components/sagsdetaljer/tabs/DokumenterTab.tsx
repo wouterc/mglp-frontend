@@ -25,6 +25,7 @@ interface DokumentFilterState {
     tekst: string;
     ansvarlig: string;
     status: string; // "alle", "mangler_fil", "har_fil"
+    informations_kilde: string;
     aktiv_filter: string; // "kun_aktive", "alle"
     overskredet: boolean;
     vigtige: boolean;
@@ -34,46 +35,21 @@ interface DokumentFilterState {
 
 export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const { state, dispatch } = useAppState();
+    const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner } = state;
     const navigate = useNavigate();
 
-    const [colleagues, setColleagues] = useState<UserType[]>([]);
-    const [statusser, setStatusser] = useState<any[]>([]);
-    const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
+    // Master Groups from global state
+    const masterGroups = useMemo(() => {
+        return blokinfoSkabeloner.filter(g => g.formaal === 3);
+    }, [blokinfoSkabeloner]);
 
-    // Fetch colleagues, statuses and info sources
-    useEffect(() => {
-        const loadMetaData = async () => {
-            try {
-                const [users, stats, kilder] = await Promise.all([
-                    api.get<UserType[]>('/kerne/users/'),
-                    api.get<any[]>('/kerne/status/?formaal=3'),
-                    api.get<InformationsKilde[]>('/kerne/informationskilder/')
-                ]);
-
-                setColleagues(users.filter(u => u.is_active));
-                setStatusser((stats as any).results || stats);
-                setInformationsKilder(kilder);
-            } catch (error) {
-                console.error("Fejl ved hentning af metadata", error);
-            }
-        };
-        loadMetaData();
-    }, []);
-
-    // Master Groups State (to ensure we have IDs for Quick Add even if docs are missing it)
-    const [masterGroups, setMasterGroups] = useState<Blokinfo[]>([]);
-
-    useEffect(() => {
-        api.get<Blokinfo[]>('/skabeloner/blokinfo/').then(data => {
-            // Filter for Document Groups (formaal = 3 usually, or just use all and match by name)
-            // BlokInfoSkabelonerPage uses formaal 3 for Documents.
-            const relevant = data.filter(g => g.formaal === 3);
-            setMasterGroups(relevant);
-        });
-    }, []);
-
-    const handleSelectSag = (id: number) => {
-        navigate(`/ dokumenter / ${id} `);
+    const handleSelectSag = async (id: number) => {
+        try {
+            const fuldSag = await api.get<Sag>(`/sager/${id}/`);
+            dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
+        } catch (e: any) {
+            console.error("Fejl ved sags-skift i DokumenterTab:", e);
+        }
     };
 
     const cachedDocs = state.cachedDokumenter[sag.id];
@@ -100,6 +76,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         tekst: '',
         ansvarlig: '',
         status: 'alle',
+        informations_kilde: '',
         aktiv_filter: 'kun_aktive',
         overskredet: false,
         vigtige: false
@@ -119,6 +96,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             tekst: '',
             ansvarlig: '',
             status: 'alle',
+            informations_kilde: '',
             aktiv_filter: 'kun_aktive',
             overskredet: false,
             vigtige: false
@@ -141,6 +119,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // Quick Add State
     const [quickAddValues, setQuickAddValues] = useState<Record<number, string>>({});
     const [isSavingNy, setIsSavingNy] = useState<Record<number, boolean>>({});
+    const [activeRow, setActiveRow] = useState<number | null>(null);
 
     // State for Save to Template Modal
     const [confirmTemplateDoc, setConfirmTemplateDoc] = useState<SagsDokument | null>(null);
@@ -149,23 +128,29 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const fetchDokumenter = useCallback(async (arg?: boolean | number) => {
         const force = typeof arg === 'boolean' ? arg : false;
-        if (!force && state.cachedDokumenter[sag.id]) {
+        const sagId = sag.id; // Capture ID to avoid dependency loop on 'sag' object if it changes
+
+        // Hvis vi har cache og ikke forcer, så er vi færdige med "initial load"
+        if (!force && state.cachedDokumenter[sagId]) {
             setLoading(false);
-            return;
+            // Vi henter stadig i baggrunden for at sikre frisk data,
+            // men uden at blokere UI.
+        } else if (!state.cachedDokumenter[sagId]) {
+            setLoading(true);
         }
 
         try {
-            const data = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sag.id}`);
+            const data = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sagId}`);
             dispatch({
                 type: 'SET_CACHED_DOKUMENTER',
-                payload: { sagId: sag.id, dokumenter: data }
+                payload: { sagId: sagId, dokumenter: data }
             });
         } catch (error) {
             console.error("Fejl ved hentning af dokumenter:", error);
         } finally {
             setLoading(false);
         }
-    }, [sag.id, dispatch, state.cachedDokumenter]);
+    }, [sag.id, dispatch, state.cachedDokumenter[sag.id] !== undefined]); // @# Check existence instead of full object
 
     useEffect(() => {
         fetchDokumenter();
@@ -399,7 +384,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // Derived State: Processed Data with Grouping and Formatting
     const { processedGroups, globalStats } = useMemo(() => {
         const docs = cachedDocs || [];
-        const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local time
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dayOfWeek = today.getDay();
+        let maxOrangeDiff = 1;
+        if (dayOfWeek === 5) maxOrangeDiff = 3;
+        else if (dayOfWeek === 6) maxOrangeDiff = 2;
 
         // 1. Calculate Global stats (Total / Completed for ALL relevant docs)
         // Usually "Total" visually refers to "Active" docs, but logic depends on requirements.
@@ -411,7 +401,15 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         };
 
         // 2. Filter Documents
+        const valgteProcesIds = sag.valgte_processer?.map(p => p.id) || [];
+
         const filtered = docs.filter(doc => {
+            // Proces Filter: Skal matche sagens valgte processer
+            const docProcesId = doc.gruppe_proces_id || (doc.gruppe as any)?.proces_id;
+            if (docProcesId && !valgteProcesIds.includes(docProcesId)) {
+                return false;
+            }
+
             // Aktiv Filter
             if (filters.aktiv_filter === 'kun_aktive' && !doc.aktiv) return false;
 
@@ -422,6 +420,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 (doc.titel && doc.titel.toLowerCase().includes(query)) ||
                 (doc.filnavn && doc.filnavn.toLowerCase().includes(query)) ||
                 (doc.gruppe_navn && doc.gruppe_navn.toLowerCase().includes(query)) ||
+                (doc.gruppe_nr && doc.gruppe_nr.toString().includes(query)) ||
+                (doc.gruppe_proces_id && doc.gruppe_proces_id.toString().includes(query)) ||
                 (fullNumber.includes(query))
             );
             if (!matchesText) return false;
@@ -441,16 +441,25 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 const isDone = !!(doc.fil || doc.link);
                 if (isDone) return false;
 
-                // Dato check: Sammenlign datoer korrekt
-                const internPast = doc.dato_intern && new Date(doc.dato_intern) < new Date(today);
-                const eksternPast = doc.dato_ekstern && new Date(doc.dato_ekstern) < new Date(today);
+                const isNearOrPast = (dateStr: string | null) => {
+                    if (!dateStr) return false;
+                    const d = new Date(dateStr);
+                    d.setHours(0, 0, 0, 0);
+                    const diff = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    return diff <= maxOrangeDiff;
+                };
 
-                // Hvis ingen af datoerne er i fortiden, er den ikke overskredet
-                if (!internPast && !eksternPast) return false;
+                // Hvis ingen af datoerne er i nærheden eller fortiden, er den ikke overskredet
+                if (!isNearOrPast(doc.dato_intern) && !isNearOrPast(doc.dato_ekstern)) return false;
             }
 
             // Vigtige (Important comments) Filter
             if (filters.vigtige && !doc.kommentar_vigtig) {
+                return false;
+            }
+
+            // Informations Kilde Filter
+            if (filters.informations_kilde && doc.informations_kilde?.id.toString() !== filters.informations_kilde) {
                 return false;
             }
 
@@ -474,12 +483,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             }
         });
 
-        // Initialize groups based on ALL docs (to show empty groups matching filter, or just filtered? 
-        // Providing totals usually requires iterating all docs to account for the "Total" in header, even if some hidden)
-        // Let's iterate all docs to build group skeletons and counts first
+        // Initialize groups based on ALL docs
         docs.forEach(doc => {
-            // Only count if it matches the "Aktiv" filter logic generally used for "Total" view, 
-            // usually we show (Completed / Total Active).
             if (!doc.aktiv && filters.aktiv_filter === 'kun_aktive') return;
 
             const name = doc.gruppe_navn || 'Andre dokumenter';
@@ -493,7 +498,6 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                     id: groupId
                 };
             } else if (!groups[name].id && groupId) {
-                // Update group ID if we found one and didn't have one before
                 groups[name].id = groupId;
             }
 
@@ -505,17 +509,15 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         filtered.forEach(doc => {
             const name = doc.gruppe_navn || 'Andre dokumenter';
             const groupId = doc.gruppe?.id || null;
-            // Ensure group exists (might be missing if we skipped it above due to some logic, but shouldn't happen if consistency exists)
             if (!groups[name]) {
                 groups[name] = {
                     docs: [],
                     nr: doc.gruppe_nr || 9999,
-                    totalInGroup: 0, // These would be 0 if we strictly followed above, but let's be safe
+                    totalInGroup: 0,
                     completedInGroup: 0,
                     id: groupId
                 };
             } else if (!groups[name].id && groupId) {
-                // Update group ID if we found one
                 groups[name].id = groupId;
             }
             groups[name].docs.push(doc);
@@ -532,7 +534,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             .sort((a, b) => a.nr - b.nr);
 
         return { processedGroups: result, globalStats };
-    }, [cachedDocs, filters, masterGroups]);
+    }, [cachedDocs, filters, masterGroups, sag]);
 
     const handleExpandAll = () => {
         const allKeys: Record<string, boolean> = {};
@@ -680,6 +682,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 onInlineSave={handleInlineSave}
                                                 onSaveToTemplate={handleGemTilSkabelon}
                                                 informationsKilder={informationsKilder}
+                                                isActive={activeRow === doc.id}
+                                                onFocus={() => setActiveRow(doc.id)}
+                                                onBlur={() => setActiveRow(null)}
                                             />
                                         ))}
 
@@ -761,6 +766,18 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         <option value="har_fil">Har fil</option>
                     </select>
 
+                    <select
+                        name="informations_kilde"
+                        value={filters.informations_kilde}
+                        onChange={handleFilterChange}
+                        className="p-2 w-full border border-slate-400 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option value="">Alle informationskilder</option>
+                        {informationsKilder.map(k => (
+                            <option key={k.id} value={k.id}>{k.navn}</option>
+                        ))}
+                    </select>
+
                     <div className="pt-2">
                         <label className="flex items-center space-x-2 text-sm cursor-pointer">
                             <input
@@ -795,7 +812,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                 onChange={handleFilterChange}
                                 className="rounded text-blue-600 focus:ring-blue-500"
                             />
-                            <span>Vis kun overskredne</span>
+                            <span>Overskredne & Snart</span>
                         </label>
                         <label className="flex items-center space-x-2 text-sm cursor-pointer mt-1">
                             <input

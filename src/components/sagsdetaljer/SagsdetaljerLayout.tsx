@@ -5,14 +5,14 @@ import React, { ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
-    ArrowLeft, Search, Loader2, MailPlus
+    ArrowLeft, Search, Loader2, MailPlus, ListChecks
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
 import { api } from '../../api';
 
-export type TabType = 'overblik' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
+export type TabType = 'overblik' | 'processer' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
 interface SagsdetaljerLayoutProps {
     children: ReactNode;
@@ -25,6 +25,7 @@ interface SagsdetaljerLayoutProps {
 
 const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'overblik', label: 'Overblik', icon: LayoutDashboard },
+    { id: 'processer', label: 'Processer', icon: ListChecks },
     { id: 'maegler', label: 'Mægler', icon: Building2 },
     { id: 'saelgere', label: 'Sælgere', icon: User },
     { id: 'koebere', label: 'Købere', icon: User },
@@ -52,6 +53,7 @@ function SagsdetaljerLayout({
     const [searchResults, setSearchResults] = useState<{ id: number, sags_nr: string, alias: string }[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showResults, setShowResults] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const debouncedSearch = useDebounce(searchTerm, 300);
     const searchRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +73,7 @@ function SagsdetaljerLayout({
         const performSearch = async () => {
             if (debouncedSearch.length < 2) {
                 setSearchResults([]);
+                setActiveIndex(-1);
                 return;
             }
             setIsSearching(true);
@@ -78,6 +81,7 @@ function SagsdetaljerLayout({
                 const data = await api.get<any>(`/sager/search/?q=${debouncedSearch}`);
                 setSearchResults(data);
                 setShowResults(true);
+                setActiveIndex(data.length > 0 ? 0 : -1);
             } catch (error) {
                 console.error("Søgefejl:", error);
             } finally {
@@ -91,6 +95,26 @@ function SagsdetaljerLayout({
         onNavigateToSag(id);
         setShowResults(false);
         setSearchTerm('');
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!showResults || searchResults.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev + 1) % searchResults.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIndex >= 0 && activeIndex < searchResults.length) {
+                handleSelectSearchResult(searchResults[activeIndex].id);
+            }
+        } else if (e.key === 'Escape') {
+            setShowResults(false);
+        }
     };
 
     // --- NAVIGATION LOGIK ---
@@ -133,7 +157,6 @@ function SagsdetaljerLayout({
                     </div>
                 </div>
 
-                {/* Midte: Søgefelt */}
                 <div className="flex-1 max-w-md relative" ref={searchRef}>
                     <div className="relative">
                         <input
@@ -142,6 +165,7 @@ function SagsdetaljerLayout({
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
+                            onKeyDown={handleKeyDown}
                             className="w-full pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-md text-sm transition-all"
                         />
                         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
@@ -152,15 +176,16 @@ function SagsdetaljerLayout({
                     {/* Søgeresultater Dropdown */}
                     {showResults && searchResults.length > 0 && (
                         <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                            {searchResults.map(res => (
+                            {searchResults.map((res, index) => (
                                 <button
                                     key={res.id}
                                     onClick={() => handleSelectSearchResult(res.id)}
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm border-b border-gray-50 last:border-0"
+                                    onMouseEnter={() => setActiveIndex(index)}
+                                    className={`w-full text-left px-4 py-2 text-sm border-b border-gray-50 last:border-0 transition-colors ${index === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}
                                 >
-                                    <span className="font-semibold">{res.sags_nr}</span>
-                                    <span className="mx-2 text-gray-300">|</span>
-                                    <span className="text-gray-700">{res.alias}</span>
+                                    <span className={`font-semibold ${index === activeIndex ? 'text-white' : ''}`}>{res.sags_nr}</span>
+                                    <span className={`mx-2 ${index === activeIndex ? 'text-blue-200' : 'text-gray-300'}`}>|</span>
+                                    <span className={index === activeIndex ? 'text-blue-50' : 'text-gray-700'}>{res.alias}</span>
                                 </button>
                             ))}
                         </div>

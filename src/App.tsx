@@ -33,6 +33,7 @@ import MailPage from './pages/MailPage';
 import SagsMailPage from './pages/SagsMailPage';
 import MailKurvPage from './pages/MailKurvPage';
 import type { Sag } from './types';
+import KommunikationPage from './pages/KommunikationPage';
 import { useAppState, StateContext } from './StateContext';
 
 function App() {
@@ -133,47 +134,51 @@ function App() {
   }
 
   return (
-    <Layout
-      aktivSide={aktivSideForLayout}
-      setAktivSide={(side: string) => navigateTo(side, null)}
-      filterSidebar={filterSidebarComponent}
-    >
-      <Routes>
-        <Route path="/" element={<SagsoversigtPage navigateTo={navigateTo} />} />
-        <Route path="/sagsoversigt" element={<SagsoversigtPage navigateTo={navigateTo} />} />
-        <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />
-        <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
-        <Route path="/dokumenter" element={<DokumenterPage sagId={valgtSag?.id ?? null} />} />
-        <Route path="/sags_mail" element={<SagsMailPage sagId={valgtSag?.id ?? null} />} />
-        <Route path="/mail_kurv" element={<MailKurvPage />} />
-        <Route path="/virksomheder" element={<VirksomhederPage navigateTo={navigateTo} />} />
-        <Route path="/kontakter" element={<KontakterPage navigateTo={navigateTo} />} />
-        <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />
-        <Route path="/aktivitetsskabeloner" element={<AktivitetsskabelonerPage />} />
-        <Route path="/dokumentskabeloner" element={<DokumentskabelonerPage />} />
-        <Route path="/medarbejdere" element={<MedarbejderePage />} />
-        <Route path="/min_konto" element={<MinKontoPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/glemt-adgangskode" element={<GlemtAdgangskodePage />} />
-        <Route path="/reset-password/:uid/:token" element={<NulstilAdgangskodePage />} />
+    <Routes>
+      <Route path="/chat-popup" element={<div className="h-screen bg-gray-100 overflow-hidden"><KommunikationPage /></div>} />
+      <Route path="*" element={
+        <Layout
+          aktivSide={aktivSideForLayout}
+          setAktivSide={(side: string) => navigateTo(side, null)}
+          filterSidebar={filterSidebarComponent}
+        >
+          <Routes>
+            <Route path="/" element={<SagsoversigtPage navigateTo={navigateTo} />} />
+            <Route path="/sagsoversigt" element={<SagsoversigtPage navigateTo={navigateTo} />} />
+            <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />
+            <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
+            <Route path="/dokumenter" element={<DokumenterPage sagId={valgtSag?.id ?? null} />} />
+            <Route path="/sags_mail" element={<SagsMailPage sagId={valgtSag?.id ?? null} />} />
+            <Route path="/mail_kurv" element={<MailKurvPage />} />
+            <Route path="/virksomheder" element={<VirksomhederPage navigateTo={navigateTo} />} />
+            <Route path="/kontakter" element={<KontakterPage navigateTo={navigateTo} />} />
+            <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />
+            <Route path="/aktivitetsskabeloner" element={<AktivitetsskabelonerPage />} />
+            <Route path="/dokumentskabeloner" element={<DokumentskabelonerPage />} />
+            <Route path="/medarbejdere" element={<MedarbejderePage />} />
+            <Route path="/min_konto" element={<MinKontoPage />} />
+            {/* Login-relaterede sider er allerede håndteret ovenfor */}
 
-        {/* @# Admin Routes */}
-        <Route path="/admin/users" element={<UserListPage />} />
+            {/* Admin Routes */}
+            <Route path="/admin/users" element={<UserListPage />} />
 
-        <Route path="/mail" element={<MailPage />} />
-        <Route path="*" element={<SagsoversigtPage navigateTo={navigateTo} />} />
-      </Routes>
-      <ConfirmModal
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={performLogout}
-        title="Log ud"
-        message="Er du sikker på, at du vil logge ud?"
-        confirmText="Log ud"
-        cancelText="Annuller"
-        isDestructive={true}
-      />
-    </Layout>
+            <Route path="/mail" element={<MailPage />} />
+            <Route path="/kommunikation" element={<KommunikationPage />} />
+            <Route path="*" element={<SagsoversigtPage navigateTo={navigateTo} />} />
+          </Routes>
+          <ConfirmModal
+            isOpen={showLogoutConfirm}
+            onClose={() => setShowLogoutConfirm(false)}
+            onConfirm={performLogout}
+            title="Log ud"
+            message="Er du sikker på, at du vil logge ud?"
+            confirmText="Log ud"
+            cancelText="Annuller"
+            isDestructive={true}
+          />
+        </Layout>
+      } />
+    </Routes>
   );
 }
 

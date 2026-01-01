@@ -73,7 +73,7 @@ table td select {
     font-size: 0.875rem !important;
     border-bottom-left-radius: 0.375rem;
     border-bottom-right-radius: 0.375rem;
-    min-height: 300px;
+    /* min-height removed to allow flex scaling */
 }
 
 .quill-editor .ql-toolbar {
@@ -83,5 +83,6 @@ table td select {
 }
 
 .quill-editor .ql-editor {
-    min-height: 300px;
+    /* min-height removed */
+    height: 100%;
 }

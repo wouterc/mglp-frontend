@@ -15,6 +15,9 @@ interface AktivitetRowProps {
     onEditResultat?: (aktivitet: Aktivitet) => void;
     onGemTilSkabelon?: (aktivitet: Aktivitet) => void;
     informationsKilder: InformationsKilde[];
+    isActive?: boolean;
+    onFocus?: () => void;
+    onBlur?: () => void;
 }
 
 interface InlineEditorProps {
@@ -23,9 +26,10 @@ interface InlineEditorProps {
     type?: string;
     id?: string;
     onExpand?: () => void;
+    onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand }: InlineEditorProps & { onExpand?: () => void }) => {
+const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand, onKeyDown }: InlineEditorProps & { onExpand?: () => void }) => {
     const [text, setText] = useState(value);
 
     // Sync local state when prop changes
@@ -41,6 +45,7 @@ const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand }: Inline
                 value={text || ''}
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleBlur}
+                onKeyDown={onKeyDown}
                 className="w-full py-0.5 px-1 pr-7 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0 truncate"
                 title={text || ''}
             />
@@ -57,7 +62,7 @@ const InlineTextEditor = ({ value, onSave, type = "text", id, onExpand }: Inline
     );
 };
 
-export default function AktivitetRow({
+function AktivitetRow({
     aktivitet,
     statusser,
     colleagues,
@@ -66,17 +71,65 @@ export default function AktivitetRow({
     onEditComment,
     onEditResultat,
     onGemTilSkabelon,
-    informationsKilder
+    informationsKilder,
+    isActive,
+    onFocus,
+    onBlur
 }: AktivitetRowProps) {
+    const isDone = aktivitet.status?.status_nummer === 80;
+
+    const getDateColorClass = (dateStr: string | null) => {
+        if (!dateStr || isDone) return '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const targetDate = new Date(dateStr);
+        targetDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return '!bg-red-500 !text-white';
+
+        let maxOrangeDiff = 1;
+        const dayOfWeek = today.getDay(); // 0=Sun, 5=Fri, 6=Sat
+        if (dayOfWeek === 5) maxOrangeDiff = 3;
+        else if (dayOfWeek === 6) maxOrangeDiff = 2;
+
+        if (diffDays <= maxOrangeDiff) return '!bg-orange-400 !text-white';
+        return '';
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent, nextFieldId: string) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextEl = document.getElementById(nextFieldId);
+            if (nextEl) {
+                nextEl.focus();
+                if (nextEl instanceof HTMLInputElement && nextEl.type === 'text') {
+                    nextEl.select();
+                }
+            }
+        }
+    };
 
     return (
-        <tr className="border-b border-gray-200 hover:bg-gray-50">
+        <tr
+            className={`border-b border-gray-200 transition-colors ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
+            style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
+            onClick={onFocus}
+            onFocus={onFocus}
+            onBlur={(e) => {
+                // Only call onBlur if focus is leaving the row entirely
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                    onBlur?.();
+                }
+            }}
+        >
             <td className="py-0.5 px-2 text-center">
                 <input
-                    id={`cell-${aktivitet.id}-0`}
+                    id={`a-${aktivitet.id}-f0`}
                     type="checkbox"
                     checked={!!aktivitet.aktiv}
                     onChange={(e) => onInlineSave(aktivitet, 'aktiv', e.target.checked)}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f1`)}
                     className="rounded text-blue-600 focus:ring-blue-500"
                 />
             </td>
@@ -85,21 +138,24 @@ export default function AktivitetRow({
             </td>
             <td className="py-0.5 px-2">
                 <SmartDateInput
+                    id={`a-${aktivitet.id}-f1`}
                     value={aktivitet.dato_intern}
                     onSave={(val) => onInlineSave(aktivitet, 'dato_intern', val)}
-                    className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f2`)}
+                    className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${getDateColorClass(aktivitet.dato_intern)} ${!aktivitet.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
             <td className="py-0.5 px-2">
                 <SmartDateInput
+                    id={`a-${aktivitet.id}-f2`}
                     value={aktivitet.dato_ekstern}
                     onSave={(val) => onInlineSave(aktivitet, 'dato_ekstern', val)}
-                    className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f3`)}
+                    className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${getDateColorClass(aktivitet.dato_ekstern)} ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
             <td className="py-0.5 px-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 h-full">
-                    {/* Slot 1: Skabelon Info / Note */}
                     <div className="w-4 flex justify-center">
                         {(aktivitet.skabelon_note || aktivitet.note) && (
                             <Tooltip content={aktivitet.skabelon_note || aktivitet.note}>
@@ -107,8 +163,6 @@ export default function AktivitetRow({
                             </Tooltip>
                         )}
                     </div>
-
-                    {/* Slot 2: Bruger Kommentar */}
                     <div className="w-5 flex justify-center">
                         <Tooltip content={aktivitet.kommentar || "Tilføj kommentar"}>
                             <button
@@ -125,8 +179,6 @@ export default function AktivitetRow({
                             </button>
                         </Tooltip>
                     </div>
-
-                    {/* Slot 3: Ny (Skabelon Upload) */}
                     <div className="w-5 flex justify-center">
                         {aktivitet.er_ny && onGemTilSkabelon && (
                             <Tooltip content="Denne aktivitet er kun på denne sag. Klik for at gemme den som en global skabelon.">
@@ -154,9 +206,10 @@ export default function AktivitetRow({
                         <CheckCircle2 size={16} fill={aktivitet.status?.status_nummer === 80 ? "currentColor" : "none"} />
                     </button>
                     <select
-                        id={`cell-${aktivitet.id}-2`}
+                        id={`a-${aktivitet.id}-f3`}
                         value={aktivitet.status?.id || ''}
                         onChange={(e) => onInlineSave(aktivitet, 'status', e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f4`)}
                         className={`flex-grow py-0.5 px-1 border rounded-md text-[12px] bg-transparent focus:border-black focus:ring-0 ${aktivitet.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-gray-300'
                             }`}
                     >
@@ -167,25 +220,30 @@ export default function AktivitetRow({
             </td>
             <td className="py-0.5 px-2">
                 <InlineTextEditor
-                    id={`cell-${aktivitet.id}-7`}
+                    id={`a-${aktivitet.id}-f4`}
                     value={aktivitet.resultat}
                     onSave={(val) => onInlineSave(aktivitet, 'resultat', val)}
                     onExpand={onEditResultat ? () => onEditResultat(aktivitet) : undefined}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f5`)}
                 />
             </td>
             <td className="py-0.5 px-0.5 text-center">
                 <input
+                    id={`a-${aktivitet.id}-f5`}
                     type="checkbox"
                     checked={!!aktivitet.skal_mailes}
                     onChange={(e) => onInlineSave(aktivitet, 'skal_mailes', e.target.checked)}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f6`)}
                     className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 mt-1"
                     title="Vælg til næste mail"
                 />
             </td>
             <td className="py-0.5 px-2">
                 <select
+                    id={`a-${aktivitet.id}-f6`}
                     value={aktivitet.informations_kilde?.id || ''}
                     onChange={(e) => onInlineSave(aktivitet, 'informations_kilde_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                    onKeyDown={(e) => handleKeyDown(e, `a-${aktivitet.id}-f7`)}
                     className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
                 >
                     <option value="">Ingen</option>
@@ -198,7 +256,7 @@ export default function AktivitetRow({
             </td>
             <td className="py-0.5 px-2">
                 <select
-                    id={`cell-${aktivitet.id}-4`}
+                    id={`a-${aktivitet.id}-f7`}
                     value={aktivitet.ansvarlig || ''}
                     onChange={(e) => onInlineSave(aktivitet, 'ansvarlig', e.target.value)}
                     className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
@@ -212,3 +270,5 @@ export default function AktivitetRow({
         </tr>
     );
 }
+
+export default React.memo(AktivitetRow);

@@ -20,23 +20,29 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const [loading, setLoading] = useState(!valgtSag && !!sagId);
 
   useEffect(() => {
-    // Hvis valgtSag matcher sagId, brug den.
+    // 1. Hvis valgtSag matcher sagId, brug den øjeblikkeligt
     if (valgtSag && valgtSag.id === sagId) {
       setLocalSag(valgtSag);
       setLoading(false);
     } else if (sagId) {
-      // Hent sag hvis den mangler
-      setLoading(true);
+      // Kun vis loader hvis vi ikke har sagen i cache overhovedet
+      if (!valgtSag || valgtSag.id !== sagId) {
+        setLoading(true);
+      }
+    }
+
+    // 2. Hent/opdater altid sags-data i baggrunden hvis vi har et sagId
+    if (sagId) {
       api.get<Sag>(`/sager/${sagId}/`).then(data => {
         setLocalSag(data);
         dispatch({ type: 'SET_VALGT_SAG', payload: data });
         setLoading(false);
       }).catch(err => {
-        console.error(err);
+        console.error("Fejl ved hentning af sag i DokumenterPage:", err);
         setLoading(false);
       });
     }
-  }, [sagId, valgtSag, dispatch]);
+  }, [sagId, valgtSag?.id, dispatch]); // @# Kun reager på id ændring
 
   if (!sagId) {
     return (

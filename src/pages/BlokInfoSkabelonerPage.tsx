@@ -2,11 +2,76 @@
 // @# 2025-11-23 19:15 - Tilføjet Import/Export funktionalitet (Excel).
 import React, { useState, useEffect, useMemo, Fragment, ChangeEvent, ReactElement, useCallback } from 'react';
 import { api } from '../api';
-import { PlusCircle, AlertCircle, Edit, Save, XCircle, UploadCloud, Download, Loader2 } from 'lucide-react';
+import { PlusCircle, AlertCircle, Edit, Save, XCircle, UploadCloud, Download, Loader2, Maximize2 } from 'lucide-react';
 import type { Blokinfo } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
+
+interface InlineEditorProps {
+  value: string | null | undefined;
+  onSave: (value: string) => void;
+  onEdit?: () => void;
+  onBlur?: () => void;
+  onExpand?: () => void;
+  placeholder?: string;
+}
+
+const InlineTextEditor = ({ value, onSave, onEdit, onBlur, onExpand, placeholder }: InlineEditorProps) => {
+  const [text, setText] = useState(value || '');
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => { setText(value || ''); }, [value]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (text !== (value || '')) onSave(text);
+    if (onBlur) onBlur();
+  };
+
+  if (!isEditing) {
+    return (
+      <div
+        className="cursor-text py-1 px-2 rounded hover:bg-blue-50/50 group/editor relative min-h-[24px] flex items-center"
+        onClick={() => {
+          setIsEditing(true);
+          if (onEdit) onEdit();
+        }}
+      >
+        <span className={`truncate flex-1 ${!text ? 'text-gray-300 italic' : 'text-gray-700'}`}>
+          {text || placeholder || 'Klik for at skrive...'}
+        </span>
+        {onExpand && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onExpand(); }}
+            className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover/editor:opacity-100 transition-opacity"
+          >
+            <Maximize2 size={12} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 w-full bg-white rounded border border-blue-400 p-0.5">
+      <input
+        autoFocus
+        type="text"
+        value={text}
+        className="flex-1 text-xs px-1 py-0.5 outline-none text-black bg-transparent"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+      />
+      {onExpand && (
+        <button onMouseDown={(e) => { e.preventDefault(); onExpand(); }} className="p-1 text-blue-500">
+          <Maximize2 size={12} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const formaalBeskrivelser: { [key: number]: string } = {
   1: '1: Procesoversigt (for aktiviteter)',
@@ -25,10 +90,10 @@ function BlokInfoSkabelonerPage(): ReactElement {
   } = state;
 
   // State til redigering/oprettelse
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editedData, setEditedData] = useState<Partial<Blokinfo>>({});
+  // State til den celle der lige nu redigeres
+  const [activeCell, setActiveCell] = useState<{ id: number; field: string; value: any } | null>(null);
   const [visOpretForm, setVisOpretForm] = useState<boolean>(false);
-  const [nySkabelonData, setNySkabelonData] = useState({ formaal: '', nr: '', titel_kort: '', beskrivelse: '' });
+  const [nySkabelonData, setNySkabelonData] = useState({ formaal: '', nr: '', titel_kort: '', beskrivelse: '', proces_id: '' });
 
   // State til Import/Export
   const [visImportModal, setVisImportModal] = useState(false);
@@ -37,14 +102,21 @@ function BlokInfoSkabelonerPage(): ReactElement {
   const hentSkabeloner = useCallback(async () => {
     if (erBlokinfoSkabelonerHentet && !visImportModal) return;
 
-    dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerIsLoading: true, blokinfoSkabelonerError: null } });
+    // Kun sæt isLoading hvis vi slet ikke har data endnu (for at undgå flicker ved opdateringer)
+    const shouldShowLoading = !erBlokinfoSkabelonerHentet;
+    if (shouldShowLoading) {
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerIsLoading: true, blokinfoSkabelonerError: null } });
+    }
+
     try {
       const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: data, erBlokinfoSkabelonerHentet: true } });
     } catch (e) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: 'Kunne ikke hente data.' } });
     } finally {
-      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerIsLoading: false } });
+      if (shouldShowLoading) {
+        dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerIsLoading: false } });
+      }
     }
   }, [dispatch, erBlokinfoSkabelonerHentet, visImportModal]);
 
@@ -66,6 +138,8 @@ function BlokInfoSkabelonerPage(): ReactElement {
       return true;
     });
   }, [skabeloner, filters]);
+
+  const procesMuligheder = useMemo(() => skabeloner.filter(s => s.formaal === 1), [skabeloner]);
 
   // --- EKSPORT FUNKTION ---
   const handleExport = () => {
@@ -101,36 +175,35 @@ function BlokInfoSkabelonerPage(): ReactElement {
     }
   };
 
-  const handleEditClick = (skabelon: Blokinfo) => {
-    setEditingId(skabelon.id);
-    setEditedData({ ...skabelon });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditedData({});
-  };
-
-  const handleEditChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditedData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async (id: number) => {
+  const handleQuickUpdate = async (skabelon: Blokinfo, updates: Partial<Blokinfo>) => {
     try {
-      await api.put(`/skabeloner/blokinfo/${id}/`, editedData);
-      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
-      hentSkabeloner(); // Genindlæs for at opdatere listen
-      handleCancelEdit();
+      const updatedSkabelon = await api.put<Blokinfo>(`/skabeloner/blokinfo/${skabelon.id}/`, { ...skabelon, ...updates });
+
+      // Opdater lokal state med det samme
+      const nyeSkabeloner = skabeloner.map(s => s.id === skabelon.id ? updatedSkabelon : s);
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: nyeSkabeloner } });
     } catch (err) {
-      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: "Kunne ikke gemme ændringerne." } });
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: "Kunne ikke opdatere feltet." } });
+    }
+  };
+
+  const handleQuickSaveProces = async (skabelon: Blokinfo, newProcesId: string) => {
+    try {
+      const proces_id = newProcesId === '' ? null : Number(newProcesId);
+      const updatedSkabelon = await api.put<Blokinfo>(`/skabeloner/blokinfo/${skabelon.id}/`, { ...skabelon, proces_id });
+
+      // Opdater lokal state med det samme
+      const nyeSkabeloner = skabeloner.map(s => s.id === skabelon.id ? updatedSkabelon : s);
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: nyeSkabeloner } });
+    } catch (err) {
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: "Kunne ikke opdatere proces." } });
     }
   };
 
   const handleOpretClick = () => setVisOpretForm(true);
   const handleAnnullerOpret = () => {
     setVisOpretForm(false);
-    setNySkabelonData({ formaal: '', nr: '', titel_kort: '', beskrivelse: '' });
+    setNySkabelonData({ formaal: '', nr: '', titel_kort: '', beskrivelse: '', proces_id: '' });
   };
 
   const handleNySkabelonChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -140,9 +213,12 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   const handleGemNy = async () => {
     try {
-      await api.post(`/skabeloner/blokinfo/`, nySkabelonData);
-      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { erBlokinfoSkabelonerHentet: false } });
-      hentSkabeloner();
+      const nySkabelon = await api.post<Blokinfo>(`/skabeloner/blokinfo/`, nySkabelonData);
+
+      // Tilføj den nye til den lokale liste
+      const nyeSkabeloner = [...skabeloner, nySkabelon];
+      dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: nyeSkabeloner } });
+
       handleAnnullerOpret();
     } catch (err) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: "Kunne ikke oprette ny skabelon." } });
@@ -198,10 +274,10 @@ function BlokInfoSkabelonerPage(): ReactElement {
         <table className="min-w-full bg-white table-fixed">
           <thead className="bg-gray-800 text-white text-sm">
             <tr>
-              <th className="text-left py-1 px-2 uppercase font-semibold w-[15%]">Nr</th>
-              <th className="text-left py-1 px-2 uppercase font-semibold w-[40%]">Titel</th>
+              <th className="text-left py-1 px-2 uppercase font-semibold w-[10%]">Nr</th>
+              <th className="text-left py-1 px-2 uppercase font-semibold w-[30%]">Titel</th>
               <th className="text-left py-1 px-2 uppercase font-semibold w-[35%]">Beskrivelse</th>
-              <th className="text-left py-1 px-2 uppercase font-semibold w-[10%]"></th>
+              <th className="text-left py-1 px-2 uppercase font-semibold w-[25%]">Proces (Relateret)</th>
             </tr>
             <tr>
               <th className="p-1"><input type="text" name="nr" value={filters.nr} onChange={handleFilterChange} placeholder="Filtrer..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></th>
@@ -226,12 +302,20 @@ function BlokInfoSkabelonerPage(): ReactElement {
                 <td className="py-1 px-2"><input type="text" name="titel_kort" value={nySkabelonData.titel_kort} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
                 <td className="py-1 px-2" colSpan={2}>
                   <div className="flex items-center space-x-2">
-                    <select name="formaal" value={nySkabelonData.formaal} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
+                    <select name="formaal" value={nySkabelonData.formaal} onChange={handleNySkabelonChange} className="w-1/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
                       <option value="">Vælg formål...</option>
                       {Object.entries(formaalBeskrivelser).map(([key, value]) => (
                         <option key={key} value={key}>{value}</option>
                       ))}
                     </select>
+                    {Number(nySkabelonData.formaal) > 1 && (
+                      <select name="proces_id" value={nySkabelonData.proces_id} onChange={handleNySkabelonChange} className="w-2/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
+                        <option value="">Ingen proces valgt...</option>
+                        {procesMuligheder.map(p => (
+                          <option key={p.id} value={p.id}>{p.nr} - {p.titel_kort}</option>
+                        ))}
+                      </select>
+                    )}
                     <button onClick={handleGemNy} title="Gem"><Save size={16} className="text-green-600 hover:text-green-800" /></button>
                     <button onClick={handleAnnullerOpret} title="Annuller"><XCircle size={16} className="text-red-600 hover:text-red-800" /></button>
                   </div>
@@ -241,38 +325,117 @@ function BlokInfoSkabelonerPage(): ReactElement {
             {filtreredeSkabeloner.map(skabelon => {
               const showHeader = skabelon.formaal !== lastFormaal;
               if (showHeader) lastFormaal = skabelon.formaal;
+
+              const isCellActive = (field: string) => activeCell?.id === skabelon.id && activeCell?.field === field;
+
               return (
                 <Fragment key={skabelon.id}>
                   {showHeader && (
                     <tr className="bg-gray-200 sticky top-0">
-                      <td colSpan={4} className="py-1 px-2 font-bold text-gray-700">
+                      <td colSpan={4} className="py-1.5 px-3 font-bold text-gray-700 text-base border-y border-gray-300">
                         {formaalBeskrivelser[skabelon.formaal] || `Ukendt Formål (${skabelon.formaal})`}
                       </td>
                     </tr>
                   )}
-                  <tr className="border-b border-gray-200 hover:bg-gray-100">
-                    {editingId === skabelon.id ? (
-                      <>
-                        <td className="py-1 px-2">{editedData.nr}</td>
-                        <td className="py-1 px-2"><input type="text" name="titel_kort" value={editedData.titel_kort || ''} onChange={handleEditChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
-                        <td className="py-1 px-2"><input type="text" name="beskrivelse" value={editedData.beskrivelse || ''} onChange={handleEditChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
-                        <td className="py-1 px-2">
-                          <div className="flex items-center space-x-2">
-                            <button onClick={() => handleSave(skabelon.id)} title="Gem"><Save size={16} className="text-green-600 hover:text-green-800" /></button>
-                            <button onClick={handleCancelEdit} title="Annuller"><XCircle size={16} className="text-red-600 hover:text-red-800" /></button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-1 px-2">{skabelon.nr}</td>
-                        <td className="py-1 px-2 break-words">{skabelon.titel_kort}</td>
-                        <td className="py-1 px-2 break-words">{skabelon.beskrivelse}</td>
-                        <td className="py-1 px-2">
-                          <button onClick={() => handleEditClick(skabelon)} title="Rediger"><Edit size={16} className="text-blue-600 hover:text-blue-800" /></button>
-                        </td>
-                      </>
-                    )}
+                  <tr className={`border-b transition-all group ${activeCell?.id === skabelon.id ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'}`}>
+                    {/* NR FELT */}
+                    <td className="py-2 px-2 text-center">
+                      {isCellActive('nr') ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={activeCell?.value ?? ''}
+                          className="w-full text-black px-2 py-1 text-sm rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
+                          onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                          onBlur={() => {
+                            if (activeCell?.value !== undefined) {
+                              handleQuickUpdate(skabelon, { nr: Number(activeCell.value) });
+                            }
+                            setActiveCell(null);
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        />
+                      ) : (
+                        <div
+                          className="font-medium text-gray-500 cursor-text py-1 hover:bg-blue-50/50 rounded transition-colors"
+                          onClick={() => setActiveCell({ id: skabelon.id, field: 'nr', value: skabelon.nr })}
+                        >
+                          {skabelon.nr}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* TITEL FELT */}
+                    <td className="py-2 px-2">
+                      {isCellActive('titel_kort') ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={activeCell?.value ?? ''}
+                          className="w-full text-black px-2 py-1 text-sm rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
+                          onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                          onBlur={() => {
+                            if (activeCell?.value !== undefined) {
+                              handleQuickUpdate(skabelon, { titel_kort: activeCell.value });
+                            }
+                            setActiveCell(null);
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        />
+                      ) : (
+                        <div
+                          className="font-semibold text-gray-800 cursor-text py-1 px-2 hover:bg-blue-50/50 rounded truncate transition-colors"
+                          onClick={() => setActiveCell({ id: skabelon.id, field: 'titel_kort', value: skabelon.titel_kort })}
+                        >
+                          {skabelon.titel_kort}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* BESKRIVELSE FELT */}
+                    <td className="py-2 px-2 max-w-0">
+                      <InlineTextEditor
+                        value={skabelon.beskrivelse}
+                        placeholder="Klik for beskrivelse..."
+                        onEdit={() => setActiveCell({ id: skabelon.id, field: 'beskrivelse', value: skabelon.beskrivelse })}
+                        onBlur={() => setActiveCell(null)}
+                        onSave={(val) => handleQuickUpdate(skabelon, { beskrivelse: val })}
+                        onExpand={() => setActiveCell({ id: skabelon.id, field: 'beskrivelse_expanded', value: skabelon.beskrivelse })}
+                      />
+                      {isCellActive('beskrivelse_expanded') && (
+                        <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-1/3 min-w-[500px]">
+                          <label className="block text-xs font-bold mb-1 text-gray-500">Beskrivelse:</label>
+                          <textarea
+                            autoFocus
+                            value={activeCell?.value ?? ''}
+                            className="w-full p-2 text-sm border rounded h-48 focus:ring-1 focus:ring-blue-400 outline-none"
+                            onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                            onBlur={() => {
+                              handleQuickUpdate(skabelon, { beskrivelse: activeCell?.value });
+                              setActiveCell(null);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </td>
+
+                    {/* PROCES FELT (ALTID SELECT) */}
+                    <td className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
+                      {skabelon.formaal > 1 ? (
+                        <select
+                          value={skabelon.proces_id || ''}
+                          onChange={(e) => handleQuickSaveProces(skabelon, e.target.value)}
+                          className="w-full text-blue-600 bg-transparent border-none hover:bg-blue-50/50 focus:ring-0 text-sm italic py-1 px-1 cursor-pointer outline-none rounded transition-colors"
+                        >
+                          <option value="" className="text-gray-400">Vælg proces...</option>
+                          {procesMuligheder.map(p => (
+                            <option key={p.id} value={p.id} className="text-black not-italic">{p.nr} - {p.titel_kort}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-center text-gray-400 py-1">-</div>
+                      )}
+                    </td>
                   </tr>
                 </Fragment>
               )

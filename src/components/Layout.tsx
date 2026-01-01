@@ -1,11 +1,12 @@
 // --- Fil: src/components/Layout.tsx ---
 // @# 2025-09-15 18:20 - Justeret bredden på den lukkede venstre sidebar fra w-20 til w-16.
 // @# 2025-11-17 21:55 - Importeret 'Link' og erstattet <button> med <Link> for navigation.
-import React, { useState, ReactNode } from 'react';
+import React, { useState, ReactNode, useEffect } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
-import { Link } from 'react-router-dom';
-import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart } from 'lucide-react';
 import { useAppState } from '../StateContext';
+import { KommunikationService } from '../services/KommunikationService';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,7 +19,26 @@ interface LayoutProps {
 function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProps): React.ReactElement {
   const { state } = useAppState();
   const { currentUser } = state;
+  const location = useLocation(); // Ensure useLocation is imported/used if needed for re-fetching on nav, or just interval
   const [erMenuAaben, setErMenuAaben] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchUnread = async () => {
+      try {
+        const data = await KommunikationService.getUnreadCount();
+        setUnreadCount(data.unread_count);
+      } catch (e) {
+        // silent fail
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000); // 30 sec
+    return () => clearInterval(interval);
+  }, [currentUser]);
   const menuSektioner = [
     {
       titel: 'SAGSBEHANDLING',
@@ -38,6 +58,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         { id: 'kontakter', navn: 'Kontakter', ikon: Users },
         // @# 2025-12-07 - Ny side
         { id: 'medarbejdere', navn: 'Medarbejdere', ikon: UserCircle },
+        { id: 'kommunikation', navn: 'Intern Chat', ikon: MessageCircleHeart },
       ],
     },
     {
@@ -98,11 +119,20 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
                   <li key={punkt.id}>
                     <Link
                       to={`/${punkt.id}`}
-                      className={`flex items-center justify-center sm:justify-start w-full p-3 text-left hover:bg-gray-700 ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
+                      className={`flex items-center justify-center sm:justify-start w-full p-3 text-left hover:bg-gray-700 relative ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
                       title={punkt.navn}
                     >
                       <punkt.ikon size={20} />
-                      {erMenuAaben && <span className="ml-4">{punkt.navn}</span>}
+                      {erMenuAaben && <span className="ml-4 flex-1">{punkt.navn}</span>}
+                      {punkt.id === 'kommunikation' && unreadCount > 0 && (
+                        erMenuAaben ? (
+                          <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            {unreadCount}
+                          </span>
+                        ) : (
+                          <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-800"></span>
+                        )
+                      )}
                     </Link>
                   </li>
                 ))}
@@ -139,7 +169,10 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <main
+        className={`flex-1 min-h-0 ${aktivSide.includes('kommunikation') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}
+        style={aktivSide.includes('kommunikation') ? { overflow: 'hidden' } : {}}
+      >
         {children}
       </main>
 

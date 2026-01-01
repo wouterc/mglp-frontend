@@ -24,15 +24,14 @@ interface AktiviteterPageProps {
 // --- Hovedkomponent ---
 function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const { state, dispatch } = useAppState();
-    const { valgtSag, hentedeAktiviteter, gruppeLoadingStatus, aktiviteterIsLoading, aktiviteterFilters, aktiviteterUdvidedeGrupper } = state;
-
-    const [aktivitetStatusser, setAktivitetStatusser] = useState<Status[]>([]);
+    const { valgtSag, hentedeAktiviteter, gruppeLoadingStatus, aktiviteterIsLoading, aktiviteterFilters, aktiviteterUdvidedeGrupper, cachedAktiviteter, users: colleagues, aktivitetStatusser, informationsKilder } = state;
 
     // UI State
     const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState<Aktivitet | null>(null);
     const [redigeringsMode, setRedigeringsMode] = useState<'kommentar' | 'resultat'>('kommentar');
     const [quickAddValues, setQuickAddValues] = useState<Record<number, string>>({});
     const [isSavingNy, setIsSavingNy] = useState<Record<number, boolean>>({});
+    const [activeRow, setActiveRow] = useState<number | null>(null);
 
     // Modal states
     const [confirmTemplateActivity, setConfirmTemplateActivity] = useState<Aktivitet | null>(null);
@@ -43,24 +42,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     useTableNavigation(tableRef);
 
     // --- Local State for DATA ---
-    const { cachedAktiviteter } = state;
     const [allActivities, setAllActivities] = useState<Aktivitet[]>([]);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
-    const [colleagues, setColleagues] = useState<User[]>([]);
-    const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
-
-    useEffect(() => {
-        api.get<User[]>('/kerne/users/').then(data => {
-            setColleagues(data.filter(u => u.is_active));
-        });
-        api.get<any[]>('/kerne/status/?formaal=2').then(data => {
-            // StatusViewSet supports pagination if using DefaultRouter, but here it might return .results
-            const statuses = (data as any).results || data;
-            setAktivitetStatusser(statuses);
-        });
-        api.get<InformationsKilde[]>('/kerne/informationskilder/').then(setInformationsKilder).catch(console.error);
-    }, []);
 
     const [confirmDialog, setConfirmDialog] = useState<{
         isOpen: boolean;
@@ -92,29 +76,33 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             setAllActivities([]); // Ryd hvis ingen cache
         }
 
+        // 2. Hent i baggrunden hvis vi har cache, ellers vis loader
         fetchAktiviteterPåSag(valgtSag.id);
-    }, [valgtSag, dispatch]);
+    }, [valgtSag?.id, dispatch]); // @# Kun reager på sags-ID ændring
 
     const fetchAktiviteterPåSag = async (sagId: number) => {
-        // Kun vis loading-spinner hvis vi ikke har data i cachen
         const hasCachedData = !!cachedAktiviteter[sagId];
 
-        setIsFetchingAll(true);
+        // Kun vis "Hoved-loading" hvis vi slet ikke har data
         if (!hasCachedData) {
             dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
         }
 
+        // isFetchingAll styrer den lille spinner i headeren
+        setIsFetchingAll(true);
+
         try {
             const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${sagId}`);
             setAllActivities(data);
-            // Opdater cachen i global state
             dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: sagId, aktiviteter: data } });
 
-            // Tjek også global synk-status
             const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
             setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
         } catch (e: any) {
-            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
+            if (!hasCachedData) {
+                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
+            }
+            console.error("Fejl ved hentning af aktiviteter:", e);
         } finally {
             setIsFetchingAll(false);
             dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
@@ -161,9 +149,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
     };
 
-    const handleGemTilSkabelon = (aktivitet: Aktivitet) => {
+    const handleGemTilSkabelon = useCallback((aktivitet: Aktivitet) => {
         setConfirmTemplateActivity(aktivitet);
-    };
+    }, []);
 
     const performGemTilSkabelon = async () => {
         if (!confirmTemplateActivity) return;
@@ -207,55 +195,33 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const filters = aktiviteterFilters;
         const lowerAkt = filters.aktivitet.toLowerCase();
         const lowerAns = filters.ansvarlig.toLowerCase();
-        const today = new Date().toLocaleDateString('sv-SE');
-
-        // 1. Filtrer aktiviteter
-        const filtered = allActivities.filter(a => {
-            if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) return false;
-            // Ansvarlig søgning (bemærk ansvarlig kan være null)
-            if (lowerAns && !a.ansvarlig?.toLowerCase().includes(lowerAns)) return false;
-
-            // Status
-            if (filters.status) {
-                if (filters.status === 'ikke-faerdigmeldt') {
-                    if (a.status?.status_kategori === 1) return false; // 1 = Færdig
-                } else {
-                    if (a.status?.id.toString() !== filters.status.toString()) return false;
-                }
-            }
-
-            if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) return false;
-
-            // Datoer
-            if (filters.dato_intern_efter && (!a.dato_intern || new Date(a.dato_intern) < new Date(filters.dato_intern_efter))) return false;
-            if (filters.dato_intern_foer && (!a.dato_intern || new Date(a.dato_intern) > new Date(filters.dato_intern_foer))) return false;
-
-            // Overskredet logik
-            if (filters.overskredet) {
-                const isDone = a.status?.status_kategori === 1;
-                if (isDone) return false;
-                const internPast = a.dato_intern && new Date(a.dato_intern) < new Date(today);
-                const eksternPast = a.dato_ekstern && new Date(a.dato_ekstern) < new Date(today);
-                if (!internPast && !eksternPast) return false;
-            }
-
-            // Vigtige (Important comments) Filter
-            if (filters.vigtige && !a.kommentar_vigtig) {
-                return false;
-            }
-
-            return true;
-        });
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dayOfWeek = today.getDay();
+        let maxOrangeDiff = 1;
+        if (dayOfWeek === 5) maxOrangeDiff = 3;
+        else if (dayOfWeek === 6) maxOrangeDiff = 2;
 
         const groupsMap: Record<string, any> = {};
+        let samletTotal = 0;
+        let samletFaerdige = 0;
 
-        // Først, kør igennem ALLE aktiviteter for at få total counts
-        allActivities.forEach(a => {
-            if (!a.gruppe || !a.proces) return;
-            const key = `${a.proces.id}-${a.gruppe.id}`;
+        // One-pass filtering and grouping
+        const valgteProcesIds = valgtSag?.valgte_processer?.map(p => p.id) || [];
+
+        for (const a of allActivities) {
+            if (!a.gruppe) continue;
+
+            // Determine process ID.
+            // Prefer a.proces.id if present, otherwise look at a.gruppe.proces_id
+            const aProcesId = a.proces?.id || a.gruppe?.proces_id;
+
+            if (!aProcesId || !valgteProcesIds.includes(aProcesId)) continue;
+
+            const key = `${aProcesId}-${a.gruppe.id}`;
             if (!groupsMap[key]) {
                 groupsMap[key] = {
-                    proces: a.proces,
+                    proces: a.proces || { id: a.gruppe.proces_id, titel_kort: "Ukendt proces" }, // Fallback for UI
                     gruppe: a.gruppe,
                     filteredAktiviteter: [],
                     total_aktiv_count: 0,
@@ -264,26 +230,61 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                     filtered_faerdig_count: 0
                 };
             }
-            if (a.aktiv) {
-                groupsMap[key].total_aktiv_count++;
-                if (a.status?.status_kategori === 1) {
-                    groupsMap[key].total_faerdig_count++;
-                }
-            }
-        });
 
-        // Nu tilføj de filtrerede til listerne
-        filtered.forEach(a => {
-            if (!a.gruppe || !a.proces) return;
-            const key = `${a.proces.id}-${a.gruppe.id}`;
-            if (groupsMap[key]) {
-                groupsMap[key].filteredAktiviteter.push(a);
-                groupsMap[key].filtered_aktiv_count++;
+            const g = groupsMap[key];
+
+            // Counts for the summary (regardless of filters, but depends on 'aktiv' flag)
+            if (a.aktiv) {
+                g.total_aktiv_count++;
+                samletTotal++;
                 if (a.status?.status_kategori === 1) {
-                    groupsMap[key].filtered_faerdig_count++;
+                    g.total_faerdig_count++;
+                    samletFaerdige++;
                 }
             }
-        });
+
+            // Apply Filters
+            if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
+            if (lowerAns && !a.ansvarlig?.toLowerCase().includes(lowerAns)) continue;
+
+            if (filters.status) {
+                if (filters.status === 'ikke-faerdigmeldt') {
+                    if (a.status?.status_kategori === 1) continue;
+                } else {
+                    if (a.status?.id.toString() !== filters.status.toString()) continue;
+                }
+            }
+
+            if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) continue;
+
+            if (filters.dato_intern_efter && (!a.dato_intern || new Date(a.dato_intern) < new Date(filters.dato_intern_efter))) continue;
+            if (filters.dato_intern_foer && (!a.dato_intern || new Date(a.dato_intern) > new Date(filters.dato_intern_foer))) continue;
+
+            if (filters.overskredet) {
+                if (a.status?.status_kategori === 1) continue;
+
+                const isNearOrPast = (dateStr: string | null) => {
+                    if (!dateStr) return false;
+                    const d = new Date(dateStr);
+                    d.setHours(0, 0, 0, 0);
+                    const diff = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    return diff <= maxOrangeDiff;
+                };
+
+                if (!isNearOrPast(a.dato_intern) && !isNearOrPast(a.dato_ekstern)) continue;
+            }
+
+            if (filters.vigtige && !a.kommentar_vigtig) continue;
+
+            if (filters.informations_kilde && a.informations_kilde?.id.toString() !== filters.informations_kilde.toString()) continue;
+
+            // If we reached here, it's filtered IN
+            g.filteredAktiviteter.push(a);
+            g.filtered_aktiv_count++;
+            if (a.status?.status_kategori === 1) {
+                g.filtered_faerdig_count++;
+            }
+        }
 
         const processedGroups = Object.values(groupsMap).filter((g: any) =>
             g.filteredAktiviteter.length > 0
@@ -295,19 +296,16 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const actMap: Record<string, Aktivitet[]> = {};
         processedGroups.forEach((g: any) => {
             g.filteredAktiviteter.sort((a: Aktivitet, b: Aktivitet) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
-            const key = `${g.proces.id}-${g.gruppe.id}`;
-            actMap[key] = g.filteredAktiviteter;
+            actMap[`${g.proces.id}-${g.gruppe.id}`] = g.filteredAktiviteter;
         });
 
-        const samlet = processedGroups.reduce((acc: any, gruppe: any) => {
-            acc.total += gruppe.total_aktiv_count;
-            acc.faerdige += gruppe.total_faerdig_count;
-            return acc;
-        }, { total: 0, faerdige: 0 });
+        return {
+            filteredGroups: processedGroups,
+            groupedActivities: actMap,
+            samletTaeling: { total: samletTotal, faerdige: samletFaerdige }
+        };
 
-        return { filteredGroups: processedGroups, groupedActivities: actMap, samletTaeling: samlet };
-
-    }, [allActivities, aktiviteterFilters]);
+    }, [allActivities, aktiviteterFilters, valgtSag]);
 
 
     const handleToggleAlleGrupper = (vis: boolean) => {
@@ -337,7 +335,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         });
     };
 
-    const handleInlineSave = async (aktivitet: Aktivitet, field: string, value: string | boolean | null) => {
+    const handleInlineSave = useCallback(async (aktivitet: Aktivitet, field: string, value: string | boolean | null) => {
         const feltNavn = field === 'status' ? 'status_id' : field;
         const payload = { [feltNavn]: value };
         try {
@@ -348,9 +346,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         } catch (e) {
             console.error("Fejl ved inline save:", e);
         }
-    };
+    }, [setAllActivities]);
 
-    const handleStatusToggle = async (aktivitet: Aktivitet) => {
+    const handleStatusToggle = useCallback(async (aktivitet: Aktivitet) => {
         const isDone = aktivitet.status?.status_nummer === 80;
         const targetStatusNr = isDone ? 10 : 80;
         const targetStatus = aktivitetStatusser.find(s => s.status_nummer === targetStatusNr);
@@ -358,7 +356,17 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (targetStatus) {
             await handleInlineSave(aktivitet, 'status', targetStatus.id.toString());
         }
-    };
+    }, [handleInlineSave, aktivitetStatusser]);
+
+    const handleEditComment = useCallback((a: Aktivitet) => {
+        setRedigeringsMode('kommentar');
+        setAktivitetTilRedigering(a);
+    }, []);
+
+    const handleEditResultat = useCallback((a: Aktivitet) => {
+        setRedigeringsMode('resultat');
+        setAktivitetTilRedigering(a);
+    }, []);
 
     const handleSynkroniser = async () => {
         if (!valgtSag) return;
@@ -477,12 +485,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                             </tr>
                         </thead>
                         <tbody>
-                            {aktiviteterIsLoading || isFetchingAll ? (
-                                <tr><td colSpan={9} className="text-center p-4">Henter aktiviteter...</td></tr>
-                            ) : state.aktiviteterError ? (
-                                <tr><td colSpan={9} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
+                            {aktiviteterIsLoading && allActivities.length === 0 ? (
+                                <tr><td colSpan={10} className="text-center p-4">Henter aktiviteter...</td></tr>
+                            ) : state.aktiviteterError && allActivities.length === 0 ? (
+                                <tr><td colSpan={10} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
                             ) : !valgtSag ? (
-                                <tr><td colSpan={9} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
+                                <tr><td colSpan={10} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
                             ) : filteredGroups.length === 0 ? (
                                 <tr><td colSpan={10} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
                             ) : filteredGroups.map((gruppeSummary: any) => {
@@ -517,10 +525,13 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 colleagues={colleagues}
                                                 onInlineSave={handleInlineSave}
                                                 onStatusToggle={handleStatusToggle}
-                                                onEditComment={(a) => { setRedigeringsMode('kommentar'); setAktivitetTilRedigering(a); }}
-                                                onEditResultat={(a) => { setRedigeringsMode('resultat'); setAktivitetTilRedigering(a); }}
+                                                onEditComment={handleEditComment}
+                                                onEditResultat={handleEditResultat}
                                                 onGemTilSkabelon={handleGemTilSkabelon}
                                                 informationsKilder={informationsKilder}
+                                                isActive={activeRow === aktivitet.id}
+                                                onFocus={() => setActiveRow(aktivitet.id)}
+                                                onBlur={() => setActiveRow(null)}
                                             />
                                         ))}
 

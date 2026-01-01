@@ -22,14 +22,12 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedCaseLabel, setSelectedCaseLabel] = useState<string>('');
+    const [activeIndex, setActiveIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Initial fetch of alias if value is present (conditionally)
     useEffect(() => {
         if (value) {
-            // Optimistically we might want to fetch the case details to show the label correctly
-            // But usually this component is used where we might already know it, or we fetch it.
-            // For now, let's just fetch it if we don't have a label.
             api.get<any>(`/sager/${value}/`).then(res => {
                 setSelectedCaseLabel(`${res.sags_nr}${res.alias ? ' - ' + res.alias : ''}`);
             }).catch(() => {
@@ -44,6 +42,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
         const handler = setTimeout(async () => {
             if (searchTerm.length < 2) {
                 setResults([]);
+                setActiveIndex(-1);
                 return;
             }
             setLoading(true);
@@ -51,6 +50,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
                 const data = await api.get<SearchResult[]>(`/sager/search/?q=${searchTerm}`);
                 setResults(data);
                 setIsOpen(true);
+                setActiveIndex(data.length > 0 ? 0 : -1);
             } catch (e) {
                 console.error("Fejl ved søgning:", e);
             } finally {
@@ -79,6 +79,31 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
         setSelectedCaseLabel(`${item.sags_nr}${item.alias ? ' - ' + item.alias : ''}`);
         setIsOpen(false);
         setSearchTerm('');
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!isOpen) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                setIsOpen(true);
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex(prev => (results.length > 0 ? (prev + 1) % results.length : -1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex(prev => (results.length > 0 ? (prev - 1 + results.length) % results.length : -1));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIndex >= 0 && activeIndex < results.length) {
+                handleSelect(results[activeIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            setIsOpen(false);
+        }
     };
 
     return (
@@ -103,19 +128,21 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
                             className="w-full text-sm p-1 border border-gray-200 rounded focus:outline-none focus:border-blue-500"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                         />
                     </div>
                     {loading && <div className="p-2 text-xs text-center text-gray-500">Søger...</div>}
-                    {!loading && results.map(r => (
+                    {!loading && results.map((r, index) => (
                         <div
                             key={r.id}
-                            className="p-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between items-center"
+                            className={`p-2 text-sm cursor-pointer flex justify-between items-center ${index === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 text-gray-700'}`}
+                            onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => handleSelect(r)}
                         >
-                            <span><span className="font-mono font-medium">{r.sags_nr}</span> {r.alias && `- ${r.alias}`}</span>
-                            {value === r.id && <Check size={14} className="text-blue-600" />}
+                            <span><span className={`font-mono font-medium ${index === activeIndex ? 'text-white' : 'text-gray-900'}`}>{r.sags_nr}</span> {r.alias && `- ${r.alias}`}</span>
+                            {value === r.id && <Check size={14} className={index === activeIndex ? 'text-white' : 'text-blue-600'} />}
                         </div>
                     ))}
                     {!loading && searchTerm.length >= 2 && results.length === 0 && (

@@ -9,6 +9,8 @@ export interface Blokinfo {
   nr: number;
   titel_kort: string | null;
   beskrivelse: string | null;
+  proces?: string | null;
+  proces_id?: number | null;
 }
 
 export interface InformationsKilde {
@@ -29,6 +31,7 @@ export interface SkabAktivitet {
   ansvarlig: string | null;
   frist: number | null;
   informations_kilde?: InformationsKilde | null;
+  informations_kilde_id?: number | null;
   mail_titel?: string | null;
   er_ny?: boolean;
 }
@@ -142,6 +145,10 @@ export interface Sag {
 
   opgaver_oprettet: boolean;
   mappen_oprettet: boolean;
+
+  valgte_processer: Blokinfo[];
+  valgte_processer_ids?: number[];
+
   // Relationer
   maegler_virksomhed: Virksomhed | null;
   maegler_kontakt: Kontakt | null;
@@ -198,6 +205,7 @@ export interface AktiviteterFilterState {
   aktivitet: string;
   ansvarlig: string;
   status: string;
+  informations_kilde: string;
   aktiv_filter: string;
   dato_intern_efter: string;
   dato_intern_foer: string;
@@ -286,6 +294,7 @@ export interface SkabDokument {
   udgaaet: boolean | null;
   kommentar: string | null;
   informations_kilde?: InformationsKilde | null;
+  informations_kilde_id?: number | null;
   mail_titel?: string | null;
   er_ny?: boolean;
 }
@@ -322,6 +331,7 @@ export interface SagsDokument {
   gruppe: Blokinfo | null;
   gruppe_navn?: string;
   gruppe_nr?: number;
+  gruppe_proces_id?: number;
   dokument_nr?: number;
   titel: string | null;
   fil: string | null; // URL til fil

@@ -19,9 +19,12 @@ interface DokumentRowProps {
     statusser: any[];
     onStatusToggle: (doc: SagsDokument) => void;
     informationsKilder: InformationsKilde[];
+    isActive?: boolean;
+    onFocus?: () => void;
+    onBlur?: () => void;
 }
 
-export default function DokumentRow({
+const DokumentRow = React.memo(function DokumentRow({
     doc,
     sag,
     colleagues,
@@ -33,8 +36,45 @@ export default function DokumentRow({
     onSaveToTemplate,
     statusser,
     onStatusToggle,
-    informationsKilder
+    informationsKilder,
+    isActive,
+    onFocus,
+    onBlur
 }: DokumentRowProps) {
+    const isDone = doc.status?.status_nummer === 80;
+
+    const getDateColorClass = (dateStr: string | null) => {
+        if (!dateStr || isDone) return '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const targetDate = new Date(dateStr);
+        targetDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return '!bg-red-500 !text-white';
+
+        let maxOrangeDiff = 1;
+        const dayOfWeek = today.getDay(); // 0=Sun, 5=Fri, 6=Sat
+        if (dayOfWeek === 5) maxOrangeDiff = 3;
+        else if (dayOfWeek === 6) maxOrangeDiff = 2;
+
+        if (diffDays <= maxOrangeDiff) return '!bg-orange-400 !text-white';
+        return '';
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent, nextFieldId: string) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextEl = document.getElementById(nextFieldId);
+            if (nextEl) {
+                nextEl.focus();
+                if (nextEl instanceof HTMLInputElement && nextEl.type === 'text') {
+                    nextEl.select();
+                }
+            }
+        }
+    };
+
     const [isUploading, setIsUploading] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -77,13 +117,26 @@ export default function DokumentRow({
     };
 
     return (
-        <tr {...getRootProps()} className={`hover:bg-gray-50 group transition-colors relative ${isDragActive ? 'bg-blue-50 ring-2 ring-blue-400 z-10' : ''}`}>
+        <tr
+            {...getRootProps()}
+            className={`group transition-colors relative ${isDragActive ? 'bg-blue-50 ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
+            style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
+            onClick={onFocus}
+            onFocus={onFocus}
+            onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                    onBlur?.();
+                }
+            }}
+        >
             <td className="px-0 py-3 text-right w-8 pr-1">
                 <input {...getInputProps()} />
                 <input
+                    id={`d-${doc.id}-f0`}
                     type="checkbox"
                     checked={doc.aktiv}
                     readOnly
+                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f1`)}
                     className="rounded text-blue-600 focus:ring-blue-500"
                 />
             </td>
@@ -98,16 +151,20 @@ export default function DokumentRow({
             </td>
             <td className="px-2 py-1.5 w-20 relative align-middle">
                 <SmartDateInput
+                    id={`d-${doc.id}-f1`}
                     value={doc.dato_intern}
                     onSave={(val) => onInlineSave(doc.id, 'dato_intern', val)}
-                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
+                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f2`)}
+                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${getDateColorClass(doc.dato_intern)} ${!doc.dato_intern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
             <td className="px-2 py-1.5 w-20 relative align-middle">
                 <SmartDateInput
+                    id={`d-${doc.id}-f2`}
                     value={doc.dato_ekstern}
                     onSave={(val) => onInlineSave(doc.id, 'dato_ekstern', val)}
-                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${!doc.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
+                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f3`)}
+                    className={`w-full py-0.5 px-1 border border-slate-400 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${getDateColorClass(doc.dato_ekstern)} ${!doc.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
             <td className="px-0 py-1.5 w-20 relative align-middle">
@@ -176,8 +233,10 @@ export default function DokumentRow({
                         <CheckCircle2 size={16} fill={doc.status?.status_nummer === 80 ? "currentColor" : "none"} strokeWidth={2.5} />
                     </button>
                     <select
+                        id={`d-${doc.id}-f3`}
                         value={doc.status?.id || ''}
                         onChange={(e) => onInlineSave(doc.id, 'status_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                        onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f4`)}
                         className={`flex-grow h-7 py-0 px-1 border rounded text-[12px] bg-transparent focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-slate-400'}`}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -247,17 +306,21 @@ export default function DokumentRow({
             </td>
             <td className="px-0 py-1.5 align-middle text-center w-8">
                 <input
+                    id={`d-${doc.id}-f4`}
                     type="checkbox"
                     checked={!!doc.skal_mailes}
                     onChange={(e) => onInlineSave(doc.id, 'skal_mailes', e.target.checked)}
+                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f5`)}
                     className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 mt-1"
                     title="Vælg til næste mail"
                 />
             </td>
             <td className="px-2 py-1.5 w-20 align-middle overflow-hidden">
                 <select
+                    id={`d-${doc.id}-f5`}
                     value={doc.informations_kilde?.id || ''}
                     onChange={(e) => onInlineSave(doc.id, 'informations_kilde_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f6`)}
                     className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
                 >
                     <option value="">Ingen</option>
@@ -270,6 +333,7 @@ export default function DokumentRow({
             </td>
             <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
                 <select
+                    id={`d-${doc.id}-f6`}
                     value={doc.ansvarlig || ''}
                     onChange={(e) => onInlineSave(doc.id, 'ansvarlig', e.target.value === '' ? null : parseInt(e.target.value))}
                     className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
@@ -284,4 +348,6 @@ export default function DokumentRow({
             </td>
         </tr>
     );
-};
+});
+
+export default DokumentRow;

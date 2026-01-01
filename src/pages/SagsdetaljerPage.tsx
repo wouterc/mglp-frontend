@@ -18,6 +18,7 @@ import SaelgereTab from '../components/sagsdetaljer/tabs/SaelgereTab';
 import RaadgivereTab from '../components/sagsdetaljer/tabs/RaadgivereTab';
 import KommuneTab from '../components/sagsdetaljer/tabs/KommuneTab';
 import ForsyningTab from '../components/sagsdetaljer/tabs/ForsyningTab';
+import ProcesserTab from '../components/sagsdetaljer/tabs/ProcesserTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
@@ -30,11 +31,11 @@ interface SagsdetaljerPageProps {
 
 function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactElement {
     const { state, dispatch } = useAppState();
-    const { statusser } = state;
-    const location = useLocation(); // @# Brug hook
+    const { sagsStatusser: statusser } = state;
+    const location = useLocation();
 
-    const [sag, setSag] = useState<Sag | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [sag, setSag] = useState<Sag | null>(state.valgtSag && state.valgtSag.id === sagId ? state.valgtSag : null);
+    const [isLoading, setIsLoading] = useState(!sag && !!sagId);
     const [error, setError] = useState<string | null>(null);
 
     // UI State
@@ -43,40 +44,45 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
     // 1. Hent kun sagens stamdata (Letvægts fetch)
     const fetchSag = useCallback(async (id: number, silent = false) => {
-        if (!silent) setIsLoading(true);
+        // Hvis vi allerede har sagen i global state og id matcher, 
+        // så behøver vi ikke vise den store spinner mens vi re-validerer.
+        const hasLoadedMatch = state.valgtSag && state.valgtSag.id === id;
+
+        if (!silent && !hasLoadedMatch) {
+            setIsLoading(true);
+        }
+
         setError(null);
         try {
             const data = await api.get<Sag>(`/sager/${id}/`);
             setSag(data);
             dispatch({ type: 'SET_VALGT_SAG', payload: data });
         } catch (e: any) {
-            setError(e.message);
-            setSag(null);
+            if (!hasLoadedMatch) {
+                setError(e.message);
+                setSag(null);
+            }
+            console.error("Fejl ved hentning af sag:", e);
         } finally {
             setIsLoading(false);
         }
-    }, [dispatch]);
+    }, [dispatch, state.valgtSag]);
 
-    // 1b. Sørg for at statusser er indlæst
-    useEffect(() => {
-        const fetchStatusser = async () => {
-            if (statusser.length > 0) return;
-            try {
-                const data = await api.get<any>('/kerne/status/?formaal=1');
-                dispatch({ type: 'SET_STATUSSER', payload: Array.isArray(data.results) ? data.results : data });
-            } catch (e) {
-                console.error("Fejl ved hentning af statusser:", e);
-            }
-        };
-        fetchStatusser();
-    }, [statusser.length, dispatch]);
+    // 1b. Sørg for at statusser er indlæst (Lookups håndteres nu i StateContext)
+    // Men vi behøver stadig sags-statusser (formaal=1) som måske ikke er dem i global state?
+    // StateContext henter formaal=2 (aktiviteter). 
+    // Lad os tjekke om vi skal tilføje flere statusser til global state.
 
-    // Initial load
+    // Initial load: Hent data når sagId ændres
     useEffect(() => {
         if (sagId) {
             fetchSag(sagId);
+        }
+    }, [sagId]); // Kun kør når sagId ændres
 
-            // @# Tjek for initialTab i navigation state
+    // Tab-initialisering: Sæt start-fane når sagId ændres eller ved navigation
+    useEffect(() => {
+        if (sagId) {
             const navState = location.state as { initialTab?: TabType } | null;
             if (navState?.initialTab) {
                 setActiveTab(navState.initialTab);
@@ -84,7 +90,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 setActiveTab('overblik');
             }
         }
-    }, [sagId, fetchSag, location.state]); // @# Tilføj location.state til deps
+    }, [sagId, location.state]); // Kør når vi skifter sag eller hopper ind med en specifik fane
 
     // 2. Håndter navigation (Næste/Forrige) fra Layoutet
     const handleNavigateToSag = async (targetId: number) => {
@@ -176,6 +182,8 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                     onStatusChange={handleStatusChange} // @# Send handler med
                     onUpdate={handleUpdateSag}
                 />;
+            case 'processer':
+                return <ProcesserTab sag={sag} onUpdate={handleUpdateSag} />;
             case 'maegler':
                 return <MaeglerTab sag={sag} onUpdate={handleUpdateSag} />;
             case 'bank':
