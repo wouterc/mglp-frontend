@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, Fragment, ReactElemen
 import AktivitetForm from '../components/AktivitetForm.tsx';
 import useDebounce from '../hooks/useDebounce.ts';
 import { PlusCircle, AlertCircle, Edit, FunnelX, Loader2, UploadCloud, Download, ChevronLeft, ChevronRight, Info, RefreshCw, Maximize2 } from 'lucide-react';
-import type { Blokinfo, SkabAktivitet, AktivitetsskabelonerFilterState } from '../types.ts';
+import type { Blokinfo, SkabAktivitet, AktivitetsskabelonerFilterState, SkabDokument } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
@@ -12,6 +12,8 @@ import { api } from '../api';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
+import ActivityDocLinkerPanel from '../components/panels/ActivityDocLinkerPanel.tsx';
+import { Link as LinkIcon, Columns } from 'lucide-react';
 
 interface InlineEditorProps {
   value: string | null | undefined;
@@ -140,6 +142,69 @@ function AktivitetsskabelonerPage(): ReactElement {
     message: '',
     onConfirm: () => { },
   });
+
+  // @# Linker State (Split View)
+  const [showLinkerPanel, setShowLinkerPanel] = useState(false);
+  const [selectedLinkerActivityId, setSelectedLinkerActivityId] = useState<number | null>(null);
+  const [dokumentskabeloner, setDokumentskabeloner] = useState<SkabDokument[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
+  // Load documents once when panel is opened first time
+  useEffect(() => {
+    if (showLinkerPanel && dokumentskabeloner.length === 0 && !loadingDocs) {
+      setLoadingDocs(true);
+      api.get<any>(`/skabeloner/dokumenter/?limit=1000&udgaaet=false`)
+        .then(data => {
+          const results = Array.isArray(data) ? data : (data.results || []);
+          setDokumentskabeloner(results);
+        })
+        .catch(e => {
+          console.error("Failed to fetch doc templates", e);
+          showAlert('Fejl', 'Kunne ikke hente dokumentskabeloner.');
+        })
+        .finally(() => setLoadingDocs(false));
+    }
+  }, [showLinkerPanel, dokumentskabeloner.length, loadingDocs]);
+
+
+  // Handle selection (row click or specific logic)
+  const handleRowClick = (aktivitet: SkabAktivitet) => {
+    // If panel is open, update selection
+    if (showLinkerPanel) {
+      setSelectedLinkerActivityId(aktivitet.id);
+    }
+    // Also set for editing? Or is inline edit enough? 
+    // Usually clicking row doesn't trigger edit mode in this table unless clicking specific cells.
+  };
+
+  const handleToggleLinkerPanel = () => {
+    setShowLinkerPanel(!showLinkerPanel);
+    if (!showLinkerPanel && !selectedLinkerActivityId && aktiviteter.length > 0) {
+      // Auto-select first if none selected
+      // setSelectedLinkerActivityId(aktiviteter[0].id);
+    }
+  };
+
+  const selectedLinkerActivity = useMemo(() =>
+    aktiviteter.find(a => a.id === selectedLinkerActivityId) || null,
+    [aktiviteter, selectedLinkerActivityId]
+  );
+
+  const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
+    try {
+      const updated = await api.patch<SkabAktivitet>(`/skabeloner/aktiviteter/${aktivitetId}/`, { dokumenter: documentIds });
+
+      dispatch({
+        type: 'SET_AKTIVITETSSKABELONER_STATE',
+        payload: {
+          aktivitetsskabeloner: aktiviteter.map(a => a.id === updated.id ? updated : a)
+        }
+      });
+    } catch (e: any) {
+      console.error("Link update failed:", e);
+      showAlert('Fejl', 'Kunne ikke opdatere links: ' + e.message);
+    }
+  };
 
   const showAlert = (title: string, message: string) => {
     setConfirmDialog({
@@ -513,6 +578,8 @@ function AktivitetsskabelonerPage(): ReactElement {
         />
       )}
 
+      {/* Old Modal Removed */}
+
       <CsvImportModal
         isOpen={visImportModal}
         onClose={() => setVisImportModal(false)}
@@ -527,12 +594,12 @@ function AktivitetsskabelonerPage(): ReactElement {
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
         <h2 className="text-2xl font-bold text-gray-800">Aktivitetsskabeloner</h2>
         <div className="flex space-x-2">
-          <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">
-            {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-          </button>
           <button onClick={() => setVisImportModal(true)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Importer fra Excel">
             <UploadCloud size={20} />
           </button>
+
+
+
           {(nyeAktiviteterFindes || isSyncingAlle) && (
             <button
               onClick={handleSynkroniserAlleSager}
@@ -638,6 +705,7 @@ function AktivitetsskabelonerPage(): ReactElement {
             </button>
           </div>
 
+
           <div className="flex-1 overflow-y-auto p-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <table className="min-w-full table-fixed">
@@ -646,6 +714,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                     <th className="text-center py-3 px-1 w-[5%]">Nr.</th>
                     <th className="text-left py-3 px-4 w-[25%]">Aktivitet</th>
                     <th className="text-left py-3 px-4 w-[25%]">Kommentar</th>
+                    <th className="text-center py-3 px-2 w-[4%]">Link</th>
                     <th className="text-left py-3 px-2 w-[10%]">Kilde</th>
                     <th className="text-left py-3 px-4 w-[25%]">Mail Titel</th>
                     <th className="text-center py-3 px-2 w-[10%]">Status</th>
@@ -659,8 +728,20 @@ function AktivitetsskabelonerPage(): ReactElement {
                       const isCellActive = (field: string) => activeCell?.id === a.id && activeCell?.field === field;
                       const isRowActive = activeCell?.id === a.id;
 
+
                       return (
-                        <tr key={a.id} className={`border-b transition-all group ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'}`}>
+                        <tr
+                          key={a.id}
+                          onClick={(e) => {
+                            // Don't trigger if editing
+                            if (!activeCell) handleRowClick(a);
+                          }}
+                          className={`border-b transition-all group cursor-default
+                                ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : ''}
+                                ${selectedLinkerActivityId === a.id && showLinkerPanel ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : 'border-gray-100 hover:bg-gray-50'}
+                            `}
+                        >
+                          {/* NR FELT */}
                           {/* NR FELT */}
                           <td className="py-2 px-1 text-center">
                             {isCellActive('aktivitet_nr') ? (
@@ -739,6 +820,28 @@ function AktivitetsskabelonerPage(): ReactElement {
                                 />
                               </div>
                             )}
+                          </td>
+
+                          {/* LINK BUTTON */}
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!showLinkerPanel) {
+                                  setShowLinkerPanel(true);
+                                }
+                                setSelectedLinkerActivityId(a.id);
+                              }}
+                              className={`p-1.5 rounded-full transition-colors ${a.dokumenter && a.dokumenter.length > 0
+                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                : 'text-gray-300 hover:text-gray-500'
+                                }`}
+                              title={a.dokumenter && a.dokumenter.length > 0
+                                ? `${a.dokumenter.length} dokumenter linket`
+                                : "Link dokumenter"}
+                            >
+                              <LinkIcon size={16} />
+                            </button>
                           </td>
 
                           {/* KILDE FELT */}
@@ -872,20 +975,39 @@ function AktivitetsskabelonerPage(): ReactElement {
               </div>
             )}
           </div>
+          {showLinkerPanel && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200" onClick={() => setShowLinkerPanel(false)}>
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                <ActivityDocLinkerPanel
+                  selectedAktivitet={selectedLinkerActivity}
+                  dokumenter={dokumentskabeloner}
+                  onLinkChanges={handleLinkChanges}
+                  onClose={() => setShowLinkerPanel(false)}
+                  isLoadingDocs={loadingDocs}
+                />
+              </div>
+            </div>
+          )}
         </div>
+
+
       </div>
-      {confirmDialog.isOpen && (
-        <ConfirmModal
-          isOpen={confirmDialog.isOpen}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          confirmText={confirmDialog.confirmText}
-          cancelText={confirmDialog.cancelText}
-          onConfirm={confirmDialog.onConfirm}
-          onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-        />
-      )}
-    </div>
+
+
+      {
+        confirmDialog.isOpen && (
+          <ConfirmModal
+            isOpen={confirmDialog.isOpen}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            confirmText={confirmDialog.confirmText}
+            cancelText={confirmDialog.cancelText}
+            onConfirm={confirmDialog.onConfirm}
+            onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+          />
+        )
+      }
+    </div >
   );
 }
 

@@ -6,6 +6,7 @@ import React, { useState, ReactNode, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart } from 'lucide-react';
 import { useAppState } from '../StateContext';
+import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
 
 interface LayoutProps {
@@ -26,18 +27,49 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
   useEffect(() => {
     if (!currentUser) return;
 
-    const fetchUnread = async () => {
+    let intervalId: NodeJS.Timeout;
+
+    const setupInterval = async () => {
+      // 1. Fetch unread count immediately
+      const fetchUnread = async () => {
+        try {
+          const data = await KommunikationService.getUnreadCount();
+          setUnreadCount(data.unread_count);
+        } catch (e) { /* silent fail */ }
+      };
+      fetchUnread();
+
+      // 2. Fetch Interval Setting
+      let intervalMs = 30000; // Default 30 sec
       try {
-        const data = await KommunikationService.getUnreadCount();
-        setUnreadCount(data.unread_count);
-      } catch (e) {
-        // silent fail
+        // Try to get from backend
+        // Note: Using raw fetch/api here because we need to handle 404 specifically
+        const response = await api.get<any>('/kerne/global-variables/NOTIFICATION_INTERVAL/');
+        if (response && response.vaerdi) {
+          intervalMs = parseInt(response.vaerdi, 10);
+        }
+      } catch (error: any) {
+        // If 404, it means variable doesn't exist. Create it.
+        if (error.response?.status === 404 || error.message?.includes('404')) {
+          try {
+            await api.post('/kerne/global-variables/', {
+              noegle: 'NOTIFICATION_INTERVAL',
+              vaerdi: '30000',
+              beskrivelse: 'Interval for tjek af ulæste beskeder (ms)'
+            });
+          } catch (createError) { /* ignore */ }
+        }
       }
+
+      // 3. Start Interval
+      intervalId = setInterval(fetchUnread, intervalMs);
     };
 
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 30000); // 30 sec
-    return () => clearInterval(interval);
+    setupInterval();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [currentUser]);
   const menuSektioner = [
     {

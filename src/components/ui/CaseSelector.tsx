@@ -14,9 +14,10 @@ interface CaseSelectorProps {
     onChange: (id: number) => void;
     placeholder?: string;
     className?: string;
+    label?: string; // Opt: If provided, no fetch is needed
 }
 
-export default function CaseSelector({ value, onChange, placeholder = "Søg efter sag...", className = "" }: CaseSelectorProps) {
+export default function CaseSelector({ value, onChange, placeholder = "Søg efter sag...", className = "", label }: CaseSelectorProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -28,15 +29,19 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
     // Initial fetch of alias if value is present (conditionally)
     useEffect(() => {
         if (value) {
-            api.get<any>(`/sager/${value}/`).then(res => {
-                setSelectedCaseLabel(`${res.sags_nr}${res.alias ? ' - ' + res.alias : ''}`);
-            }).catch(() => {
-                setSelectedCaseLabel(`Sag #${value}`);
-            });
+            if (label) {
+                setSelectedCaseLabel(label);
+            } else {
+                api.get<any>(`/sager/${value}/`).then(res => {
+                    setSelectedCaseLabel(`${res.sags_nr}${res.alias ? ' - ' + res.alias : ''}`);
+                }).catch(() => {
+                    setSelectedCaseLabel(`Sag #${value}`);
+                });
+            }
         } else {
             setSelectedCaseLabel('');
         }
-    }, [value]);
+    }, [value, label]);
 
     useEffect(() => {
         const handler = setTimeout(async () => {

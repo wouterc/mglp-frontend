@@ -1,16 +1,32 @@
 import React, { ReactElement, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppState } from '../StateContext';
-import { User, Shield, Mail, Key, Loader2, UserCircle } from 'lucide-react';
+import { api } from '../api';
+import { User, Shield, Mail, Key, Loader2, UserCircle, Monitor, Settings, AppWindow, ExternalLink, CircleHelp } from 'lucide-react';
 import Button from '../components/ui/Button';
+import Tooltip from '../components/Tooltip';
 import RedigerProfilModal from '../components/RedigerProfilModal';
 import SkiftAdgangskodeModal from '../components/SkiftAdgangskodeModal';
 
 function MinKontoPage(): ReactElement {
-    const { state } = useAppState();
+    const { state, dispatch } = useAppState();
     const { currentUser, isAuthChecking } = state;
     const [visRedigerModal, setVisRedigerModal] = useState(false);
     const [visSkiftKodeModal, setVisSkiftKodeModal] = useState(false);
+    const [updatingPref, setUpdatingPref] = useState(false);
+
+    const handleUpdateLinkPreference = async (mode: string) => {
+        if (!currentUser || updatingPref) return;
+        setUpdatingPref(true);
+        try {
+            const updatedUser = await api.patch<any>('/kerne/me/', { preferred_link_open_mode: mode });
+            dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
+        } catch (e) {
+            console.error("Fejl ved opdatering af præference:", e);
+        } finally {
+            setUpdatingPref(false);
+        }
+    };
 
     if (isAuthChecking) {
         return (
@@ -43,72 +59,132 @@ function MinKontoPage(): ReactElement {
     else if (currentUser.is_staff) rolleTekst = "Personale";
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">Min Konto</h1>
+        <div className="p-4 max-w-3xl mx-auto">
+            <h1 className="text-xl font-bold text-gray-800 mb-4">Min Konto</h1>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
 
                 {/* Profil Kort */}
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex justify-between items-start mb-4">
-                        <h2 className="text-lg font-semibold text-gray-700 flex items-center">
-                            <UserCircle size={24} className="mr-2 text-blue-600" />
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
+                    <div className="flex justify-between items-start mb-3">
+                        <h2 className="text-base font-semibold text-gray-700 flex items-center">
+                            <UserCircle size={20} className="mr-2 text-blue-600" />
                             Personlige Oplysninger
                         </h2>
-                        <Button onClick={() => setVisRedigerModal(true)} variant="secondary" className="text-xs">
+                        <Button onClick={() => setVisRedigerModal(true)} variant="secondary" className="text-xs py-1 h-7">
                             Rediger
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fornavn</label>
-                            <div className="text-gray-900 text-lg">{currentUser.first_name || "-"}</div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Fornavn</label>
+                            <div className="text-gray-900 font-medium">{currentUser.first_name || "-"}</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Efternavn</label>
-                            <div className="text-gray-900 text-lg">{currentUser.last_name || "-"}</div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Efternavn</label>
+                            <div className="text-gray-900 font-medium">{currentUser.last_name || "-"}</div>
                         </div>
                         <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Email</label>
                             <div className="flex items-center text-gray-900">
-                                <Mail size={16} className="mr-2 text-gray-400" />
+                                <Mail size={14} className="mr-2 text-gray-400" />
                                 {currentUser.email}
                             </div>
                         </div>
 
                         {/* Extended Profile Fields */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Arbejdstelefon</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Arbejdstelefon</label>
                             <div className="text-gray-900">{currentUser.work_phone || "-"}</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Privat telefon</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Privat telefon</label>
                             <div className="text-gray-900">{currentUser.private_phone || "-"}</div>
                         </div>
                         <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Privat adresse</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Privat adresse</label>
                             <div className="text-gray-900 whitespace-pre-wrap">{currentUser.private_address || "-"}</div>
                         </div>
                     </div>
                 </div>
 
+                {/* Indstillinger Kort */}
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
+                    <h2 className="text-base font-semibold text-gray-700 flex items-center mb-3">
+                        <Settings size={20} className="mr-2 text-gray-600" />
+                        Indstillinger
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <div className="flex items-center mb-2">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mr-2">
+                                    Hvordan vil du åbne linkede dokumenter?
+                                </label>
+                                <Tooltip content={
+                                    <div className="text-xs">
+                                        <p className="mb-2 italic border-b border-gray-600 pb-1">Gælder, når du åbner dokumenter linket til en aktivitet fra aktivitetslisten.</p>
+                                        <p className="font-bold mb-1">Nyt Vindue:</p>
+                                        <p className="mb-2">Åbner dokumentet i et 'popup' vindue uden browserens værktøjslinjer. Godt hvis du har flere skærme.</p>
+                                        <p className="font-bold mb-1">Ny Fane:</p>
+                                        <p>Åbner dokumentet i en helt ny fane i din browser. Standard adfærd for de fleste hjemmesider.</p>
+                                    </div>
+                                }>
+                                    <CircleHelp size={14} className="text-gray-400 hover:text-blue-500 cursor-help" />
+                                </Tooltip>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    onClick={() => handleUpdateLinkPreference('window')}
+                                    className={`flex-1 flex items-center p-3 border rounded-md transition-all ${currentUser.preferred_link_open_mode === 'window'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                                        }`}
+                                >
+                                    <AppWindow size={18} className={`mr-3 ${currentUser.preferred_link_open_mode === 'window' ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <div className="text-left">
+                                        <div className="text-sm font-semibold">Nyt Vindue</div>
+                                        <div className="text-[10px] text-gray-500">Åbner som en popup</div>
+                                    </div>
+                                    {currentUser.preferred_link_open_mode === 'window' && <div className="ml-auto w-2 h-2 rounded-full bg-blue-600"></div>}
+                                </button>
+
+                                <button
+                                    onClick={() => handleUpdateLinkPreference('tab')}
+                                    className={`flex-1 flex items-center p-3 border rounded-md transition-all ${currentUser.preferred_link_open_mode === 'tab'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                                        }`}
+                                >
+                                    <ExternalLink size={18} className={`mr-3 ${currentUser.preferred_link_open_mode === 'tab' ? 'text-blue-600' : 'text-gray-400'}`} />
+                                    <div className="text-left">
+                                        <div className="text-sm font-semibold">Ny Fane</div>
+                                        <div className="text-[10px] text-gray-500">Åbner i en ny browserfane</div>
+                                    </div>
+                                    {currentUser.preferred_link_open_mode === 'tab' && <div className="ml-auto w-2 h-2 rounded-full bg-blue-600"></div>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Sikkerhed Kort */}
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-700 flex items-center mb-4">
-                        <Shield size={24} className="mr-2 text-green-600" />
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
+                    <h2 className="text-base font-semibold text-gray-700 flex items-center mb-3">
+                        <Shield size={20} className="mr-2 text-green-600" />
                         Adgang og Sikkerhed
                     </h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-gray-100 pb-6 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100 pb-4 mb-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Brugernavn</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Brugernavn</label>
                             <div className="text-gray-900">{currentUser.username}</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Rolle i systemet</label>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Rolle i systemet</label>
                             <div className="flex items-center">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${currentUser.is_superuser ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${currentUser.is_superuser ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                                     {rolleTekst}
                                 </span>
                             </div>
@@ -116,16 +192,41 @@ function MinKontoPage(): ReactElement {
                     </div>
 
                     <div>
-                        <h3 className="text-sm font-medium text-gray-900 mb-2">Adgangskode</h3>
-                        <div className="flex items-center justify-between bg-gray-50 p-4 rounded-md border border-gray-200">
+                        <h3 className="text-xs font-bold text-gray-900 mb-2">Adgangskode</h3>
+                        <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md border border-gray-200">
                             <div className="flex items-center">
-                                <Key size={20} className="text-gray-400 mr-3" />
+                                <Key size={16} className="text-gray-400 mr-3" />
                                 <span className="text-gray-600 text-sm">********</span>
                             </div>
-                            <Button onClick={() => setVisSkiftKodeModal(true)} variant="secondary" className="text-xs">
+                            <Button onClick={() => setVisSkiftKodeModal(true)} variant="secondary" className="text-xs py-1 h-7">
                                 Skift kode
                             </Button>
                         </div>
+                    </div>
+                </div>
+
+                {/* Support Kort */}
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
+                    <h2 className="text-base font-semibold text-gray-700 flex items-center mb-3">
+                        <Monitor size={20} className="mr-2 text-orange-600" />
+                        Support & Hjælp
+                    </h2>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-50 p-3 rounded-md border border-orange-200 gap-3">
+                        <div className="flex flex-col">
+                            <span className="text-gray-800 text-sm font-bold">Teknisk Support</span>
+                            <span className="text-gray-600 text-xs mt-0.5">
+                                Hvis supporten beder om adgang til din skærm, kan du bruge dette link.
+                            </span>
+                        </div>
+                        <a
+                            href="https://remotedesktop.google.com/support/?pli=1"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 shrink-0"
+                        >
+                            Fjernstyring support
+                        </a>
                     </div>
                 </div>
 

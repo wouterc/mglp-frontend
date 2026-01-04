@@ -34,6 +34,7 @@ export interface SkabAktivitet {
   informations_kilde_id?: number | null;
   mail_titel?: string | null;
   er_ny?: boolean;
+  dokumenter?: number[]; // IDs of linked SkabDokumenter
 }
 
 export interface Status {
@@ -199,6 +200,9 @@ export interface Aktivitet {
   skabelon_mail_titel?: string | null;
   er_ny?: boolean;
   skal_mailes?: boolean;
+  dokumenter?: number[]; // IDs of linked SagsDokumenter
+  har_links?: boolean;
+  links_status?: 'red' | 'green' | null;
 }
 
 export interface AktiviteterFilterState {
@@ -297,6 +301,7 @@ export interface SkabDokument {
   informations_kilde_id?: number | null;
   mail_titel?: string | null;
   er_ny?: boolean;
+  dokumenter?: number[]; // IDs of linked SkabDokumenter
 }
 
 export interface DokumentskabelonerFilterState {
@@ -317,6 +322,7 @@ export interface User {
   work_phone?: string;
   private_phone?: string;
   private_address?: string;
+  preferred_link_open_mode?: 'window' | 'tab' | null;
   is_online?: boolean;
   last_seen?: string;
 }
@@ -351,6 +357,8 @@ export interface SagsDokument {
   mail_titel?: string | null;
   oprettet_dato: string;
   skal_mailes?: boolean;
+  aktiviteter?: number[]; // IDs of linked Aktiviteter (reverse relation)
+  har_links?: boolean;
 }
 
 export interface MailSkabelon {

@@ -1,11 +1,11 @@
 // --- Fil: src/pages/DokumenterPage.tsx ---
-import React, { ReactElement, useEffect, useState } from 'react';
+import React, { ReactElement, useEffect, useState, useRef } from 'react';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { Sag } from '../types';
 import DokumenterTab from '../components/sagsdetaljer/tabs/DokumenterTab';
 import { Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface DokumenterPageProps {
   sagId: number | null;
@@ -15,36 +15,55 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const { state, dispatch } = useAppState();
   const { valgtSag } = state;
   const navigate = useNavigate();
+  const location = useLocation(); // @# Added hook
+
+  // @# Resolve effective sagId (prop > URL)
+  const queryParams = new URLSearchParams(location.search);
+  const urlSagId = queryParams.get('sag_id');
+  const effectiveSagId = sagId || (urlSagId ? parseInt(urlSagId, 10) : null);
 
   const [localSag, setLocalSag] = useState<Sag | null>(valgtSag);
-  const [loading, setLoading] = useState(!valgtSag && !!sagId);
+  const [loading, setLoading] = useState(!valgtSag && !!effectiveSagId);
+
+  const hasToggledRef = useRef(false);
+
+  // Luk filter-menuen som standard når siden åbnes
+  useEffect(() => {
+    if (hasToggledRef.current) return;
+
+    if (state.erFilterMenuAaben) {
+      dispatch({ type: 'TOGGLE_FILTER_MENU' });
+      hasToggledRef.current = true;
+    }
+    // Vi vil kun køre dette ved mount, så vi ignorerer dependency-warning
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   useEffect(() => {
-    // 1. Hvis valgtSag matcher sagId, brug den øjeblikkeligt
-    if (valgtSag && valgtSag.id === sagId) {
+    if (!effectiveSagId) return;
+
+    // 1. Hvis valgtSag matcher sagId, brug den og stop fetch
+    if (valgtSag && valgtSag.id === effectiveSagId) {
       setLocalSag(valgtSag);
       setLoading(false);
-    } else if (sagId) {
-      // Kun vis loader hvis vi ikke har sagen i cache overhovedet
-      if (!valgtSag || valgtSag.id !== sagId) {
-        setLoading(true);
-      }
+      return;
     }
 
-    // 2. Hent/opdater altid sags-data i baggrunden hvis vi har et sagId
-    if (sagId) {
-      api.get<Sag>(`/sager/${sagId}/`).then(data => {
-        setLocalSag(data);
-        dispatch({ type: 'SET_VALGT_SAG', payload: data });
-        setLoading(false);
-      }).catch(err => {
-        console.error("Fejl ved hentning af sag i DokumenterPage:", err);
-        setLoading(false);
-      });
-    }
-  }, [sagId, valgtSag?.id, dispatch]); // @# Kun reager på id ændring
+    // 2. Fetch hvis vi mangler sagen eller id ikke matcher
+    setLoading(true);
+    api.get<Sag>(`/sager/${effectiveSagId}/`).then(data => {
+      setLocalSag(data);
+      dispatch({ type: 'SET_VALGT_SAG', payload: data });
+      setLoading(false);
+    }).catch(err => {
+      console.error("Fejl ved hentning af sag i DokumenterPage:", err);
+      setLoading(false);
+    });
 
-  if (!sagId) {
+  }, [effectiveSagId, valgtSag, dispatch]);
+
+  if (!effectiveSagId) {
     return (
       <div className="p-12 text-center text-gray-500 bg-white m-6 rounded-lg shadow-sm">
         <h1 className="text-2xl font-bold mb-4">Dokumentoversigt</h1>

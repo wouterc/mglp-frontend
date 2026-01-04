@@ -52,7 +52,11 @@ export default function MailKurvPage(): ReactElement {
                     <div className="text-xs text-gray-500 mb-2">
                         Vælg en sag for at se og redigere mail-kurven.
                     </div>
-                    <CaseSelector value={valgtSag?.id || null} onChange={handleSelectSag} />
+                    <CaseSelector
+                        value={valgtSag?.id || null}
+                        onChange={handleSelectSag}
+                        label={valgtSag ? `${valgtSag.sags_nr}${valgtSag.alias ? ' - ' + valgtSag.alias : ''}` : undefined}
+                    />
                 </div>
 
                 <div className="flex-1 overflow-y-auto">

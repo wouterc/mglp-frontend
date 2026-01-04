@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2 } from 'lucide-react';
+import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2, Link as LinkIcon } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import { Aktivitet, User, Status, InformationsKilde } from '../../types';
@@ -14,6 +14,7 @@ interface AktivitetRowProps {
     onEditComment: (aktivitet: Aktivitet) => void;
     onEditResultat?: (aktivitet: Aktivitet) => void;
     onGemTilSkabelon?: (aktivitet: Aktivitet) => void;
+    onLinkClick?: (aktivitet: Aktivitet) => void; // @# New Prop
     informationsKilder: InformationsKilde[];
     isActive?: boolean;
     onFocus?: () => void;
@@ -71,6 +72,7 @@ function AktivitetRow({
     onEditComment,
     onEditResultat,
     onGemTilSkabelon,
+    onLinkClick, // @# New Prop
     informationsKilder,
     isActive,
     onFocus,
@@ -162,6 +164,20 @@ function AktivitetRow({
                                 <Info size={14} className="text-amber-500 cursor-help" />
                             </Tooltip>
                         )}
+                    </div>
+                    <div className="w-5 flex justify-center">
+                        {/* Link Icon */}
+                        <Tooltip content={aktivitet.har_links ? "Vis linkede dokumenter" : "Link dokumenter"}>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onLinkClick?.(aktivitet); }}
+                                className={`p-0.5 rounded transition-colors ${aktivitet.har_links
+                                    ? (aktivitet.links_status === 'red' ? 'text-red-500 hover:bg-red-50 font-bold' : 'text-green-600 hover:bg-green-50 font-bold')
+                                    : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
+                                    }`}
+                            >
+                                <LinkIcon size={16} fill={aktivitet.har_links ? "currentColor" : "none"} />
+                            </button>
+                        </Tooltip>
                     </div>
                     <div className="w-5 flex justify-center">
                         <Tooltip content={aktivitet.kommentar || "Tilføj kommentar"}>
@@ -267,7 +283,7 @@ function AktivitetRow({
                     ))}
                 </select>
             </td>
-        </tr>
+        </tr >
     );
 }
 

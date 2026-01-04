@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeEvent } from 'react';
 import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
+import LinkingTab from '../components/skabeloner/LinkingTab';
 import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2 } from 'lucide-react';
 import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState } from '../types.ts';
 import { useAppState } from '../StateContext.js';
@@ -96,6 +97,7 @@ function DokumentskabelonerPage(): ReactElement {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
   const [visForm, setVisForm] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'oversigt' | 'linking'>('oversigt');
   const [dokumentTilRedigering, setDokumentTilRedigering] = useState<SkabDokument | null>(null);
 
   // State til den celle der lige nu redigeres
@@ -381,7 +383,10 @@ function DokumentskabelonerPage(): ReactElement {
     <div className="flex flex-col h-screen bg-gray-100">
       {/* Header */}
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
-        <h2 className="text-2xl font-bold text-gray-800">Dokumentskabeloner</h2>
+        <div className="flex items-baseline gap-6">
+          <h2 onClick={() => setActiveTab('oversigt')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'oversigt' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Dokumentskabeloner</h2>
+          <h2 onClick={() => setActiveTab('linking')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'linking' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Link Aktiviteter</h2>
+        </div>
         <div className="flex space-x-2">
           {(nyeDokumenterFindes || isSyncingAlle) && (
             <button
@@ -406,7 +411,7 @@ function DokumentskabelonerPage(): ReactElement {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className={`flex flex-1 overflow-hidden relative ${activeTab === 'oversigt' ? '' : 'hidden'}`}>
         {/* Sidebar - Grupper */}
         <div
           className="bg-white border-r border-gray-200 flex flex-col flex-shrink-0 relative transition-all duration-75"
@@ -783,6 +788,9 @@ function DokumentskabelonerPage(): ReactElement {
             </div>
           </div>
         </div>
+      </div>
+      <div className={`flex-1 overflow-hidden ${activeTab === 'linking' ? 'flex' : 'hidden'}`}>
+        <LinkingTab blokinfo={blokinfo} />
       </div>
 
       {visForm && (

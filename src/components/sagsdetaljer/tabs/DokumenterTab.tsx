@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Sag, SagsDokument, Blokinfo, InformationsKilde } from '../../../types';
 import { api } from '../../../api';
@@ -37,6 +37,22 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const { state, dispatch } = useAppState();
     const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner } = state;
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const handleLinkClick = (doc: SagsDokument) => {
+        if (!doc.aktiviteter || doc.aktiviteter.length === 0) return;
+        const width = 1200;
+        const height = 800;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+
+        const ids = doc.aktiviteter.join(',');
+        window.open(
+            `/sager/${sag.id}/aktiviteter?ids=${ids}`,
+            `LinkedActivities_Window`,
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+        );
+    };
 
     // Master Groups from global state
     const masterGroups = useMemo(() => {
@@ -159,7 +175,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            await api.post(`/ sager / ${sag.id} /synkroniser_dokumenter/`);
+            await api.post(`/sager/${sag.id}/synkroniser_dokumenter/`);
             await fetchDokumenter(true);
             setNyeDokumenterFindes(false);
             if (onUpdate) onUpdate();
@@ -194,7 +210,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 formData.append('status_id', status80.id.toString());
             }
 
-            await api.patch(`/ sager / sagsdokumenter / ${docId}/`, formData);
+            await api.patch(`/sager/sagsdokumenter/${docId}/`, formData);
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Upload fejl:", e);
@@ -413,9 +429,19 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             // Aktiv Filter
             if (filters.aktiv_filter === 'kun_aktive' && !doc.aktiv) return false;
 
+
             // Tekst Søgning (Title, Filename, GroupName, Number)
             const query = filters.tekst.toLowerCase();
             const fullNumber = `${doc.gruppe_nr || ''}.${doc.dokument_nr || ''}`;
+
+            // @# Linked Data ID Filter
+            const searchParams = new URLSearchParams(location.search);
+            const idsParam = searchParams.get('ids');
+            if (idsParam) {
+                const ids = idsParam.split(',').map(Number);
+                if (!ids.includes(doc.id)) return false;
+            }
+
             const matchesText = !query || (
                 (doc.titel && doc.titel.toLowerCase().includes(query)) ||
                 (doc.filnavn && doc.filnavn.toLowerCase().includes(query)) ||
@@ -534,7 +560,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             .sort((a, b) => a.nr - b.nr);
 
         return { processedGroups: result, globalStats };
-    }, [cachedDocs, filters, masterGroups, sag]);
+    }, [cachedDocs, filters, masterGroups, sag, location.search]);
 
     const handleExpandAll = () => {
         const allKeys: Record<string, boolean> = {};
@@ -603,7 +629,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
                     {/* Sag Search Box (Skift sag) */}
                     <div className="min-w-72">
-                        <CaseSelector value={sag.id} onChange={handleSelectSag} />
+                        <CaseSelector
+                            value={sag.id}
+                            onChange={handleSelectSag}
+                            label={`${sag.sags_nr}${sag.alias ? ' - ' + sag.alias : ''}`}
+                        />
                     </div>
                 </div>
 
@@ -681,6 +711,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 onRename={openRenameModal}
                                                 onInlineSave={handleInlineSave}
                                                 onSaveToTemplate={handleGemTilSkabelon}
+                                                onLinkClick={handleLinkClick}
                                                 informationsKilder={informationsKilder}
                                                 isActive={activeRow === doc.id}
                                                 onFocus={() => setActiveRow(doc.id)}

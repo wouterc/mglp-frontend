@@ -317,7 +317,11 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                         </h2>
                     </div>
 
-                    <CaseSelector value={sagId} onChange={handleSelectSag} />
+                    <CaseSelector
+                        value={sagId}
+                        onChange={handleSelectSag}
+                        label={valgtSag && valgtSag.id === sagId ? `${valgtSag.sags_nr}${valgtSag.alias ? ' - ' + valgtSag.alias : ''}` : undefined}
+                    />
 
                     <div className="space-y-2">
                         <div className="relative">
@@ -558,10 +562,10 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                                                             <tr
                                                                 key={doc.id}
                                                                 className={`transition-colors border-b border-gray-100 ${dragOverDocId === doc.id
-                                                                        ? 'bg-blue-100 ring-2 ring-inset ring-blue-500 z-10'
-                                                                        : doc.fil
-                                                                            ? 'bg-white hover:bg-gray-50'
-                                                                            : 'bg-gray-50/50 hover:bg-gray-100'
+                                                                    ? 'bg-blue-100 ring-2 ring-inset ring-blue-500 z-10'
+                                                                    : doc.fil
+                                                                        ? 'bg-white hover:bg-gray-50'
+                                                                        : 'bg-gray-50/50 hover:bg-gray-100'
                                                                     }`}
                                                                 onDragOver={(e) => handleDragOverDoc(e, doc.id)}
                                                                 onDrop={(e) => handleDropOnDoc(e, doc)}

@@ -135,6 +135,10 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/glemt-adgangskode" element={<GlemtAdgangskodePage />} />
+      <Route path="/reset-password/:uid/:token" element={<NulstilAdgangskodePage />} />
+
       <Route path="/chat-popup" element={<div className="h-screen bg-gray-100 overflow-hidden"><KommunikationPage /></div>} />
       <Route path="*" element={
         <Layout

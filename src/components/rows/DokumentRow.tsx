@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink } from 'lucide-react';
+import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import { SagsDokument, Sag, User, InformationsKilde } from '../../types';
@@ -18,6 +18,7 @@ interface DokumentRowProps {
     onSaveToTemplate: (doc: SagsDokument) => void;
     statusser: any[];
     onStatusToggle: (doc: SagsDokument) => void;
+    onLinkClick?: (doc: SagsDokument) => void; // @# New Prop
     informationsKilder: InformationsKilde[];
     isActive?: boolean;
     onFocus?: () => void;
@@ -36,6 +37,7 @@ const DokumentRow = React.memo(function DokumentRow({
     onSaveToTemplate,
     statusser,
     onStatusToggle,
+    onLinkClick, // @# New Prop
     informationsKilder,
     isActive,
     onFocus,
@@ -184,13 +186,23 @@ const DokumentRow = React.memo(function DokumentRow({
 
                     {/* Slot 2: Link */}
                     <div className="w-4 flex justify-center">
-                        {processedLink ? (
+                        {doc.har_links && (
+                            <Tooltip content="Vis linkede aktiviteter">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onLinkClick?.(doc); }}
+                                    className="text-blue-600 hover:text-blue-800"
+                                >
+                                    <LinkIcon size={14} />
+                                </button>
+                            </Tooltip>
+                        )}
+                        {!doc.har_links && processedLink ? (
                             <div className="relative group/extlink inline-block">
                                 <a href={processedLink} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700" onClick={(e) => e.stopPropagation()}>
                                     <ExternalLink size={14} />
                                 </a>
                             </div>
-                        ) : <div className="w-4 h-4" />}
+                        ) : !doc.har_links && <div className="w-4 h-4" />}
                     </div>
 
                     {/* Slot 3: User Comment */}

@@ -4,6 +4,7 @@
 // @# 2025-11-03 21:10 - Tilføjet useEffect til at gen-hente åbne grupper ved filter-ændring.
 // @# 2025-12-25 20:30 - Refactoring: Added internal FilterSidebar, CaseSelector, and AktivitetRow.
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, useRef, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail } from 'lucide-react';
 import { useAppState } from '../StateContext';
@@ -15,6 +16,10 @@ import AktiviteterFilter from '../components/AktiviteterFilter';
 import AktivitetRow from '../components/rows/AktivitetRow';
 import CaseSelector from '../components/ui/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import ActivityDocumentLinkerModal from '../components/modals/ActivityDocumentLinkerModal'; // @# New Import
+import { SagsDokument } from '../types'; // @# New Import
+import { Link as LinkIcon } from 'lucide-react'; // @# New Import
+import LinkOpenPreferenceModal from '../components/modals/LinkOpenPreferenceModal';
 
 
 interface AktiviteterPageProps {
@@ -24,6 +29,7 @@ interface AktiviteterPageProps {
 // --- Hovedkomponent ---
 function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const { state, dispatch } = useAppState();
+    const location = useLocation();
     const { valgtSag, hentedeAktiviteter, gruppeLoadingStatus, aktiviteterIsLoading, aktiviteterFilters, aktiviteterUdvidedeGrupper, cachedAktiviteter, users: colleagues, aktivitetStatusser, informationsKilder } = state;
 
     // UI State
@@ -36,6 +42,61 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     // Modal states
     const [confirmTemplateActivity, setConfirmTemplateActivity] = useState<Aktivitet | null>(null);
     const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean; title: string; message: string; type?: 'info' | 'success' | 'error' } | null>(null);
+
+
+    // State for Link Preference Modal
+    const [showLinkPreferenceModal, setShowLinkPreferenceModal] = useState<{ aktivitet: Aktivitet } | null>(null);
+
+    const openLinkApp = useCallback((aktivitet: Aktivitet, mode: 'window' | 'tab') => {
+        if (!valgtSag) return;
+        const ids = aktivitet.dokumenter?.join(',');
+        const url = `/dokumenter?sag_id=${valgtSag.id}&ids=${ids}`;
+
+        if (mode === 'window') {
+            const width = 1200;
+            const height = 800;
+            const left = (window.screen.width - width) / 2;
+            const top = (window.screen.height - height) / 2;
+            window.open(url, `LinkedDocuments_Window`, `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+        } else {
+            window.open(url, '_blank');
+        }
+    }, [valgtSag]);
+
+    const handleLinkAppClick = (aktivitet: Aktivitet) => {
+        if (!aktivitet.dokumenter || aktivitet.dokumenter.length === 0 || !valgtSag) return;
+
+        // 1. Check user preference from currentUser (global state)
+        // Note: We need to access currentUser from state.currentUser (useAppState)
+        const userPref = state.currentUser?.preferred_link_open_mode;
+
+        if (userPref) {
+            openLinkApp(aktivitet, userPref);
+        } else {
+            // 2. No preference -> Show Modal
+            setShowLinkPreferenceModal({ aktivitet });
+        }
+    };
+
+    const handleSaveLinkPreference = (mode: 'window' | 'tab') => {
+        if (!showLinkPreferenceModal) return;
+
+        // 1. Open immediately to avoid opup blocker (must be sync with user click)
+        const { aktivitet } = showLinkPreferenceModal;
+        openLinkApp(aktivitet, mode);
+
+        setShowLinkPreferenceModal(null);
+
+        // 2. Save to backend in background
+        api.patch<User>('/kerne/me/', { preferred_link_open_mode: mode })
+            .then(updatedUser => {
+                // Update global state
+                dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
+            })
+            .catch(e => {
+                console.error("Kunne ikke gemme præference", e);
+            });
+    };
 
 
     const tableRef = useRef<HTMLTableElement>(null);
@@ -279,6 +340,15 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             if (filters.informations_kilde && a.informations_kilde?.id.toString() !== filters.informations_kilde.toString()) continue;
 
             // If we reached here, it's filtered IN
+            // If we reached here, it's filtered IN
+            // @# ID Filtering
+            const searchParams = new URLSearchParams(location.search);
+            const idsParam = searchParams.get('ids');
+            if (idsParam) {
+                const ids = idsParam.split(',').map(Number);
+                if (!ids.includes(a.id)) continue;
+            }
+
             g.filteredAktiviteter.push(a);
             g.filtered_aktiv_count++;
             if (a.status?.status_kategori === 1) {
@@ -305,7 +375,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             samletTaeling: { total: samletTotal, faerdige: samletFaerdige }
         };
 
-    }, [allActivities, aktiviteterFilters, valgtSag]);
+    }, [allActivities, aktiviteterFilters, valgtSag, location.search]);
 
 
     const handleToggleAlleGrupper = (vis: boolean) => {
@@ -458,13 +528,18 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                         </button>
                                     </Tooltip>
                                 )}
+
                             </div>
                         </div>
 
                     </div>
 
                     <div className="min-w-72">
-                        <CaseSelector value={valgtSag?.id || null} onChange={handleSelectSag} />
+                        <CaseSelector
+                            value={valgtSag?.id || null}
+                            onChange={handleSelectSag}
+                            label={valgtSag ? `${valgtSag.sags_nr}${valgtSag.alias ? ' - ' + valgtSag.alias : ''}` : undefined}
+                        />
                     </div>
                 </div>
 
@@ -528,6 +603,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 onEditComment={handleEditComment}
                                                 onEditResultat={handleEditResultat}
                                                 onGemTilSkabelon={handleGemTilSkabelon}
+                                                onLinkClick={handleLinkAppClick}
                                                 informationsKilder={informationsKilder}
                                                 isActive={activeRow === aktivitet.id}
                                                 onFocus={() => setActiveRow(aktivitet.id)}
@@ -604,7 +680,18 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 isDestructive={feedbackModal?.type === 'error'}
             />
 
-        </div >
+            {/* Link Preference Modal */}
+            {showLinkPreferenceModal && (
+                <LinkOpenPreferenceModal
+                    isOpen={!!showLinkPreferenceModal}
+                    onSave={handleSaveLinkPreference}
+                    onClose={() => setShowLinkPreferenceModal(null)}
+                />
+            )}
+
+
+
+        </div>
     );
 }
 
