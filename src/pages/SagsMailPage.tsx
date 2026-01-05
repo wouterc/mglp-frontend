@@ -327,11 +327,14 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                             <input
+                                id="sagsmail-search-input"
+                                name="sagsmail-search-input"
                                 type="text"
                                 placeholder="Søg i mail..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
                                 className="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                                aria-label="Søg i mail"
                             />
                         </div>
 
@@ -523,11 +526,14 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                                         <div className="relative w-40">
                                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
                                             <input
+                                                id="sagsmail-doc-search-input"
+                                                name="sagsmail-doc-search-input"
                                                 type="text"
                                                 placeholder="Søg dok..."
                                                 value={docSearch}
                                                 onChange={e => setDocSearch(e.target.value)}
                                                 className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                aria-label="Søg efter dokument"
                                             />
                                         </div>
                                         <button onClick={() => setShowDocPanel(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
@@ -641,21 +647,27 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                         </label>
                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
                             <input
+                                id="edit-mail-comment-important"
+                                name="edit-mail-comment-important"
                                 type="checkbox"
                                 checked={editCommentImportant}
                                 onChange={(e) => setEditCommentImportant(e.target.checked)}
                                 className="rounded text-red-600 focus:ring-red-500"
+                                aria-label="Marker som vigtig"
                             />
                             <span className={editCommentImportant ? "font-bold text-red-600" : ""}>Vigtig / Obs</span>
                         </label>
                     </div>
                     <textarea
+                        id="edit-mail-comment-textarea"
+                        name="edit-mail-comment-textarea"
                         autoFocus
                         rows={6}
                         className={`w-full border rounded-md shadow-sm p-2 text-sm placeholder-gray-400 outline-none transition-all ${editCommentImportant ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'}`}
                         value={editCommentText}
                         onChange={(e) => setEditCommentText(e.target.value)}
                         placeholder="Skriv din kommentar her..."
+                        aria-label="Kommentar tekst"
                     />
                 </div>
             </Modal>

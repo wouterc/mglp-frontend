@@ -160,6 +160,8 @@ function SagsdetaljerLayout({
                 <div className="flex-1 max-w-md relative" ref={searchRef}>
                     <div className="relative">
                         <input
+                            id="sagsdetaljer-search-input"
+                            name="sagsdetaljer-search-input"
                             type="text"
                             placeholder="Søg sag (nr, alias)..."
                             value={searchTerm}
@@ -167,6 +169,7 @@ function SagsdetaljerLayout({
                             onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
                             onKeyDown={handleKeyDown}
                             className="w-full pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-md text-sm transition-all"
+                            aria-label="Søg sag"
                         />
                         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
                             {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}

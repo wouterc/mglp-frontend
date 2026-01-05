@@ -100,7 +100,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
             {/* Topbar: Rådgiver sagsnummer */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Rådgiverens sagsnummer</label>
+                    <label htmlFor="raadgiver_sagsnr" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Rådgiverens sagsnummer</label>
                     {isSavingSagsNr && (
                         <div className="flex items-center text-blue-500 text-xs font-medium animate-pulse">
                             <Loader2 size={12} className="animate-spin mr-1" />
@@ -111,6 +111,8 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                 <div className="flex gap-2 max-w-md">
                     <div className="relative flex-grow">
                         <input
+                            id="raadgiver_sagsnr"
+                            name="raadgiver_sagsnr"
                             type="text"
                             value={localSagsNr}
                             onChange={(e) => setLocalSagsNr(e.target.value)}
@@ -121,6 +123,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                             }}
                             placeholder="Indtast sagsnr..."
                             className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                            aria-label="Rådgiverens sagsnummer"
                         />
                     </div>
                     {sag.raadgiver_sagsnr && (
@@ -191,15 +194,18 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
                             <User size={24} className="mr-3 text-gray-400" />
-                            Primær Rådgiver
+                            <label htmlFor="raadgiver_kontakt_id">Primær Rådgiver</label>
                             {isSaving && <Loader2 size={16} className="ml-2 animate-spin text-blue-600" />}
                         </h2>
                     </div>
 
                     <select
+                        id="raadgiver_kontakt_id"
+                        name="raadgiver_kontakt_id"
                         value={sag.raadgiver_kontakt?.id || ''}
                         onChange={(e) => saveSagUpdate({ raadgiver_kontakt_id: e.target.value ? parseInt(e.target.value) : null })}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm"
+                        aria-label="Vælg primær rådgiver"
                     >
                         <option value="">Vælg primær rådgiver...</option>
                         {alleRaadgiverKontakter.map(k => (

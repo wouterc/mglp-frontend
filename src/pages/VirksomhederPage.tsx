@@ -287,12 +287,15 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
             <div className="mb-4 py-4 px-2 bg-gray-50 rounded-lg border border-gray-200 flex">
                 <div className="relative w-[25%] pr-4">
                     <input
+                        id="filter-navn"
                         type="text"
                         name="navn"
                         placeholder="Filtrer på navn..."
                         value={virksomhederFilters.navn}
                         onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
+                        aria-label="Filtrer på navn"
+                        autoComplete="off"
                     />
                     {virksomhederFilters.navn && (
                         <button onClick={() => handleFilterChange({ target: { name: 'navn', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
@@ -303,12 +306,15 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
                 <div className="relative w-[15%] pr-4">
                     <input
+                        id="filter-afdeling"
                         type="text"
                         name="afdeling"
                         placeholder="Filtrer på afdeling..."
                         value={virksomhederFilters.afdeling}
                         onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
+                        aria-label="Filtrer på afdeling"
+                        autoComplete="off"
                     />
                     {virksomhederFilters.afdeling && (
                         <button onClick={() => handleFilterChange({ target: { name: 'afdeling', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
@@ -319,10 +325,12 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
                 <div className="relative w-[10%] pr-4">
                     <select
+                        id="filter-gruppe"
                         name="gruppe"
                         value={virksomhederFilters.gruppe}
                         onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm bg-white"
+                        aria-label="Filtrer på gruppe"
                     >
                         <option value="">Alle grupper...</option>
                         {virksomhedGrupper.map(g => (
@@ -333,12 +341,15 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
                 <div className="relative w-[10%] pr-4">
                     <input
+                        id="filter-telefon"
                         type="text"
                         name="telefon"
                         placeholder="Filtrer på telefon..."
                         value={virksomhederFilters.telefon}
                         onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
+                        aria-label="Filtrer på telefon"
+                        autoComplete="off"
                     />
                     {virksomhederFilters.telefon && (
                         <button onClick={() => handleFilterChange({ target: { name: 'telefon', value: '' } } as any)} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">
@@ -349,12 +360,15 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
 
                 <div className="relative w-[35%] pr-2">
                     <input
+                        id="filter-email"
                         type="text"
                         name="email"
                         placeholder="Filtrer på email..."
                         value={virksomhederFilters.email}
                         onChange={handleFilterChange}
                         className="w-full p-2 border rounded-md text-sm pr-7"
+                        aria-label="Filtrer på email"
+                        autoComplete="off"
                     />
                     {virksomhederFilters.email && (
                         <button onClick={() => handleFilterChange({ target: { name: 'email', value: '' } } as any)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" title="Ryd felt">

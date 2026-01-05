@@ -177,6 +177,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                     </div>
 
                     <SearchableSelect
+                        id="vand_virksomhed_id"
+                        name="vand_virksomhed_id"
                         options={getOptions('vand')}
                         value={sag.vand_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'vand')}
@@ -201,6 +203,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                         )}
                     </div>
                     <SearchableSelect
+                        id="varme_virksomhed_id"
+                        name="varme_virksomhed_id"
                         options={getOptions('varme')}
                         value={sag.varme_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'varme')}
@@ -225,6 +229,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                         )}
                     </div>
                     <SearchableSelect
+                        id="spildevand_virksomhed_id"
+                        name="spildevand_virksomhed_id"
                         options={getOptions('spildevand')}
                         value={sag.spildevand_virksomhed?.id || null}
                         onChange={(id) => handleForsyningChange(id, 'spildevand')}

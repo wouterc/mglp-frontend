@@ -147,9 +147,12 @@ export default function LinkingTab({ blokinfo }: LinkingTabProps) {
                     </h3>
                     <div className="mt-2 space-y-2">
                         <select
+                            id="linking-proces-select"
+                            name="linkingProces"
                             className="w-full text-sm border p-1 rounded"
                             value={selectedProcesId}
                             onChange={(e) => setSelectedProcesId(e.target.value)}
+                            aria-label="Filtrer aktiviteter på proces"
                         >
                             <option value="">Alle processer</option>
                             {processes.map(p => <option key={p.id} value={p.id}>{p.nr} - {p.titel_kort}</option>)}
@@ -157,10 +160,13 @@ export default function LinkingTab({ blokinfo }: LinkingTabProps) {
                         <div className="relative">
                             <Search size={14} className="absolute left-2 top-2 text-gray-400" />
                             <input
+                                id="linking-act-search"
+                                name="linkingActSearch"
                                 className="w-full pl-8 text-sm border p-1 rounded"
                                 placeholder="Søg i aktiviteter..."
                                 value={actSearch}
                                 onChange={(e) => setActSearch(e.target.value)}
+                                aria-label="Søg i aktiviteter"
                             />
                         </div>
                     </div>
@@ -253,9 +259,12 @@ export default function LinkingTab({ blokinfo }: LinkingTabProps) {
                     <div className="p-3 bg-gray-50 border-b border-gray-200 flex gap-2">
                         <div className="w-1/3">
                             <select
+                                id="linking-doc-group-select"
+                                name="linkingDocGroup"
                                 className="w-full text-sm border p-1.5 rounded"
                                 value={selectedDocGroupId}
                                 onChange={(e) => setSelectedDocGroupId(e.target.value)}
+                                aria-label="Filtrer dokumenter på gruppe"
                             >
                                 <option value="">Alle grupper</option>
                                 {docGroups.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
@@ -264,10 +273,13 @@ export default function LinkingTab({ blokinfo }: LinkingTabProps) {
                         <div className="flex-1 relative">
                             <Search size={14} className="absolute left-2 top-2.5 text-gray-400" />
                             <input
+                                id="linking-doc-search"
+                                name="linkingDocSearch"
                                 className="w-full pl-8 text-sm border p-1 rounded"
                                 placeholder="Søg i dokumenter..."
                                 value={docSearch}
                                 onChange={(e) => setDocSearch(e.target.value)}
+                                aria-label="Søg i dokumenter"
                             />
                         </div>
                     </div>

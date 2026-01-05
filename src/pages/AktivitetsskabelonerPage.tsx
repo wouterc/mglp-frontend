@@ -630,7 +630,7 @@ function AktivitetsskabelonerPage(): ReactElement {
         >
           <div className="p-4 space-y-4">
             <div className="flex justify-between items-center">
-              <label className="block text-xs font-semibold text-gray-400 uppercase">Proces</label>
+              <div className="block text-xs font-semibold text-gray-400 uppercase">Proces</div>
               <button onClick={toggleSidebar} className="p-1 text-gray-400 hover:text-gray-600 rounded-md" title={isExpanded ? "Skjul menu" : "Vis menu"}>
                 {isExpanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
               </button>
@@ -638,10 +638,12 @@ function AktivitetsskabelonerPage(): ReactElement {
 
             <div>
               <select
+                id="filter-proces"
                 name="proces_nr"
                 value={filters.proces_nr}
                 onChange={handleFilterChange}
                 className="w-full p-2 border border-gray-200 rounded-md text-sm bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all font-medium"
+                aria-label="Vælg proces"
               >
                 <option value="">Alle processer</option>
                 {procesList.map(p => (
@@ -651,7 +653,7 @@ function AktivitetsskabelonerPage(): ReactElement {
             </div>
 
             <div className="border-t border-gray-100 pt-4">
-              <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Grupper</label>
+              <div className="block text-xs font-semibold text-gray-400 uppercase mb-2">Grupper</div>
               <div className="space-y-1">
                 {tilgaengeligeFilterGrupper.map(g => {
                   const isActive = filters.gruppe_nr === g.nr.toString();
@@ -690,13 +692,13 @@ function AktivitetsskabelonerPage(): ReactElement {
           <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between gap-4">
             <div className="flex-1 flex items-center gap-4">
               <div className="w-24">
-                <input type="text" name="aktivitet_nr" placeholder="Nr..." value={filters.aktivitet_nr} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm" />
+                <input id="filter-aktivitet-nr" type="text" name="aktivitet_nr" placeholder="Nr..." value={filters.aktivitet_nr} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm" aria-label="Filtrer på nummer" />
               </div>
               <div className="flex-1 max-w-md">
-                <input type="text" name="aktivitet" placeholder="Søg i aktiviteter..." value={filters.aktivitet} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm" />
+                <input id="filter-aktivitet-navn" type="text" name="aktivitet" placeholder="Søg i aktiviteter..." value={filters.aktivitet} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm" aria-label="Søg i aktiviteter" />
               </div>
               <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-600">
-                <input type="checkbox" checked={visUdgaaede} onChange={() => dispatch({ type: 'SET_AKTIVITETSSKABELONER_STATE', payload: { aktivitetsskabelonerVisUdgaaede: !visUdgaaede } })} className="h-4 w-4 rounded border-gray-300" />
+                <input id="filter-vis-udgaaede" type="checkbox" checked={visUdgaaede} onChange={() => dispatch({ type: 'SET_AKTIVITETSSKABELONER_STATE', payload: { aktivitetsskabelonerVisUdgaaede: !visUdgaaede } })} className="h-4 w-4 rounded border-gray-300" aria-label="Vis udgåede aktiviteter" />
                 <span>Vis udgåede</span>
               </label>
             </div>
@@ -780,7 +782,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                             />
                             {isCellActive('aktivitet_expanded') && (
                               <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-20 min-w-[400px]">
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Aktivitet Titel:</label>
+                                <div className="block text-xs font-bold mb-1 text-gray-500">Aktivitet Titel:</div>
                                 <textarea
                                   autoFocus
                                   value={activeCell?.value ?? ''}
@@ -807,7 +809,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                             />
                             {isCellActive('note_expanded') && (
                               <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-40 min-w-[400px]">
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</label>
+                                <div className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</div>
                                 <textarea
                                   autoFocus
                                   value={activeCell?.value ?? ''}
@@ -887,7 +889,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                             />
                             {isCellActive('mail_expanded') && (
                               <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 right-20 min-w-[400px]">
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Mail Titel:</label>
+                                <div className="block text-xs font-bold mb-1 text-gray-500">Mail Titel:</div>
                                 <textarea
                                   autoFocus
                                   value={activeCell?.value ?? ''}
@@ -904,11 +906,14 @@ function AktivitetsskabelonerPage(): ReactElement {
                           <td className="py-2 px-2 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <input
+                                id={`aktiv-checkbox-${a.id}`}
+                                name={`aktiv-${a.id}`}
                                 type="checkbox"
                                 checked={a.aktiv || false}
                                 onChange={() => handleToggleAktiv(a)}
                                 className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
                                 title="Aktiv / Deaktiver"
+                                aria-label="Toggle aktiv status"
                               />
                               <div className="flex items-center gap-1 min-w-[32px] justify-center">
                                 {manglerSync[a.id] && (
@@ -944,12 +949,15 @@ function AktivitetsskabelonerPage(): ReactElement {
                       <td colSpan={5} className="py-2 px-4">
                         <form onSubmit={handleQuickAdd} className="flex gap-2 items-center">
                           <input
+                            id="ny-aktivitet-navn"
+                            name="ny-aktivitet-navn"
                             type="text"
                             placeholder="Indtast navnet på den nye aktivitet her... (Enter for at gemme)"
                             value={nyAktivitetNavn}
                             onChange={(e) => setNyAktivitetNavn(e.target.value)}
                             className="flex-1 w-full bg-transparent border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 px-2 py-1 text-[11px] placeholder-gray-400"
                             disabled={isSavingNy}
+                            aria-label="Nyt aktivitet navn"
                           />
                           <button
                             type="submit"

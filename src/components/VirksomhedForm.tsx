@@ -241,12 +241,12 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
 
             <div>
               <label htmlFor="navn" className="block text-sm font-medium">Navn (Påkrævet)</label>
-              <input type="text" name="navn" value={formData.navn || ''} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="navn" name="navn" value={formData.navn || ''} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md" />
             </div>
 
             <div>
               <label htmlFor="afdeling" className="block text-sm font-medium">Afdeling</label>
-              <input type="text" name="afdeling" value={formData.afdeling || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="afdeling" name="afdeling" value={formData.afdeling || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
 
             <div>
@@ -254,6 +254,7 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
               <div className="flex items-center space-x-2 mt-1">
                 <input
                   type="text"
+                  id="cvr_nr"
                   name="cvr_nr"
                   value={formData.cvr_nr || ''}
                   onChange={handleChange}
@@ -276,6 +277,7 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
             <div>
               <label htmlFor="gruppe_id" className="block text-sm font-medium">Gruppe</label>
               <select
+                id="gruppe_id"
                 name="gruppe_id"
                 value={formData.gruppe_id || ''}
                 onChange={handleChange}
@@ -300,15 +302,15 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
             <legend className="text-lg font-medium px-2">Kontakt Info</legend>
             <div>
               <label htmlFor="telefon" className="block text-sm font-medium">Telefon</label>
-              <input type="text" name="telefon" value={formData.telefon || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="telefon" name="telefon" value={formData.telefon || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium">Email</label>
-              <input type="email" name="email" value={formData.email || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="email" id="email" name="email" value={formData.email || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div className="col-span-2">
               <label htmlFor="web" className="block text-sm font-medium">Web</label>
-              <input type="text" name="web" value={formData.web || ''} onChange={handleChange} placeholder="https://..." className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="web" name="web" value={formData.web || ''} onChange={handleChange} placeholder="https://..." className="mt-1 w-full p-2 border rounded-md" />
             </div>
           </fieldset>
 
@@ -322,21 +324,22 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
 
             <div className="md:col-span-3">
               <label htmlFor="adresse_vej" className="block text-sm font-medium">Vej og Nr.</label>
-              <input type="text" name="adresse_vej" value={formData.adresse_vej || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_vej" name="adresse_vej" value={formData.adresse_vej || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="adresse_postnr" className="block text-sm font-medium">Postnr.</label>
-              <input type="text" name="adresse_postnr" value={formData.adresse_postnr || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_postnr" name="adresse_postnr" value={formData.adresse_postnr || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div className="md:col-span-2">
               <label htmlFor="adresse_by" className="block text-sm font-medium">By</label>
-              <input type="text" name="adresse_by" value={formData.adresse_by || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_by" name="adresse_by" value={formData.adresse_by || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
 
             <div>
               <label htmlFor="kommunekode" className="block text-sm font-medium">Kommunekode</label>
               <input
                 type="text"
+                id="kommunekode"
                 name="kommunekode"
                 value={formData.kommunekode || ''}
                 onChange={handleChange}
@@ -348,7 +351,7 @@ function VirksomhedForm({ onSave, onCancel, virksomhedTilRedigering, onSaveNyVir
 
           <div>
             <label htmlFor="kommentar" className="block text-sm font-medium">Kommentar</label>
-            <textarea name="kommentar" value={formData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 w-full p-2 border rounded-md"></textarea>
+            <textarea id="kommentar" name="kommentar" value={formData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 w-full p-2 border rounded-md"></textarea>
           </div>
         </form>
       </div>

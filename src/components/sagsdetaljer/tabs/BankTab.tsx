@@ -149,7 +149,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
             {/* Topbar: Bank Sagsnummer */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Bankens sagsnummer</label>
+                    <label htmlFor="bank_sagsnr" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Bankens sagsnummer</label>
                     {isSavingSagsNr && (
                         <div className="flex items-center text-blue-500 text-xs font-medium animate-pulse">
                             <Loader2 size={12} className="animate-spin mr-1" />
@@ -160,6 +160,8 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                 <div className="flex gap-2 max-w-md">
                     <div className="relative flex-grow">
                         <input
+                            id="bank_sagsnr"
+                            name="bank_sagsnr"
                             type="text"
                             value={localSagsNr}
                             onChange={(e) => setLocalSagsNr(e.target.value)}
@@ -170,6 +172,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                             }}
                             placeholder="Indtast sagsnr..."
                             className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                            aria-label="Bankens sagsnummer"
                         />
                     </div>
                     {sag.bank_sagsnr && (
@@ -186,7 +189,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
                             <Landmark size={24} className="mr-3 text-gray-400" />
-                            Bankvirksomhed
+                            <label htmlFor="bank_virksomhed_id">Bankvirksomhed</label>
                             {isSaving && <Loader2 size={16} className="ml-2 animate-spin text-blue-600" />}
                         </h2>
                         <button onClick={handleEditVirksomhed} className="p-1 text-gray-400 hover:text-blue-600 transition-colors">
@@ -195,9 +198,12 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                     </div>
 
                     <select
+                        id="bank_virksomhed_id"
+                        name="bank_virksomhed_id"
                         value={sag.bank_virksomhed?.id || ''}
                         onChange={handleVirksomhedChange}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm"
+                        aria-label="Vælg bankvirksomhed"
                     >
                         {isLoadingBanker ? <option>Henter...</option> : <option value="">Vælg bank...</option>}
                         {alleBanker.map(b => (
@@ -261,7 +267,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
                             <User size={24} className="mr-3 text-gray-400" />
-                            Kontaktperson
+                            <label htmlFor="bank_kontakt_id">Kontaktperson</label>
                         </h2>
                         <button onClick={handleEditKontakt} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" disabled={!sag.bank_kontakt}>
                             <Edit size={18} />
@@ -269,10 +275,13 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
                     </div>
 
                     <select
+                        id="bank_kontakt_id"
+                        name="bank_kontakt_id"
                         value={sag.bank_kontakt?.id || ''}
                         onChange={handleKontaktChange}
                         disabled={!sag.bank_virksomhed}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        aria-label="Vælg kontaktperson"
                     >
                         {isLoadingKontakter ? <option>Henter...</option> : <option value="">Vælg kontaktperson...</option>}
                         {kontakter.map(k => (

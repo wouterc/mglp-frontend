@@ -620,11 +620,14 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 <td className="py-1 px-2" colSpan={3}>
                                                     <form onSubmit={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)} className="flex w-full items-center gap-2">
                                                         <input
+                                                            id={`quick-add-activity-${gruppeKey}`}
+                                                            name={`quick-add-activity-${gruppeKey}`}
                                                             type="text"
                                                             placeholder="Nyt aktivitet navn... (Enter for at gemme)"
                                                             value={quickAddValues[gruppeSummary.gruppe.id] || ''}
                                                             onChange={(e) => setQuickAddValues({ ...quickAddValues, [gruppeSummary.gruppe.id]: e.target.value })}
                                                             className="w-full px-2 py-1 text-[11px] border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 bg-transparent placeholder-gray-400"
+                                                            aria-label="Nyt aktivitet navn"
                                                         />
                                                     </form>
                                                 </td>

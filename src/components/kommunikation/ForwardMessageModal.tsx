@@ -42,23 +42,27 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({ isOpen, onClo
                         <div className="flex gap-4">
                             <label className="flex items-center">
                                 <input
+                                    id="forward-type-user"
                                     type="radio"
-                                    name="type"
+                                    name="forwardType"
                                     value="user"
                                     checked={selectedType === 'user'}
                                     onChange={() => { setSelectedType('user'); setSelectedRecipientId(undefined); }}
                                     className="mr-2"
+                                    aria-label="Videresend til Person"
                                 />
                                 Person
                             </label>
                             <label className="flex items-center">
                                 <input
+                                    id="forward-type-team"
                                     type="radio"
-                                    name="type"
+                                    name="forwardType"
                                     value="team"
                                     checked={selectedType === 'team'}
                                     onChange={() => { setSelectedType('team'); setSelectedRecipientId(undefined); }}
                                     className="mr-2"
+                                    aria-label="Videresend til Team"
                                 />
                                 Team
                             </label>
@@ -70,9 +74,12 @@ const ForwardMessageModal: React.FC<ForwardMessageModalProps> = ({ isOpen, onClo
                             Modtager
                         </label>
                         <select
+                            id="forward-recipient-select"
+                            name="forwardRecipient"
                             className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
                             value={selectedRecipientId || ''}
                             onChange={(e) => setSelectedRecipientId(Number(e.target.value))}
+                            aria-label="Vælg modtager"
                         >
                             <option value="">Vælg modtager...</option>
                             {selectedType === 'user' ? (

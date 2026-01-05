@@ -458,20 +458,24 @@ function DokumentskabelonerPage(): ReactElement {
           <div className="p-4 bg-white border-b border-gray-200 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <input
+                id="filter-dokument-navn"
                 type="text"
                 name="dokument"
                 placeholder="Søg dokument..."
                 value={filters.dokument}
                 onChange={handleFilterChange}
                 className="px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-black text-sm w-64"
+                aria-label="Søg efter dokument"
               />
               <input
+                id="filter-dokument-nr"
                 type="text"
                 name="dokument_nr"
                 placeholder="Nr..."
                 value={filters.dokument_nr}
                 onChange={handleFilterChange}
                 className="px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-black text-sm w-20"
+                aria-label="Filtrer på nummer"
               />
             </div>
 
@@ -544,15 +548,20 @@ function DokumentskabelonerPage(): ReactElement {
                           >
                             <td className="py-2 px-3 text-center">
                               <input
+                                id={`aktiv-checkbox-${dok.id}`}
+                                name={`aktiv-${dok.id}`}
                                 type="checkbox"
                                 checked={!!dok.aktiv}
                                 onChange={() => handleToggleAktiv(dok)}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                aria-label="Toggle aktiv status"
                               />
                             </td>
                             <td className="py-2 px-3 text-sm text-gray-600">
                               {isCellActive('dokument_nr') ? (
                                 <input
+                                  id={`edit-nr-${dok.id}`}
+                                  name="dokument_nr"
                                   autoFocus
                                   type="number"
                                   value={activeCell?.value ?? ''}
@@ -565,6 +574,7 @@ function DokumentskabelonerPage(): ReactElement {
                                     setActiveCell(null);
                                   }}
                                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                  aria-label="Rediger nummer"
                                 />
                               ) : (
                                 <div
@@ -579,6 +589,8 @@ function DokumentskabelonerPage(): ReactElement {
                               <div className="flex items-center gap-2 overflow-hidden">
                                 {isCellActive('dokument') ? (
                                   <input
+                                    id={`edit-dokument-${dok.id}`}
+                                    name="dokument"
                                     autoFocus
                                     type="text"
                                     value={activeCell?.value ?? ''}
@@ -591,6 +603,7 @@ function DokumentskabelonerPage(): ReactElement {
                                       setActiveCell(null);
                                     }}
                                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                    aria-label="Rediger dokument navn"
                                   />
                                 ) : (
                                   <span
@@ -626,8 +639,10 @@ function DokumentskabelonerPage(): ReactElement {
                               />
                               {isCellActive('link_expanded') && (
                                 <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-40 min-w-[400px]">
-                                  <label className="block text-xs font-bold mb-1 text-gray-500">Link:</label>
+                                  <div className="block text-xs font-bold mb-1 text-gray-500">Link:</div>
                                   <textarea
+                                    id={`edit-link-expanded-${dok.id}`}
+                                    name="link"
                                     autoFocus
                                     value={activeCell?.value ?? ''}
                                     className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
@@ -636,6 +651,7 @@ function DokumentskabelonerPage(): ReactElement {
                                       handleQuickUpdate(dok, { link: activeCell?.value });
                                       setActiveCell(null);
                                     }}
+                                    aria-label="Rediger link"
                                   />
                                 </div>
                               )}
@@ -651,8 +667,10 @@ function DokumentskabelonerPage(): ReactElement {
                               />
                               {isCellActive('filnavn_expanded') && (
                                 <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-1/3 min-w-[400px]">
-                                  <label className="block text-xs font-bold mb-1 text-gray-500">Filnavn mønster:</label>
+                                  <div className="block text-xs font-bold mb-1 text-gray-500">Filnavn mønster:</div>
                                   <textarea
+                                    id={`edit-filnavn-expanded-${dok.id}`}
+                                    name="filnavn"
                                     autoFocus
                                     value={activeCell?.value ?? ''}
                                     className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
@@ -661,6 +679,7 @@ function DokumentskabelonerPage(): ReactElement {
                                       handleQuickUpdate(dok, { filnavn: activeCell?.value });
                                       setActiveCell(null);
                                     }}
+                                    aria-label="Rediger filnavn mønster"
                                   />
                                 </div>
                               )}
@@ -668,6 +687,8 @@ function DokumentskabelonerPage(): ReactElement {
                             <td className="py-2 px-3 text-sm text-gray-600 truncate">
                               {isCellActive('informations_kilde_id') ? (
                                 <select
+                                  id={`select-kilde-${dok.id}`}
+                                  name="informations_kilde_id"
                                   autoFocus
                                   value={activeCell?.value ?? ''}
                                   className="w-full text-black px-1 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none bg-white font-sans"
@@ -679,6 +700,7 @@ function DokumentskabelonerPage(): ReactElement {
                                     setActiveCell(null);
                                   }}
                                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                  aria-label="Vælg kilde"
                                 >
                                   <option value="">Vælg kilde...</option>
                                   {informationsKilder.map(k => (
@@ -705,8 +727,10 @@ function DokumentskabelonerPage(): ReactElement {
                               </Tooltip>
                               {isCellActive('kommentar') && (
                                 <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-2 right-10 min-w-[350px]">
-                                  <label className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</label>
+                                  <div className="block text-xs font-bold mb-1 text-gray-500">Kommentar / Note:</div>
                                   <textarea
+                                    id={`edit-kommentar-expanded-${dok.id}`}
+                                    name="kommentar"
                                     autoFocus
                                     value={activeCell?.value ?? ''}
                                     className="w-full p-2 text-xs border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
@@ -715,6 +739,7 @@ function DokumentskabelonerPage(): ReactElement {
                                       handleQuickUpdate(dok, { kommentar: activeCell?.value });
                                       setActiveCell(null);
                                     }}
+                                    aria-label="Rediger kommentar"
                                   />
                                 </div>
                               )}
@@ -747,11 +772,14 @@ function DokumentskabelonerPage(): ReactElement {
                           <td className="py-1 px-2">
                             <form onSubmit={handleQuickAdd}>
                               <input
+                                id="ny-dokument-navn"
+                                name="ny-dokument-navn"
                                 type="text"
                                 value={nyDokumentNavn}
                                 onChange={(e) => setNyDokumentNavn(e.target.value)}
                                 placeholder="Nyt dokumentnavn... (Enter for at gemme)"
                                 className="w-full px-2 py-1 text-[11px] bg-transparent border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 placeholder-gray-400 outline-none"
+                                aria-label="Nyt dokumentnavn"
                               />
                             </form>
                           </td>

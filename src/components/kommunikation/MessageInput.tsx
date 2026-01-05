@@ -44,7 +44,30 @@ const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ 
         setContent(prev => prev + emojiData.emoji);
         setShowEmojiPicker(false);
     };
-    // ...
+
+    React.useEffect(() => {
+        const fixInputs = () => {
+            const tooltipInputs = document.querySelectorAll('.ql-tooltip input[type="text"]');
+            tooltipInputs.forEach((input) => {
+                if (input instanceof HTMLInputElement) {
+                    if (!input.id) input.id = 'ql-tooltip-input';
+                    if (!input.name) input.name = 'qlTooltipInput';
+                    if (!input.getAttribute('aria-label')) {
+                        input.setAttribute('aria-label', 'Indtast link, formel eller video URL');
+                    }
+                }
+            });
+        };
+
+        // Run immediately
+        fixInputs();
+
+        // Observe for any changes to the DOM (nodes added or attributes changed)
+        const observer = new MutationObserver(fixInputs);
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+        return () => observer.disconnect();
+    }, []);
 
     const handleSend = () => {
         if (!content.trim()) return;
@@ -158,6 +181,7 @@ const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ 
                         className="flex-1 text-xs border-gray-300 rounded"
                         value={linkUrl}
                         onChange={(e) => setLinkUrl(e.target.value)}
+                        aria-label="Link URL"
                     />
                     <input
                         type="text"
@@ -167,6 +191,7 @@ const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ 
                         className="flex-1 text-xs border-gray-300 rounded"
                         value={linkTitle}
                         onChange={(e) => setLinkTitle(e.target.value)}
+                        aria-label="Link Titel"
                     />
                 </div>
             )}

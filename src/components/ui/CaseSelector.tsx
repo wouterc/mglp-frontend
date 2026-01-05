@@ -128,6 +128,8 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
                     <div className="p-2 border-b border-gray-100">
                         <input
+                            id="case-selector-search-input"
+                            name="case-selector-search-input"
                             type="text"
                             placeholder="Indtast sagsnr eller navn..."
                             className="w-full text-sm p-1 border border-gray-200 rounded focus:outline-none focus:border-blue-500"
@@ -136,6 +138,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
                             onKeyDown={handleKeyDown}
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
+                            aria-label="Søg efter sag"
                         />
                     </div>
                     {loading && <div className="p-2 text-xs text-center text-gray-500">Søger...</div>}

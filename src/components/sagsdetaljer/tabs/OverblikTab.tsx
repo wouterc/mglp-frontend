@@ -124,14 +124,14 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
                     {/* Rad 1: Adresse og Sagsnr */}
                     <div className="md:col-span-2">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Adresse</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Adresse</div>
                         <div className="flex items-center">
                             {sag.fuld_adresse && <CopyButton text={sag.fuld_adresse} id="adresse" />}
                             <p className="text-gray-900 text-base font-medium truncate" title={sag.fuld_adresse || ''}>{sag.fuld_adresse || '-'}</p>
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Sagsnummer & Alias</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Sagsnummer & Alias</div>
                         <div className="flex items-center">
                             <CopyButton text={`${sag.sags_nr}`} id="sagsnr" />
                             <p className="text-gray-900 text-base font-medium truncate">{sag.sags_nr} - {sag.alias}</p>
@@ -140,33 +140,35 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
 
                     {/* Rad 2: Property Basic */}
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Boligtype</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Boligtype</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_type || '-'}</p>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_matrikel || '-'}</p>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_bfe || '-'}</p>
                     </div>
 
                     {/* Rad 3: Ansvarlig, Mail, Status */}
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Hovedansvarlig</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Hovedansvarlig</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.hovedansvarlige || '-'}</p>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Standard mail-konto</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Standard mail-konto</div>
                         <p className="text-gray-900 text-sm font-medium truncate" title={sag.standard_outlook_account_details?.email_address || ''}>
                             {sag.standard_outlook_account_details ? `${sag.standard_outlook_account_details.account_name}` : '-'}
                         </p>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Nuværende Status</label>
+                        <label htmlFor="status_select" className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Nuværende Status</label>
                         <div className="mt-0.5">
                             <select
+                                id="status_select"
+                                name="status_select"
                                 value={sag.status?.id || ''}
                                 onChange={handleSelectChange}
                                 className={`
@@ -183,11 +185,11 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
 
                     {/* Rad 4: BBR og Anpart */}
                     <div className="md:col-span-2">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</div>
                         <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
                     </div>
                     <div>
-                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Anpart</label>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Anpart</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_anpart || '-'}</p>
                     </div>
 
@@ -196,21 +198,21 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         <div className="md:col-span-2 pt-2 mt-0 border-t border-gray-100">
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Mægler sagsnr.</label>
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Mægler sagsnr.</div>
                                     <div className="flex items-center">
                                         <CopyButton text={sag.maegler_sagsnr || ''} id="maegler-sagsnr" />
                                         <p className="text-gray-900 text-sm font-medium truncate">{sag.maegler_sagsnr || '-'}</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Bank sagsnr.</label>
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Bank sagsnr.</div>
                                     <div className="flex items-center">
                                         <CopyButton text={sag.bank_sagsnr || ''} id="bank-sagsnr" />
                                         <p className="text-gray-900 text-sm font-medium truncate">{sag.bank_sagsnr || '-'}</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Rådgiver sagsnr.</label>
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Rådgiver sagsnr.</div>
                                     <div className="flex items-center">
                                         <CopyButton text={sag.raadgiver_sagsnr || ''} id="raadgiver-sagsnr" />
                                         <p className="text-gray-900 text-sm font-medium truncate">{sag.raadgiver_sagsnr || '-'}</p>
@@ -222,7 +224,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
 
                     <div className="md:col-span-2 mt-0">
                         <div className="flex items-center gap-2 mb-0.5 min-h-[20px]">
-                            <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Kommentar</label>
+                            <label htmlFor="kommentar_textarea" className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Kommentar</label>
                             {erAendret && (
                                 <button
                                     onClick={handleSaveComment}
@@ -245,6 +247,8 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                             )}
                         </div>
                         <textarea
+                            id="kommentar_textarea"
+                            name="kommentar"
                             value={localComment}
                             onChange={(e) => setLocalComment(e.target.value)}
                             placeholder="Skriv en kommentar..."

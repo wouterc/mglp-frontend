@@ -180,15 +180,15 @@ function KontaktForm({ onSave, onCancel, kontaktTilRedigering, defaultRolleIds =
             <legend className="text-lg font-medium px-2">Person Info</legend>
             <div>
               <label htmlFor="fornavn" className="block text-sm font-medium">Fornavn</label>
-              <input type="text" name="fornavn" value={formData.fornavn || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="fornavn" name="fornavn" value={formData.fornavn || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="mellemnavn" className="block text-sm font-medium">Mellemnavn</label>
-              <input type="text" name="mellemnavn" value={formData.mellemnavn || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="mellemnavn" name="mellemnavn" value={formData.mellemnavn || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="efternavn" className="block text-sm font-medium">Efternavn (Påkrævet)</label>
-              <input type="text" name="efternavn" value={formData.efternavn || ''} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="efternavn" name="efternavn" value={formData.efternavn || ''} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md" />
             </div>
           </fieldset>
 
@@ -204,9 +204,12 @@ function KontaktForm({ onSave, onCancel, kontaktTilRedigering, defaultRolleIds =
                   roller.map(r => (
                     <label key={r.id} className="flex items-center space-x-2 text-sm">
                       <input
+                        id={`rolle-${r.id}`}
+                        name={`rolle-${r.id}`}
                         type="checkbox"
                         checked={formData.roller_ids.includes(r.id)}
                         onChange={() => handleRolleChange(r.id)}
+                        aria-label={r.navn}
                       />
                       <span>{r.navn}</span>
                     </label>
@@ -218,6 +221,7 @@ function KontaktForm({ onSave, onCancel, kontaktTilRedigering, defaultRolleIds =
             <div>
               <label htmlFor="virksomhed_id" className="block text-sm font-medium">Virksomhed</label>
               <select
+                id="virksomhed_id"
                 name="virksomhed_id"
                 value={formData.virksomhed_id || ''}
                 onChange={handleChange}
@@ -240,11 +244,11 @@ function KontaktForm({ onSave, onCancel, kontaktTilRedigering, defaultRolleIds =
             </div>
             <div>
               <label htmlFor="telefon" className="block text-sm font-medium">Telefon</label>
-              <input type="text" name="telefon" value={formData.telefon || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="telefon" name="telefon" value={formData.telefon || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium">Email</label>
-              <input type="email" name="email" value={formData.email || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="email" id="email" name="email" value={formData.email || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
           </fieldset>
 
@@ -259,21 +263,21 @@ function KontaktForm({ onSave, onCancel, kontaktTilRedigering, defaultRolleIds =
 
             <div className="md:col-span-3">
               <label htmlFor="adresse_vej" className="block text-sm font-medium">Vej og Nr.</label>
-              <input type="text" name="adresse_vej" value={formData.adresse_vej || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_vej" name="adresse_vej" value={formData.adresse_vej || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div>
               <label htmlFor="adresse_postnr" className="block text-sm font-medium">Postnr.</label>
-              <input type="text" name="adresse_postnr" value={formData.adresse_postnr || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_postnr" name="adresse_postnr" value={formData.adresse_postnr || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
             <div className="md:col-span-2">
               <label htmlFor="adresse_by" className="block text-sm font-medium">By</label>
-              <input type="text" name="adresse_by" value={formData.adresse_by || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
+              <input type="text" id="adresse_by" name="adresse_by" value={formData.adresse_by || ''} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" />
             </div>
           </fieldset>
 
           <div>
             <label htmlFor="kommentar" className="block text-sm font-medium">Kommentar</label>
-            <textarea name="kommentar" value={formData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 w-full p-2 border rounded-md"></textarea>
+            <textarea id="kommentar" name="kommentar" value={formData.kommentar || ''} onChange={handleChange} rows={4} className="mt-1 w-full p-2 border rounded-md"></textarea>
           </div>
         </form>
       </div>

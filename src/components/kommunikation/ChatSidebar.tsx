@@ -127,11 +127,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 <div className="relative group">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                     <input
+                        id="chat-search-input"
+                        name="chatSearch"
                         type="text"
                         placeholder="Søg i beskeder..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
                         className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        aria-label="Søg i beskeder"
                     />
                     {searchTerm && (
                         <button
@@ -144,10 +147,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 </div>
                 <label className="mt-2 flex items-center gap-2 cursor-pointer group">
                     <input
+                        id="chat-filter-active-only"
+                        name="chatFilterActiveOnly"
                         type="checkbox"
                         checked={onlyActiveChat}
                         onChange={onToggleOnlyActive}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                        aria-label="Vis kun beskeder i denne chat"
                     />
                     <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">Kun i denne chat</span>
                 </label>

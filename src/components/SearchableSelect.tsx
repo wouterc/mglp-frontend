@@ -18,18 +18,22 @@ interface SearchableSelectProps {
   label?: string;
   disabled?: boolean;
   emptyMessage?: string;
+  id?: string;
+  name?: string;
 }
 
-function SearchableSelect({ 
-  options, 
-  value, 
-  onChange, 
-  placeholder = "Vælg...", 
-  label, 
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = "Vælg...",
+  label,
   disabled = false,
-  emptyMessage = "Ingen resultater fundet"
+  emptyMessage = "Ingen resultater fundet",
+  id = "searchable_select_input",
+  name = "searchable_select_input"
 }: SearchableSelectProps): ReactElement {
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -56,8 +60,8 @@ function SearchableSelect({
 
   const selectedOption = options.find(o => o.id === value);
 
-  const filteredOptions = options.filter(opt => 
-    opt.label.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredOptions = options.filter(opt =>
+    opt.label.toLowerCase().includes(search.toLowerCase()) ||
     (opt.subLabel && opt.subLabel.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -75,9 +79,9 @@ function SearchableSelect({
   return (
     <div className="w-full relative" ref={wrapperRef}>
       {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-      
+
       {/* Selve "knappen" der ligner et input-felt */}
-      <div 
+      <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`
           w-full p-2 border rounded-md bg-white flex justify-between items-center cursor-pointer
@@ -88,11 +92,11 @@ function SearchableSelect({
         <span className={`truncate ${!selectedOption ? 'text-gray-500' : 'text-gray-800'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        
+
         <div className="flex items-center">
           {selectedOption && !disabled && (
-            <button 
-              onClick={handleClear} 
+            <button
+              onClick={handleClear}
               className="p-1 mr-1 text-gray-400 hover:text-red-500 rounded-full"
               title="Ryd valg"
             >
@@ -109,14 +113,18 @@ function SearchableSelect({
           {/* Søgefelt i toppen */}
           <div className="p-2 border-b border-gray-100 sticky top-0 bg-white rounded-t-md">
             <div className="relative">
+              <label htmlFor={id} className="sr-only">Søg i listen</label>
               <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id={id}
+                name={name}
                 ref={inputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Søg..."
                 className="w-full p-1 pl-7 text-sm border border-gray-200 rounded-sm focus:outline-none focus:border-blue-400"
+                aria-label="Søg i listen"
               />
             </div>
           </div>

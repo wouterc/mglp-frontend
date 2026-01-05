@@ -188,6 +188,8 @@ export default function MailPreparationModal({ isOpen, onClose, sag, initialSour
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-gray-700">Mailskabelon</label>
                                     <select
+                                        id="mail-prep-template-id"
+                                        name="mail-prep-template-id"
                                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         value={selectedTemplateId}
                                         onChange={(e) => {
@@ -195,6 +197,7 @@ export default function MailPreparationModal({ isOpen, onClose, sag, initialSour
                                             setPreview(null);
                                         }}
                                         disabled={loading}
+                                        aria-label="Vælg mailskabelon"
                                     >
                                         <option value="">Vælg skabelon...</option>
                                         {templates.map(t => (
@@ -210,10 +213,13 @@ export default function MailPreparationModal({ isOpen, onClose, sag, initialSour
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-gray-700">Afsender (Outlook-konto)</label>
                                     <select
+                                        id="mail-prep-account-id"
+                                        name="mail-prep-account-id"
                                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         value={selectedAccountId}
                                         onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : "")}
                                         disabled={loading}
+                                        aria-label="Afsender Outlook-konto"
                                     >
                                         {accounts.map(a => (
                                             <option key={a.id} value={a.id}>{a.account_name} ({a.email_address})</option>
@@ -227,17 +233,22 @@ export default function MailPreparationModal({ isOpen, onClose, sag, initialSour
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-gray-700">Modtager Mail (Outlook 'Til')</label>
                                     <input
+                                        id="mail-prep-recipient-email"
+                                        name="mail-prep-recipient-email"
                                         type="email"
                                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="f.eks. kunde@eksempel.dk"
                                         value={recipientEmail}
                                         onChange={(e) => setRecipientEmail(e.target.value)}
                                         disabled={loading}
+                                        aria-label="Modtager Email"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-gray-700">Modtager Navn (for {'{{name}}'})</label>
                                     <input
+                                        id="mail-prep-recipient-name"
+                                        name="mail-prep-recipient-name"
                                         type="text"
                                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="f.eks. Jensen"
@@ -247,6 +258,7 @@ export default function MailPreparationModal({ isOpen, onClose, sag, initialSour
                                             setPreview(null);
                                         }}
                                         disabled={loading}
+                                        aria-label="Modtager Navn"
                                     />
                                 </div>
                             </div>

@@ -1,6 +1,6 @@
 # � Den Komplette Brugermanual: MGLP Administration
 
-Velkommen til den fulde vejledning til MGLP Administration. Dette dokument dækker alle aspekter af systemet, fra daglig sagsbehandling til avanceret skabelonstyring.
+Velkommen til den fulde vejledning til MGLP Flow. Dette dokument dækker alle aspekter af systemet, fra daglig sagsbehandling til avanceret skabelonstyring.
 
 ---
 

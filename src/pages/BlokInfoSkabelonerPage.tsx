@@ -280,12 +280,12 @@ function BlokInfoSkabelonerPage(): ReactElement {
               <th className="text-left py-1 px-2 uppercase font-semibold w-[25%]">Proces (Relateret)</th>
             </tr>
             <tr>
-              <th className="p-1"><input type="text" name="nr" value={filters.nr} onChange={handleFilterChange} placeholder="Filtrer..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></th>
-              <th className="p-1"><input type="text" name="titel_kort" value={filters.titel_kort} onChange={handleFilterChange} placeholder="Filtrer..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></th>
+              <th className="p-1"><input id="filter-nr" type="text" name="nr" value={filters.nr} onChange={handleFilterChange} placeholder="Filtrer..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" aria-label="Filtrer på nummer" /></th>
+              <th className="p-1"><input id="filter-titel" type="text" name="titel_kort" value={filters.titel_kort} onChange={handleFilterChange} placeholder="Filtrer..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" aria-label="Filtrer på titel" /></th>
               <th className="p-1" colSpan={2}>
                 <div className="flex space-x-2">
-                  <input type="text" name="beskrivelse" value={filters.beskrivelse} onChange={handleFilterChange} placeholder="Filtrer beskrivelse..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" />
-                  <select name="formaal" value={filters.formaal} onChange={handleFilterChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
+                  <input id="filter-beskrivelse" type="text" name="beskrivelse" value={filters.beskrivelse} onChange={handleFilterChange} placeholder="Filtrer beskrivelse..." className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" aria-label="Filtrer på beskrivelse" />
+                  <select id="filter-formaal" name="formaal" value={filters.formaal} onChange={handleFilterChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border bg-white" aria-label="Filtrer på formål">
                     <option value="">Alle formål...</option>
                     {Object.entries(formaalBeskrivelser).map(([key, value]) => (
                       <option key={key} value={key}>{value}</option>
@@ -298,18 +298,18 @@ function BlokInfoSkabelonerPage(): ReactElement {
           <tbody className="text-gray-700 text-sm">
             {visOpretForm && (
               <tr className="bg-blue-50">
-                <td className="py-1 px-2"><input type="number" name="nr" value={nySkabelonData.nr} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
-                <td className="py-1 px-2"><input type="text" name="titel_kort" value={nySkabelonData.titel_kort} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" /></td>
+                <td className="py-1 px-2"><input id="ny-skabelon-nr" type="number" name="nr" value={nySkabelonData.nr} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" aria-label="Ny skabelon nummer" /></td>
+                <td className="py-1 px-2"><input id="ny-skabelon-titel" type="text" name="titel_kort" value={nySkabelonData.titel_kort} onChange={handleNySkabelonChange} className="w-full text-black px-1 py-0.5 text-sm rounded-sm border" aria-label="Ny skabelon titel" /></td>
                 <td className="py-1 px-2" colSpan={2}>
                   <div className="flex items-center space-x-2">
-                    <select name="formaal" value={nySkabelonData.formaal} onChange={handleNySkabelonChange} className="w-1/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
+                    <select id="ny-skabelon-formaal" name="formaal" value={nySkabelonData.formaal} onChange={handleNySkabelonChange} className="w-1/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white" aria-label="Ny skabelon formål">
                       <option value="">Vælg formål...</option>
                       {Object.entries(formaalBeskrivelser).map(([key, value]) => (
                         <option key={key} value={key}>{value}</option>
                       ))}
                     </select>
                     {Number(nySkabelonData.formaal) > 1 && (
-                      <select name="proces_id" value={nySkabelonData.proces_id} onChange={handleNySkabelonChange} className="w-2/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white">
+                      <select id="ny-skabelon-proces" name="proces_id" value={nySkabelonData.proces_id} onChange={handleNySkabelonChange} className="w-2/3 text-black px-1 py-0.5 text-sm rounded-sm border bg-white" aria-label="Ny skabelon proces">
                         <option value="">Ingen proces valgt...</option>
                         {procesMuligheder.map(p => (
                           <option key={p.id} value={p.id}>{p.nr} - {p.titel_kort}</option>
@@ -342,11 +342,14 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     <td className="py-2 px-2 text-center">
                       {isCellActive('nr') ? (
                         <input
+                          id={`edit-nr-${skabelon.id}`}
+                          name="nr"
                           autoFocus
                           type="number"
                           value={activeCell?.value ?? ''}
                           className="w-full text-black px-2 py-1 text-sm rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
                           onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                          aria-label="Rediger nummer"
                           onBlur={() => {
                             if (activeCell?.value !== undefined) {
                               handleQuickUpdate(skabelon, { nr: Number(activeCell.value) });
@@ -369,11 +372,14 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     <td className="py-2 px-2">
                       {isCellActive('titel_kort') ? (
                         <input
+                          id={`edit-titel-${skabelon.id}`}
+                          name="titel_kort"
                           autoFocus
                           type="text"
                           value={activeCell?.value ?? ''}
                           className="w-full text-black px-2 py-1 text-sm rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none"
                           onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                          aria-label="Rediger titel"
                           onBlur={() => {
                             if (activeCell?.value !== undefined) {
                               handleQuickUpdate(skabelon, { titel_kort: activeCell.value });
@@ -406,10 +412,13 @@ function BlokInfoSkabelonerPage(): ReactElement {
                         <div className="absolute z-50 bg-white p-3 shadow-2xl border rounded mt-1 left-1/3 min-w-[500px]">
                           <label className="block text-xs font-bold mb-1 text-gray-500">Beskrivelse:</label>
                           <textarea
+                            id={`edit-beskrivelse-expanded-${skabelon.id}`}
+                            name="beskrivelse"
                             autoFocus
                             value={activeCell?.value ?? ''}
                             className="w-full p-2 text-sm border rounded h-48 focus:ring-1 focus:ring-blue-400 outline-none"
                             onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                            aria-label="Rediger beskrivelse"
                             onBlur={() => {
                               handleQuickUpdate(skabelon, { beskrivelse: activeCell?.value });
                               setActiveCell(null);
@@ -423,9 +432,12 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     <td className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
                       {skabelon.formaal > 1 ? (
                         <select
+                          id={`select-proces-${skabelon.id}`}
+                          name="proces_id"
                           value={skabelon.proces_id || ''}
                           onChange={(e) => handleQuickSaveProces(skabelon, e.target.value)}
                           className="w-full text-blue-600 bg-transparent border-none hover:bg-blue-50/50 focus:ring-0 text-sm italic py-1 px-1 cursor-pointer outline-none rounded transition-colors"
+                          aria-label="Vælg proces"
                         >
                           <option value="" className="text-gray-400">Vælg proces...</option>
                           {procesMuligheder.map(p => (

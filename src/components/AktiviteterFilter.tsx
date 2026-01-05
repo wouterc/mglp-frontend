@@ -56,13 +56,24 @@ function AktiviteterFilter() {
     return (
         <FilterSidebar onNulstil={handleNulstilFiltre}>
             <div className="space-y-4">
-                <input type="text" name="aktivitet" placeholder="Søg i aktivitet..." value={aktiviteterFilters.aktivitet} onChange={handleFilterChange} className="p-2 w-full border rounded-md text-sm" />
+                <input
+                    id="filter-aktivitet"
+                    type="text"
+                    name="aktivitet"
+                    placeholder="Søg i aktivitet..."
+                    value={aktiviteterFilters.aktivitet}
+                    onChange={handleFilterChange}
+                    className="p-2 w-full border rounded-md text-sm"
+                    aria-label="Søg i aktivitet"
+                />
 
                 <select
+                    id="filter-ansvarlig"
                     name="ansvarlig"
                     value={aktiviteterFilters.ansvarlig || ''}
                     onChange={handleFilterChange}
                     className="p-2 w-full border rounded-md text-sm bg-white"
+                    aria-label="Vælg ansvarlig"
                 >
                     <option value="">Alle ansvarlige</option>
                     {colleagues.map(u => (
@@ -70,34 +81,81 @@ function AktiviteterFilter() {
                     ))}
                 </select>
 
-                <select name="status" value={aktiviteterFilters.status} onChange={handleFilterChange}
-                    className="p-2 w-full border rounded-md text-sm bg-white">
+                <select
+                    id="filter-status"
+                    name="status"
+                    value={aktiviteterFilters.status}
+                    onChange={handleFilterChange}
+                    className="p-2 w-full border rounded-md text-sm bg-white"
+                    aria-label="Vælg status"
+                >
                     <option value="">Alle statusser</option>
                     <option value="ikke-faerdigmeldt">Alle ikke-færdigmeldte</option>
                     {aktivitetStatusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                 </select>
 
-                <select name="informations_kilde" value={aktiviteterFilters.informations_kilde} onChange={handleFilterChange}
-                    className="p-2 w-full border rounded-md text-sm bg-white">
+                <select
+                    id="filter-informations_kilde"
+                    name="informations_kilde"
+                    value={aktiviteterFilters.informations_kilde}
+                    onChange={handleFilterChange}
+                    className="p-2 w-full border rounded-md text-sm bg-white"
+                    aria-label="Vælg informationskilde"
+                >
                     <option value="">Alle informationskilder</option>
                     {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
                 </select>
 
                 <div className="pt-2">
                     <label className="flex items-center space-x-2 text-sm">
-                        <input type="radio" name="aktiv_filter" value="kun_aktive" checked={aktiviteterFilters.aktiv_filter === 'kun_aktive'} onChange={handleFilterChange} /> <span>Kun aktive</span>
+                        <input
+                            id="filter-aktiv-kun-aktive"
+                            type="radio"
+                            name="aktiv_filter"
+                            value="kun_aktive"
+                            checked={aktiviteterFilters.aktiv_filter === 'kun_aktive'}
+                            onChange={handleFilterChange}
+                            aria-label="Kun aktive"
+                        />
+                        <span>Kun aktive</span>
                     </label>
                     <label className="flex items-center space-x-2 text-sm">
-                        <input type="radio" name="aktiv_filter" value="alle" checked={aktiviteterFilters.aktiv_filter === 'alle'} onChange={handleFilterChange} /> <span>Alle</span>
+                        <input
+                            id="filter-aktiv-alle"
+                            type="radio"
+                            name="aktiv_filter"
+                            value="alle"
+                            checked={aktiviteterFilters.aktiv_filter === 'alle'}
+                            onChange={handleFilterChange}
+                            aria-label="Alle aktiviteter"
+                        />
+                        <span>Alle</span>
                     </label>
                 </div>
 
                 <div className="pt-2 border-t mt-2">
                     <label className="flex items-center space-x-2 text-sm cursor-pointer">
-                        <input type="checkbox" name="overskredet" checked={aktiviteterFilters.overskredet} onChange={handleFilterChange} /> <span>Overskredne & Snart</span>
+                        <input
+                            id="filter-overskredet"
+                            type="checkbox"
+                            name="overskredet"
+                            checked={aktiviteterFilters.overskredet}
+                            onChange={handleFilterChange}
+                            aria-label="Overskredne & Snart"
+                        />
+                        <span>Overskredne & Snart</span>
                     </label>
                     <label className="flex items-center space-x-2 text-sm cursor-pointer mt-1">
-                        <input type="checkbox" name="vigtige" checked={aktiviteterFilters.vigtige} onChange={handleFilterChange} className="rounded text-red-600 focus:ring-red-500" /> <span>Kun vigtige kommentarer</span>
+                        <input
+                            id="filter-vigtige"
+                            type="checkbox"
+                            name="vigtige"
+                            checked={aktiviteterFilters.vigtige}
+                            onChange={handleFilterChange}
+                            className="rounded text-red-600 focus:ring-red-500"
+                            aria-label="Kun vigtige kommentarer"
+                        />
+                        <span>Kun vigtige kommentarer</span>
                     </label>
                 </div>
             </div>

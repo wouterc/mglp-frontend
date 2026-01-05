@@ -729,11 +729,14 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 <td colSpan={5} className="px-1 py-1">
                                                     <form onSubmit={(e) => handleQuickAdd(group.id!, e)}>
                                                         <input
+                                                            id={`quick-add-doc-${group.id}`}
+                                                            name={`quick-add-doc-${group.id}`}
                                                             type="text"
                                                             placeholder="Nyt dokument navn... (Enter for at gemme)"
                                                             value={quickAddValues[group.id!] || ''}
                                                             onChange={(e) => setQuickAddValues((prev: any) => ({ ...prev, [group.id!]: e.target.value }))}
                                                             className="w-full px-2 py-1 text-[11px] border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 bg-transparent placeholder-gray-400 outline-none"
+                                                            aria-label="Nyt dokument navn"
                                                         />
                                                     </form>
                                                 </td>
@@ -910,6 +913,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         </label>
                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
                             <input
+                                id="edit-comment-important"
+                                name="edit-comment-important"
                                 type="checkbox"
                                 checked={editCommentImportant}
                                 onChange={async (e) => {
@@ -936,6 +941,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                     }
                                 }}
                                 className="rounded text-red-600 focus:ring-red-500"
+                                aria-label="Marker som vigtig"
                             />
                             <span className={editCommentImportant ? "font-bold text-red-600" : ""}>Vigtig / Obs</span>
                         </label>
@@ -954,11 +960,14 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             Mail Titel (til eksterne mails)
                         </label>
                         <input
+                            id="edit-mail-titel"
+                            name="edit-mail-titel"
                             type="text"
                             className="w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm placeholder-gray-400 outline-none focus:ring-blue-500 focus:border-blue-500"
                             value={editMailTitle}
                             onChange={(e) => setEditMailTitle(e.target.value)}
                             placeholder="F.eks. BBR-Meddelelse"
+                            aria-label="Mail Titel"
                         />
                     </div>
                 </div>
@@ -995,6 +1004,8 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             {renameFilePrefix}
                         </div>
                         <input
+                            id="rename-filename-input"
+                            name="rename-filename-input"
                             autoFocus
                             type="text"
                             className="flex-1 border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -1003,6 +1014,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleSaveRename();
                             }}
+                            aria-label="Nyt filnavn"
                         />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">

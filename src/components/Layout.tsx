@@ -23,33 +23,41 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
   const location = useLocation(); // Ensure useLocation is imported/used if needed for re-fetching on nav, or just interval
   const [erMenuAaben, setErMenuAaben] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
 
-    let intervalId: NodeJS.Timeout;
-
-    const setupInterval = async () => {
-      // 1. Fetch unread count immediately
-      const fetchUnread = async () => {
-        try {
-          const data = await KommunikationService.getUnreadCount();
-          setUnreadCount(data.unread_count);
-        } catch (e) { /* silent fail */ }
-      };
-      fetchUnread();
-
-      // 2. Fetch Interval Setting
-      let intervalMs = 30000; // Default 30 sec
+    const fetchUnread = async () => {
       try {
-        // Try to get from backend
-        // Note: Using raw fetch/api here because we need to handle 404 specifically
+        const data = await KommunikationService.getUnreadCount();
+        if (isActive) setUnreadCount(data.unread_count);
+      } catch (e) { /* silent fail */ }
+    };
+
+    let isActive = true;
+
+    const startPolling = async () => {
+      // 1. Hent med det samme
+      await fetchUnread();
+      if (!isActive) return;
+
+      // 2. Hent interval-indstilling (eller brug default 30s)
+      let intervalMs = 30000;
+      try {
         const response = await api.get<any>('/kerne/global-variables/NOTIFICATION_INTERVAL/');
+        if (!isActive) return;
         if (response && response.vaerdi) {
-          intervalMs = parseInt(response.vaerdi, 10);
+          const parsed = parseInt(response.vaerdi, 10);
+          if (!isNaN(parsed) && parsed >= 5000) { // Mindst 5 sekunder
+            intervalMs = parsed;
+          }
         }
       } catch (error: any) {
-        // If 404, it means variable doesn't exist. Create it.
+        if (!isActive) return;
         if (error.response?.status === 404 || error.message?.includes('404')) {
           try {
             await api.post('/kerne/global-variables/', {
@@ -61,14 +69,19 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         }
       }
 
-      // 3. Start Interval
-      intervalId = setInterval(fetchUnread, intervalMs);
+      // 3. Start interval (hvis vi stadig er logget ind / komponenten er aktiv)
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(fetchUnread, intervalMs);
     };
 
-    setupInterval();
+    startPolling();
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      isActive = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, [currentUser]);
   const menuSektioner = [
@@ -128,7 +141,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
           {erMenuAaben && (
             <div className="flex items-center gap-3 overflow-hidden">
               <img src="/LogoMGLP.svg" alt="MGLP" className="w-8 h-8 brightness-0 invert" />
-              <span className="font-semibold text-lg whitespace-nowrap">MGLP admin</span>
+              <span className="font-semibold text-lg whitespace-nowrap">MGLP Flow</span>
             </div>
           )}
           <button onClick={() => setErMenuAaben(!erMenuAaben)} className="p-2 rounded-md hover:bg-gray-700" title={erMenuAaben ? "Luk menu" : "Åbn menu"}>

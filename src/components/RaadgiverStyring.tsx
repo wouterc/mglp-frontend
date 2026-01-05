@@ -255,7 +255,10 @@ function RaadgiverStyring({ sagId, initialTilknytninger, onTilknytningOpdateret 
       {/* Søgeboks */}
       <div className="relative mb-4">
         <div className="relative">
+          <label htmlFor="raadgiver_soeg" className="sr-only">Søg efter rådgiver</label>
           <input
+            id="raadgiver_soeg"
+            name="raadgiver_soeg"
             type="text"
             value={soegning}
             onChange={(e) => setSoegning(e.target.value)}

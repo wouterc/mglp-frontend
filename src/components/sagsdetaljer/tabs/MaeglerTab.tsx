@@ -149,7 +149,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
             {/* Topbar: Sagsnummer Reference */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Mæglerens sagsnummer</label>
+                    <label htmlFor="maegler_sagsnr" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Mæglerens sagsnummer</label>
                     {isSavingSagsNr && (
                         <div className="flex items-center text-blue-500 text-xs font-medium animate-pulse">
                             <Loader2 size={12} className="animate-spin mr-1" />
@@ -160,6 +160,8 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                 <div className="flex gap-2 max-w-md">
                     <div className="relative flex-grow">
                         <input
+                            id="maegler_sagsnr"
+                            name="maegler_sagsnr"
                             type="text"
                             value={localSagsNr}
                             onChange={(e) => setLocalSagsNr(e.target.value)}
@@ -170,6 +172,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                             }}
                             placeholder="Indtast sagsnr..."
                             className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                            aria-label="Mæglerens sagsnummer"
                         />
                     </div>
                     {sag.maegler_sagsnr && (
@@ -186,7 +189,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
                             <Building2 size={24} className="mr-3 text-gray-400" />
-                            Mæglervirksomhed
+                            <label htmlFor="maegler_virksomhed_id">Mæglervirksomhed</label>
                             {isSaving && <Loader2 size={16} className="ml-2 animate-spin text-blue-600" />}
                         </h2>
                         <button onClick={handleEditVirksomhed} className="p-1 text-gray-400 hover:text-blue-600 transition-colors">
@@ -195,9 +198,12 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                     </div>
 
                     <select
+                        id="maegler_virksomhed_id"
+                        name="maegler_virksomhed_id"
                         value={sag.maegler_virksomhed?.id || ''}
                         onChange={handleVirksomhedChange}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm"
+                        aria-label="Vælg mæglervirksomhed"
                     >
                         {isLoadingMaeglere ? <option>Henter...</option> : <option value="">Vælg mægler...</option>}
                         {alleMaeglere.map(m => (
@@ -261,7 +267,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
                             <User size={24} className="mr-3 text-gray-400" />
-                            Kontaktperson
+                            <label htmlFor="maegler_kontakt_id">Kontaktperson</label>
                         </h2>
                         <button onClick={handleEditKontakt} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" disabled={!sag.maegler_kontakt}>
                             <Edit size={18} />
@@ -269,10 +275,13 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
                     </div>
 
                     <select
+                        id="maegler_kontakt_id"
+                        name="maegler_kontakt_id"
                         value={sag.maegler_kontakt?.id || ''}
                         onChange={handleKontaktChange}
                         disabled={!sag.maegler_virksomhed}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        aria-label="Vælg kontaktperson"
                     >
                         {isLoadingKontakter ? <option>Henter...</option> : <option value="">Vælg kontaktperson...</option>}
                         {kontakter.map(k => (

@@ -521,13 +521,16 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
       {/* Søg/Opret boks */}
       <div className="relative">
         <div className="relative">
+          <label htmlFor="saelger_soeg" className="sr-only">Søg efter sælger</label>
           <input
+            id="saelger_soeg"
+            name="saelger_soeg"
             type="text"
             value={soegning}
             onChange={(e) => setSoegning(e.target.value)}
             placeholder="Søg efter eksisterende sælger..."
             className="w-full p-2 border border-gray-300 rounded-md shadow-sm"
-
+            aria-label="Søg efter sælger"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}

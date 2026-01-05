@@ -361,6 +361,8 @@ export const StateProvider = ({ children }: StateProviderProps) => {
 
   // Persistence effects
   React.useEffect(() => {
+    if (!state.currentUser) return;
+
     const fetchLookups = async () => {
       try {
         const [users, actStatuses, sagStatuses, docStatuses, sources, groups] = await Promise.all([
@@ -387,7 +389,7 @@ export const StateProvider = ({ children }: StateProviderProps) => {
       }
     };
     fetchLookups();
-  }, [dispatch]);
+  }, [dispatch, state.currentUser]);
 
   React.useEffect(() => {
     localStorage.setItem('mglp_valgtSag', JSON.stringify(state.valgtSag));

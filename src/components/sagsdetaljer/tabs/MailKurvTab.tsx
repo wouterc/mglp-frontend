@@ -459,10 +459,13 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
                                                             {/* Source Selector */}
                                                             <div className="flex-shrink-0 w-32">
                                                                 <select
+                                                                    id={`source-select-aktivitet-${akt.id}`}
+                                                                    name={`source-select-aktivitet-${akt.id}`}
                                                                     className="w-full text-xs border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 py-1 pl-1 pr-6 bg-white"
                                                                     value={akt.informations_kilde?.id || ""}
                                                                     onChange={(e) => handleUpdateSource('aktivitet', akt.id, e.target.value ? Number(e.target.value) : null)}
                                                                     disabled={isUpdating[`aktivitet-${akt.id}`]}
+                                                                    aria-label="Vælg informationskilde for aktivitet"
                                                                 >
                                                                     <option value="">Uden kilde</option>
                                                                     {informationsKilder.map(k => (
@@ -517,10 +520,13 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
                                                             {/* Source Selector */}
                                                             <div className="flex-shrink-0 w-32">
                                                                 <select
+                                                                    id={`source-select-dokument-${doc.id}`}
+                                                                    name={`source-select-dokument-${doc.id}`}
                                                                     className="w-full text-xs border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 py-1 pl-1 pr-6 bg-white"
                                                                     value={doc.informations_kilde?.id || ""}
                                                                     onChange={(e) => handleUpdateSource('dokument', doc.id, e.target.value ? Number(e.target.value) : null)}
                                                                     disabled={isUpdating[`dokument-${doc.id}`]}
+                                                                    aria-label="Vælg informationskilde for dokument"
                                                                 >
                                                                     <option value="">Uden kilde</option>
                                                                     {informationsKilder.map(k => (
