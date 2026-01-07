@@ -479,7 +479,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     };
 
     return (
-        <div className="flex h-full gap-4">
+        <div className="flex gap-4">
             <div className="flex-1 min-w-0 flex flex-col gap-4 p-4">
                 {aktivitetTilRedigering && (
                     <SagsAktivitetForm

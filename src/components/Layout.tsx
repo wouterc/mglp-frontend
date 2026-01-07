@@ -134,9 +134,9 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
   }
 
   return (
-    <div className="grid grid-cols-[auto_1fr_auto] h-screen bg-gray-100">
+    <div className="flex h-screen max-h-screen overflow-hidden bg-gray-100 w-full">
       {/* @# 2025-09-15 18:20 - Ændret fra w-20 til w-16 for lukket tilstand. */}
-      <aside className={`bg-gray-800 text-white flex flex-col transition-all duration-300 ${erMenuAaben ? 'w-56' : 'w-16'}`}>
+      <aside className={`bg-gray-800 text-white flex flex-col shrink-0 transition-all duration-300 ${erMenuAaben ? 'w-56' : 'w-16'} h-full overflow-hidden`}>
         <div className={`flex items-center ${erMenuAaben ? 'justify-between px-3' : 'justify-center'} p-4 border-b border-gray-700 h-16 transition-all`}>
           {erMenuAaben && (
             <div className="flex items-center gap-3 overflow-hidden">
@@ -150,7 +150,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         </div>
 
 
-        <nav className="flex-grow overflow-y-auto">
+        <nav className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
           {menuSektioner.map((sektion, index) => (
             <div key={sektion.titel} className={erMenuAaben ? 'mt-4' : 'mt-2'}>
               {erMenuAaben ? (
@@ -215,8 +215,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       </aside>
 
       <main
-        className={`flex-1 min-h-0 ${aktivSide.includes('kommunikation') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}
-        style={aktivSide.includes('kommunikation') ? { overflow: 'hidden' } : {}}
+        className={`flex-1 min-h-0 h-full relative ${aktivSide.includes('kommunikation') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto overflow-x-hidden'}`}
       >
         {children}
       </main>

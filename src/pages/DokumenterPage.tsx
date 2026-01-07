@@ -87,11 +87,10 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-
-
-      {/* Genbrug tabs-komponenten */}
-      <DokumenterTab sag={localSag} />
+    <div className="flex-1 h-full overflow-y-auto p-6 scroll-smooth">
+      <div className="max-w-7xl mx-auto">
+        <DokumenterTab sag={localSag} />
+      </div>
     </div >
   );
 }

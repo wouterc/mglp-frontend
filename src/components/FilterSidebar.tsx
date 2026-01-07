@@ -18,15 +18,15 @@ function FilterSidebar({ children, onNulstil }: FilterSidebarProps): React.React
     <aside className={`bg-gray-50 border-l border-gray-200 flex flex-col transition-all duration-300 ease-in-out ${erFilterMenuAaben ? 'w-72' : 'w-16'}`}>
       {/* @# 2025-09-15 18:55 - Ikon-sektion flyttet til toppen. */}
       <div className="flex-shrink-0 p-2 flex flex-col items-center w-full">
-        <button 
-          onClick={() => dispatch({ type: 'TOGGLE_FILTER_MENU' })} 
+        <button
+          onClick={() => dispatch({ type: 'TOGGLE_FILTER_MENU' })}
           className={`p-2 rounded-md hover:bg-gray-200 text-gray-600 ${erFilterMenuAaben ? 'self-end' : ''}`}
           title={erFilterMenuAaben ? 'Skjul filtre' : 'Vis filtre'}
         >
           <SlidersHorizontal size={20} />
         </button>
-        <button 
-          onClick={onNulstil} 
+        <button
+          onClick={onNulstil}
           className={`mt-2 p-2 rounded-md hover:bg-gray-200 text-gray-600 ${erFilterMenuAaben ? 'self-end' : ''}`}
           title="Nulstil filtre"
         >

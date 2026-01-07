@@ -423,7 +423,7 @@ const KommunikationPage: React.FC = () => {
     if (!currentUser) return <div>Loading...</div>;
 
     return (
-        <div className="flex h-full overflow-hidden flex-1 relative">
+        <div className="flex flex-1 h-full overflow-hidden relative min-h-0">
             <Toast
                 message={toast.message}
                 type={toast.type}
@@ -452,7 +452,7 @@ const KommunikationPage: React.FC = () => {
                 onSelectMessage={handleSelectMessageSearchResult}
             />
 
-            <div className={`flex-1 flex min-w-0 overflow-hidden ${layoutMode === 'right' ? 'flex-row' : 'flex-col'}`}>
+            <div className={`flex-1 flex min-w-0 min-h-0 overflow-hidden ${layoutMode === 'right' ? 'flex-row' : 'flex-col'}`}>
                 {/* Chat Window Container */}
                 <div className={`flex flex-col min-w-0 min-h-0 ${layoutMode === 'right' ? 'flex-[2] border-r border-gray-200 h-full' : 'flex-1'}`}>
                     <ChatWindow
@@ -468,7 +468,7 @@ const KommunikationPage: React.FC = () => {
 
                 {/* Message Input Container */}
                 {activeRecipient && (
-                    <div className={`${layoutMode === 'right' ? 'flex-1 min-w-[350px] bg-white h-full flex flex-col shrink-0 border-l border-gray-200 pb-12' : 'shrink-0 bg-white relative z-20 pb-12 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]'}`}>
+                    <div className={`${layoutMode === 'right' ? 'flex-1 min-w-[350px] bg-white h-full flex flex-col shrink-0 border-l border-gray-200' : 'shrink-0 bg-white relative z-20 shadow-[0_-1px_10px_rgba(0,0,0,0.05)]'}`}>
                         <MessageInput
                             onSend={handleSendMessage}
                             replyingTo={replyToMessage}

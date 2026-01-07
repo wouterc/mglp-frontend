@@ -237,7 +237,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
     );
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
             {visForm && (
                 <VirksomhedForm
                     onSave={handleSave}

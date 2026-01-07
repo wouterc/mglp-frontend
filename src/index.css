@@ -90,3 +90,32 @@ table td select {
     /* min-height removed */
     height: 100%;
 }
+
+/* Premium Scrollbar */
+.custom-scrollbar::-webkit-scrollbar,
+main::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+main::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+main::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    /* gray-400 with higher opacity */
+    border-radius: 10px;
+    transition: background 0.2s;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+main::-webkit-scrollbar-thumb:hover {
+    background: rgba(107, 114, 128, 0.7);
+    /* gray-500 with higher opacity */
+    background-clip: padding-box;
+}

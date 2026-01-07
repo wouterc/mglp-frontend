@@ -64,7 +64,7 @@ const UserListPage: React.FC = () => {
     }
 
     return (
-        <div className="p-6">
+        <div className="flex-1 h-full overflow-y-auto p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">

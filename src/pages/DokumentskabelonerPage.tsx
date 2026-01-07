@@ -380,7 +380,7 @@ function DokumentskabelonerPage(): ReactElement {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
+    <div className="flex flex-col h-full bg-gray-100">
       {/* Header */}
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="flex items-baseline gap-6">

@@ -205,7 +205,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
     };
 
     return (
-        <div className="flex-1 flex flex-col bg-white overflow-hidden h-full relative">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden relative min-h-0">
             <div className="sticky top-0 z-10 p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
                     <h2 className="text-lg font-semibold text-gray-800">
@@ -221,7 +221,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
 
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto p-4 pb-24 bg-gray-50"
+                className="flex-1 overflow-y-auto p-4 pb-10 bg-gray-50"
             >
                 {!recipient ? (
                     <div className="flex items-center justify-center h-full text-gray-400">

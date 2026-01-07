@@ -567,7 +567,7 @@ function AktivitetsskabelonerPage(): ReactElement {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       {visForm && (
         <AktivitetForm
           onSave={handleSave}
