@@ -12,10 +12,12 @@ import Toast, { ToastType } from '../components/ui/Toast';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import { api } from '../api';
 import { useAppState } from '../StateContext';
+import VidensbankModal from '../components/vidensbank/VidensbankModal';
+import { Viden, VidensKategori } from '../types';
 
 const KommunikationPage: React.FC = () => {
     const { state, dispatch } = useAppState();
-    const { currentUser, users, chatTeams: teams, chatMessages: messages, chatActiveRecipient: activeRecipient, chatActiveType: activeType } = state;
+    const { currentUser, users, chatTeams: teams, chatMessages: messages, chatActiveRecipient: activeRecipient, chatActiveType: activeType, chatUnreadCounts: unreadCounts } = state;
 
     const setTeams = (payload: Team[]) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatTeams: payload } });
     const setMessages = (payload: Besked[] | ((prev: Besked[]) => Besked[])) => {
@@ -27,10 +29,13 @@ const KommunikationPage: React.FC = () => {
     };
     const setActiveRecipient = (payload: UserType | Team | undefined) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatActiveRecipient: payload } });
     const setActiveType = (payload: 'user' | 'team' | undefined) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatActiveType: payload } });
+    const setUnreadCounts = (payload: { [key: string]: number }) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatUnreadCounts: payload } });
 
 
     const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
     const [replyToMessage, setReplyToMessage] = useState<Besked | undefined>(undefined);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
 
     // Forwarding state
     const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
@@ -41,6 +46,11 @@ const KommunikationPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<Besked[]>([]);
     const [onlyActiveChat, setOnlyActiveChat] = useState(false);
+
+    // Vidensbank state
+    const [isVidensbankModalOpen, setIsVidensbankModalOpen] = useState(false);
+    const [vidensbankKategorier, setVidensbankKategorier] = useState<VidensKategori[]>([]);
+    const [vidensbankDraft, setVidensbankDraft] = useState<Viden | undefined>(undefined);
 
     // Toast Notification
     const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
@@ -62,39 +72,54 @@ const KommunikationPage: React.FC = () => {
         };
     }, []);
 
+    // Initial Fetch
     useEffect(() => {
         if (!currentUser) return;
 
         const fetchData = async () => {
             try {
-                // Users hentes nu globalt i StateContext
-
-                const teamsData = await KommunikationService.getTeams();
+                // 1. Fetch Lookups and Metadata
+                const [teamsData, unreadData, katRes] = await Promise.all([
+                    KommunikationService.getTeams(),
+                    KommunikationService.getUnreadCountsDetailed(),
+                    api.get<VidensKategori[]>('/vidensbank/kategorier/')
+                ]);
                 setTeams(teamsData);
+                setUnreadCounts(unreadData);
+                setVidensbankKategorier(katRes);
 
-                const msgs = await KommunikationService.getBeskeder();
-                setMessages(msgs);
+                // 2. Determine Active Recipient
+                let currentRecipient = activeRecipient;
+                let currentType = activeType;
 
-                // Restore active chat session IF NOT ALREADY SET in global state
-                if (!activeRecipient) {
+                if (!currentRecipient) {
                     const savedType = localStorage.getItem('chat_active_type');
                     const savedId = Number(localStorage.getItem('chat_active_id'));
 
                     if (savedType && savedId) {
                         if (savedType === 'user') {
-                            const u = users.find((user: any) => user.id === savedId);
-                            if (u) {
-                                setActiveRecipient(u);
-                                setActiveType('user');
-                            }
+                            currentRecipient = users.find((user: any) => user.id === savedId);
+                            currentType = 'user';
                         } else if (savedType === 'team') {
-                            const t = teamsData.find(team => team.id === savedId);
-                            if (t) {
-                                setActiveRecipient(t);
-                                setActiveType('team');
-                            }
+                            currentRecipient = teamsData.find(team => team.id === savedId);
+                            currentType = 'team';
                         }
                     }
+                }
+
+                // 3. Fetch Initial Messages for active chat
+                if (currentRecipient && currentType) {
+                    setActiveRecipient(currentRecipient);
+                    setActiveType(currentType);
+
+                    const msgs = await KommunikationService.getBeskeder(undefined, undefined, currentRecipient.id, currentType, 50);
+                    // Backend returns descending for limit, so we reverse
+                    setMessages(msgs.reverse());
+                    setHasMore(msgs.length === 50);
+                } else {
+                    // Try to fetch newest globally if no chat active? 
+                    // Actually usually we just start empty.
+                    setMessages([]);
                 }
 
             } catch (error) {
@@ -103,17 +128,21 @@ const KommunikationPage: React.FC = () => {
         };
 
         fetchData();
+    }, [currentUser, users.length]);
+
+    // Polling Interval
+    useEffect(() => {
+        if (!currentUser) return;
 
         const interval = setInterval(async () => {
             try {
-                // Find the highest ID we have in the CURRENT state at interval time
-                // We use dynamic access to 'messages' via the setter callback if we wanted, 
-                // but here we can just fetch and the setter handles the merging
-                const currentMsgs = messages;
-                const lastId = currentMsgs.length > 0
-                    ? Math.max(...currentMsgs.map(m => m.id))
-                    : 0;
+                // 1. Poll Unread Counts (Very lightweight)
+                const unreadData = await KommunikationService.getUnreadCountsDetailed();
+                setUnreadCounts(unreadData);
 
+                // 2. Poll for ALL new messages since last known ID
+                // This ensures sidebar updates and current chat updates
+                const lastId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) : 0;
                 const newMsgs = await KommunikationService.getBeskeder(lastId);
 
                 if (newMsgs.length > 0) {
@@ -127,10 +156,59 @@ const KommunikationPage: React.FC = () => {
             } catch (error) {
                 console.error("Polling error", error);
             }
-        }, 3000); // 3 seconds poll
+        }, 3000);
 
         return () => clearInterval(interval);
-    }, [currentUser, users.length]); // Re-run if users are loaded
+    }, [currentUser, messages.length]); // Re-bind on message length change to keep lastId correct
+
+    // Effect for changing recipient
+    useEffect(() => {
+        if (activeRecipient && activeType) {
+            setHasMore(true);
+            const activeMsgs = getActiveMessages();
+            // If we have few or no messages for this chat, fetch initial batch
+            if (activeMsgs.length < 20) {
+                KommunikationService.getBeskeder(undefined, undefined, activeRecipient.id, activeType, 50)
+                    .then(msgs => {
+                        setMessages(prev => {
+                            const existingIds = new Set(prev.map(m => m.id));
+                            const uniqueNew = msgs.filter(m => !existingIds.has(m.id));
+                            return [...prev, ...uniqueNew.reverse()].sort((a, b) => a.id - b.id);
+                        });
+                        setHasMore(msgs.length === 50);
+                    });
+            }
+        }
+    }, [activeRecipient?.id]);
+
+    const handleLoadMore = async () => {
+        if (!activeRecipient || !activeType || isLoadingMore || !hasMore) return;
+
+        const activeMsgs = getActiveMessages();
+        if (activeMsgs.length === 0) return;
+
+        const oldestId = activeMsgs[0].id;
+
+        setIsLoadingMore(true);
+        try {
+            const olderMsgs = await KommunikationService.getBeskeder(undefined, undefined, activeRecipient.id, activeType, 50, oldestId);
+            if (olderMsgs.length < 50) {
+                setHasMore(false);
+            }
+            if (olderMsgs.length > 0) {
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const uniqueOld = olderMsgs.filter(m => !existingIds.has(m.id));
+                    // Add and sort
+                    return [...prev, ...uniqueOld].sort((a, b) => a.id - b.id);
+                });
+            }
+        } catch (error) {
+            console.error("Load more error", error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
 
     // Search effect
     useEffect(() => {
@@ -141,11 +219,9 @@ const KommunikationPage: React.FC = () => {
             }
 
             try {
-                // We fetch all matching messages
                 const results = await KommunikationService.getBeskeder(undefined, searchTerm);
 
                 if (onlyActiveChat && activeRecipient) {
-                    // Filter results to only those in the active conversation
                     const filtered = results.filter(msg => {
                         if (activeType === 'user') {
                             const recipientId = activeRecipient.id;
@@ -167,8 +243,6 @@ const KommunikationPage: React.FC = () => {
         const timer = setTimeout(performSearch, 300); // 300ms debounce
         return () => clearTimeout(timer);
     }, [searchTerm, onlyActiveChat, activeRecipient, activeType, currentUser]);
-
-    // ... existing effect ...
 
     const handleSelectUser = (user: UserType) => {
         setActiveRecipient(user);
@@ -221,20 +295,15 @@ const KommunikationPage: React.FC = () => {
             parent: parentId || undefined
         };
 
-        // 1. Optimistic Update
         setMessages(prev => [...prev, optimisticMsg]);
-        setReplyToMessage(undefined); // Clear reply immediately
+        setReplyToMessage(undefined);
 
         try {
             const response = await KommunikationService.sendBesked(payload);
-
-            // 2. Replace Optimistic with Real
             setMessages(prev => prev.map(m => m.id === tempId ? response : m));
-
         } catch (error) {
             console.error("Failed to send message", error);
             showToast("Kunne ikke sende besked", "error");
-            // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
     };
@@ -247,11 +316,11 @@ const KommunikationPage: React.FC = () => {
             return messages.filter(m =>
                 (m.afsender === currentUser.id && m.modtager_person === recipientId) ||
                 (m.afsender === recipientId && m.modtager_person === currentUser.id)
-            ).sort((a, b) => new Date(a.oprettet).getTime() - new Date(b.oprettet).getTime());
+            ).sort((a, b) => a.id - b.id);
         } else {
             const teamId = activeRecipient.id;
             return messages.filter(m => m.modtager_team === teamId)
-                .sort((a, b) => new Date(a.oprettet).getTime() - new Date(b.oprettet).getTime());
+                .sort((a, b) => a.id - b.id);
         }
     };
 
@@ -267,32 +336,13 @@ const KommunikationPage: React.FC = () => {
         }
     };
 
-    // Calculate unread counts
-    const unreadCounts = React.useMemo(() => {
-        const counts: { [key: string]: number } = {};
-        if (!currentUser) return counts;
-
-        messages.forEach(msg => {
-            // Only count messages NOT sent by me and NOT read by me
-            if (msg.afsender !== currentUser.id && !msg.laest_af_mig) {
-                if (msg.modtager_team) {
-                    const key = `team-${msg.modtager_team}`;
-                    counts[key] = (counts[key] || 0) + 1;
-                } else {
-                    // Private message, count for the sender
-                    const key = `user-${msg.afsender}`;
-                    counts[key] = (counts[key] || 0) + 1;
-                }
-            }
-        });
-        return counts;
-    }, [messages, currentUser]);
+    // calculate breadcrumbs or other things if needed
 
     const location = useLocation();
     const isPopup = location.pathname.includes('chat-popup');
 
     const [layoutMode, setLayoutMode] = useState<'bottom' | 'right'>(() => {
-        if (isPopup) return 'bottom'; // Force bottom layout for popup
+        if (isPopup) return 'bottom';
         const saved = localStorage.getItem('chat_layout_mode_v2');
         return (saved === 'right' || saved === 'bottom') ? saved : 'bottom';
     });
@@ -304,7 +354,7 @@ const KommunikationPage: React.FC = () => {
     }, [layoutMode, isPopup]);
 
     const toggleLayout = () => {
-        if (isPopup) return; // Disable toggle in popup
+        if (isPopup) return;
         setLayoutMode(prev => prev === 'bottom' ? 'right' : 'bottom');
     };
 
@@ -328,12 +378,30 @@ const KommunikationPage: React.FC = () => {
         return () => {
             window.removeEventListener('resize', saveWindowState);
             window.removeEventListener('beforeunload', saveWindowState);
-            saveWindowState(); // Save on unmount too
+            saveWindowState();
         };
     }, [isPopup]);
 
     const handleDeleteMessage = (id: number) => {
         setDeletingMessageId(id);
+    };
+
+    const handleToVidensbank = (msg: Besked) => {
+        setVidensbankDraft({
+            id: 0,
+            titel: '',
+            indhold: msg.indhold,
+            kategori: '',
+            oprettet: new Date().toISOString(),
+            opdateret: new Date().toISOString(),
+        } as any);
+        setIsVidensbankModalOpen(true);
+    };
+
+    const handleVidensbankSave = () => {
+        setIsVidensbankModalOpen(false);
+        setVidensbankDraft(undefined);
+        showToast("Artikel oprettet i Vidensbanken", "success");
     };
 
     const confirmDeleteMessage = async () => {
@@ -382,8 +450,12 @@ const KommunikationPage: React.FC = () => {
             }
 
             if (activeType === recipientType && activeRecipient?.id === recipientId) {
-                const msgs = await KommunikationService.getBeskeder();
-                setMessages(msgs);
+                const msgs = await KommunikationService.getBeskeder(undefined, undefined, recipientId, recipientType, 50);
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const uniqueNew = msgs.filter(m => !existingIds.has(m.id));
+                    return [...prev, ...uniqueNew.reverse()].sort((a, b) => a.id - b.id);
+                });
             }
             showToast(`Besked videresendt til ${recipientName}`, "success");
         } catch (error) {
@@ -407,13 +479,10 @@ const KommunikationPage: React.FC = () => {
     };
 
     const handleSelectMessageSearchResult = (msg: Besked) => {
-        // Find the recipient from the message
         if (msg.modtager_team) {
             const team = teams.find(t => t.id === msg.modtager_team);
             if (team) handleSelectTeam(team);
         } else {
-            // It's a DM. If I am the afsender, recipient is modtager_person.
-            // If I am NOT the afsender, recipient is the afsender.
             const recipientId = msg.afsender === currentUser?.id ? msg.modtager_person : msg.afsender;
             const user = users.find(u => u.id === recipientId);
             if (user) handleSelectUser(user);
@@ -463,6 +532,10 @@ const KommunikationPage: React.FC = () => {
                         onReply={setReplyToMessage}
                         onDelete={handleDeleteMessage}
                         onForward={(msg) => { setForwardingMessage(msg); setIsForwardModalOpen(true); }}
+                        onToVidensbank={handleToVidensbank}
+                        onLoadMore={handleLoadMore}
+                        isLoadingMore={isLoadingMore}
+                        hasMore={hasMore}
                     />
                 </div>
 
@@ -475,6 +548,9 @@ const KommunikationPage: React.FC = () => {
                             onCancelReply={() => setReplyToMessage(undefined)}
                             fullHeight={layoutMode === 'right'}
                             onDropMessage={handleDropMessageOnInput}
+                            initialContent={(location.state as any)?.initialMessage}
+                            initialLinkUrl={(location.state as any)?.initialLinkUrl}
+                            initialLinkTitle={(location.state as any)?.initialLinkTitle}
                         />
                     </div>
                 )}
@@ -494,6 +570,14 @@ const KommunikationPage: React.FC = () => {
                 users={users.filter(u => u.id !== currentUser.id)}
                 teams={teams}
                 currentUser={currentUser}
+            />
+
+            <VidensbankModal
+                isOpen={isVidensbankModalOpen}
+                onClose={() => setIsVidensbankModalOpen(false)}
+                onSave={handleVidensbankSave}
+                editingViden={vidensbankDraft}
+                kategorier={vidensbankKategorier}
             />
 
             <ConfirmModal

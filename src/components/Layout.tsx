@@ -4,7 +4,7 @@
 import React, { useState, ReactNode, useEffect } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart } from 'lucide-react';
+import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig } from 'lucide-react';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
@@ -103,6 +103,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         { id: 'kontakter', navn: 'Kontakter', ikon: Users },
         // @# 2025-12-07 - Ny side
         { id: 'medarbejdere', navn: 'Medarbejdere', ikon: UserCircle },
+        { id: 'vidensbank', navn: 'Vidensbank', ikon: LibraryBig },
         { id: 'kommunikation', navn: 'Intern Chat', ikon: MessageCircleHeart },
       ],
     },
@@ -157,7 +158,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
                 <h2 className="px-4 text-xs font-bold uppercase text-gray-400">{sektion.titel}</h2>
               ) : (
                 /* Vis en tydelig streg mellem grupperne når menuen er lukket */
-                index > 0 && <div className="border-t-2 border-gray-500 mx-2 my-2 opacity-75"></div>
+                index > 0 && <div className="border-t-2 border-gray-500 mx-2 my-1 opacity-75"></div>
               )}
               <ul>
                 {sektion.items.map(punkt => (
@@ -196,8 +197,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
             </div>
             {erMenuAaben && (
               <div className="ml-3 overflow-hidden whitespace-nowrap">
-                <p className="text-sm font-medium truncate text-gray-100">{currentUser?.first_name ? `${currentUser.first_name} ${currentUser.last_name || ''}` : currentUser?.username}</p>
-                <p className="text-xs text-gray-400 truncate w-32">{currentUser?.email}</p>
+                <p className="text-sm font-medium truncate text-gray-100">{currentUser?.first_name ? `${currentUser.first_name} ${currentUser?.last_name || ''}` : currentUser?.username}</p>
               </div>
             )}
           </Link>

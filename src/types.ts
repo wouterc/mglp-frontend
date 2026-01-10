@@ -398,3 +398,24 @@ export interface OutgoingEmail {
   created_at: string;
   sent_at?: string;
 }
+
+export interface VidensKategori {
+  id: number;
+  navn: string;
+  beskrivelse: string | null;
+  farve: string;
+}
+
+export interface Viden {
+  id: number;
+  titel: string;
+  kategori: number;
+  kategori_details?: VidensKategori;
+  indhold: string;
+  link: string | null;
+  fil: string | null;
+  oprettet_af: number | null;
+  oprettet_af_details?: User;
+  oprettet: string;
+  opdateret: string;
+}

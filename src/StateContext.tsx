@@ -103,6 +103,7 @@ interface AppState {
   chatMessages: any[];
   chatActiveRecipient: any | undefined;
   chatActiveType: 'user' | 'team' | undefined;
+  chatUnreadCounts: { [key: string]: number };
 }
 
 // --- 2. Definer de handlinger (actions) du kan udføre ---
@@ -176,6 +177,7 @@ const initialState: AppState = {
   chatMessages: [],
   chatActiveRecipient: undefined,
   chatActiveType: undefined,
+  chatUnreadCounts: {},
 
   // Sagsoversigt
   sager: [],

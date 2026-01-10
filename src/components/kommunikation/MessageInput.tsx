@@ -10,15 +10,18 @@ interface MessageInputProps {
     replyingTo?: Besked;
     onCancelReply?: () => void;
     onDropMessage?: (messageId: number) => void;
+    initialContent?: string;
+    initialLinkUrl?: string;
+    initialLinkTitle?: string;
 }
 
-const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ onSend, replyingTo, onCancelReply, fullHeight, onDropMessage }) => {
-    const [content, setContent] = useState('');
+const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ onSend, replyingTo, onCancelReply, fullHeight, onDropMessage, initialContent, initialLinkUrl, initialLinkTitle }) => {
+    const [content, setContent] = useState(initialContent || '');
     const [type, setType] = useState<MessageType>('NORMAL');
-    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [showLinkInput, setShowLinkInput] = useState(!!initialLinkUrl);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const [linkUrl, setLinkUrl] = useState('');
-    const [linkTitle, setLinkTitle] = useState('');
+    const [linkUrl, setLinkUrl] = useState(initialLinkUrl || '');
+    const [linkTitle, setLinkTitle] = useState(initialLinkTitle || '');
 
     const [isDragOver, setIsDragOver] = useState(false);
 

@@ -11,9 +11,11 @@ interface ModalProps {
   footer?: ReactNode;
   headerActions?: ReactNode;
   maxWidth?: string; // New prop
+  wide?: boolean;
 }
 
-function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWidth = 'max-w-md' }: ModalProps): React.ReactElement | null {
+function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWidth = 'max-w-md', wide }: ModalProps): React.ReactElement | null {
+  const resolvedMaxWidth = wide ? 'max-w-4xl' : maxWidth;
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -36,10 +38,10 @@ function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWid
       onClick={onClose} // Luk ved klik på baggrunden
     >
       <div
-        className={`bg-white rounded-lg shadow-xl w-full ${maxWidth} m-4`}
+        className={`bg-white rounded-lg shadow-xl w-full ${resolvedMaxWidth} m-4 max-h-[95vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()} // Forhindrer at klik inde i modalen lukker den
       >
-        <div className="flex justify-between items-center p-4 border-b">
+        <div className="flex justify-between items-center p-4 border-b shrink-0">
           <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
           <div className="flex items-center gap-2">
             {headerActions}
@@ -48,11 +50,11 @@ function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWid
             </button>
           </div>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto min-h-0 custom-scrollbar">
           {children}
         </div>
         {footer && (
-          <div className="flex justify-end p-4 border-t bg-gray-50 rounded-b-lg">
+          <div className="flex justify-end p-4 border-t bg-gray-50 rounded-b-lg shrink-0">
             {footer}
           </div>
         )}

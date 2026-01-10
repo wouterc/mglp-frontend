@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { User, Team } from '../../types_kommunikation';
 import { User as UserType } from '../../types';
-import { Users, User as UserIcon, Search, MessageSquare, X } from 'lucide-react';
+import { Users, User as UserIcon, Search, MessageSquare, X, Book, PlusCircle } from 'lucide-react';
 import { Besked } from '../../types_kommunikation';
 import dayjs from 'dayjs';
 

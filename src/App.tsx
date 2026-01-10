@@ -34,6 +34,7 @@ import SagsMailPage from './pages/SagsMailPage';
 import MailKurvPage from './pages/MailKurvPage';
 import type { Sag } from './types';
 import KommunikationPage from './pages/KommunikationPage';
+import VidensbankPage from './pages/VidensbankPage';
 import { useAppState, StateContext } from './StateContext';
 
 function App() {
@@ -168,6 +169,7 @@ function App() {
 
             <Route path="/mail" element={<MailPage />} />
             <Route path="/kommunikation" element={<KommunikationPage />} />
+            <Route path="/vidensbank" element={<VidensbankPage />} />
             <Route path="*" element={<SagsoversigtPage navigateTo={navigateTo} />} />
           </Routes>
           <ConfirmModal

@@ -4,7 +4,7 @@ import { User, Team } from '../../types_kommunikation';
 import { User as UserType } from '../../types';
 import DOMPurify from 'dompurify';
 import dayjs from 'dayjs';
-import { Reply, MoreVertical, Copy, Trash2, ArrowRight, CornerUpLeft } from 'lucide-react';
+import { Reply, MoreVertical, Copy, Trash2, ArrowRight, CornerUpLeft, Book } from 'lucide-react';
 
 interface ChatWindowProps {
     recipient?: UserType | Team;
@@ -14,14 +14,31 @@ interface ChatWindowProps {
     onReply: (msg: Besked) => void;
     onDelete: (id: number) => void;
     onForward: (msg: Besked) => void;
+    onToVidensbank: (msg: Besked) => void;
+    onLoadMore?: () => void;
+    hasMore?: boolean;
+    isLoadingMore?: boolean;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messages, currentUser, onReply, onDelete, onForward }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({
+    recipient,
+    recipientType,
+    messages,
+    currentUser,
+    onReply,
+    onDelete,
+    onForward,
+    onToVidensbank,
+    onLoadMore,
+    hasMore = false,
+    isLoadingMore = false
+}) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
     const [prevMessagesLength, setPrevMessagesLength] = React.useState(0);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -36,19 +53,50 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
         }
     };
 
-    useEffect(() => {
-        // Only scroll if we have new messages (or initial load)
-        if (messages.length > prevMessagesLength) {
-            scrollToBottom();
-            setPrevMessagesLength(messages.length);
-        }
-    }, [messages, prevMessagesLength]);
+    // Handle scroll to load more
+    const handleScroll = () => {
+        if (!scrollContainerRef.current || isLoadingMore || !hasMore || !onLoadMore) return;
 
-    // Reset length tracker when changing recipient so we scroll to bottom of new chat
+        const { scrollTop } = scrollContainerRef.current;
+        if (scrollTop < 50) { // Near top
+            // Save scroll height to maintain position after load
+            const currentScrollHeight = scrollContainerRef.current.scrollHeight;
+
+            // This is a bit tricky, we need to handle the scroll jump after messages arrive.
+            // Usually we'd do this in a requestAnimationFrame or useEffect after messages update.
+            (scrollContainerRef.current as any)._prevScrollHeight = currentScrollHeight;
+
+            onLoadMore();
+        }
+    };
+
+    useEffect(() => {
+        if (!scrollContainerRef.current) return;
+
+        const container = scrollContainerRef.current;
+        const prevHeight = (container as any)._prevScrollHeight;
+
+        if (prevHeight && messages.length > prevMessagesLength) {
+            // We loaded more messages at the top
+            const newHeight = container.scrollHeight;
+            container.scrollTop = newHeight - prevHeight;
+            (container as any)._prevScrollHeight = null;
+        } else if (messages.length > prevMessagesLength) {
+            // New message arrived at bottom or initial load
+            const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+            if (isAtBottom || isInitialLoad) {
+                scrollToBottom();
+                setIsInitialLoad(false);
+            }
+        }
+        setPrevMessagesLength(messages.length);
+    }, [messages.length]);
+
+    // Reset when changing recipient
     useEffect(() => {
         setPrevMessagesLength(0);
+        setIsInitialLoad(true);
 
-        // Use a small timeout to allow rendering to complete before scrolling
         const timer = setTimeout(() => {
             scrollToBottom();
         }, 50);
@@ -61,7 +109,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
             const textBlob = new Blob([msg.indhold.replace(/<[^>]*>/g, '')], { type: "text/plain" });
             const data = [new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })];
             await navigator.clipboard.write(data);
-            // Could add toast here
         } catch (err) {
             console.error('Failed to copy: ', err);
             alert("Kunne ikke kopiere indholdet.");
@@ -70,13 +117,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
     };
 
     const isOnlyEmojis = (html: string) => {
-        // Strip HTML tags
         const text = html.replace(/<[^>]*>/g, '').trim();
         if (!text) return false;
-        // Check if string contains only emojis and whitespace
-        // Using \p{Extended_Pictographic} for broad emoji support
         const emojiRegex = /^(\p{Extended_Pictographic}|\s)+$/u;
-        // Check validity and limit length (e.g. max 5 emojis to be big)
         return emojiRegex.test(text) && Array.from(text).length <= 10;
     };
 
@@ -140,6 +183,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
                                     >
                                         <ArrowRight size={14} /> Videresend
                                     </button>
+                                    <button
+                                        onClick={() => { onToVidensbank(msg); setActiveMenuId(null); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                    >
+                                        <Book size={14} /> Vidensbank
+                                    </button>
                                     {isMe && (
                                         <button
                                             onClick={() => { onDelete(msg.id); setActiveMenuId(null); }}
@@ -154,7 +203,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
 
                         {label}
                         <div className="flex justify-between items-baseline mb-1 pr-6">
-                            {recipientType === 'team' && (
+                            {(recipientType === 'team' || !isMe) && (
                                 <span className="text-xs font-semibold text-gray-600 mr-2">
                                     {msg.afsender_details.first_name} {msg.afsender_details.last_name}
                                 </span>
@@ -192,12 +241,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
-                                    🔗 {msg.link_titel || 'Klik here'}
+                                    🔗 {msg.link_titel || 'Klik her'}
                                 </a>
                             </div>
                         )}
-
-                        {/* Removed the bottom reply button as it's now in the menu */}
                     </div>
                 </div>
             </div>
@@ -214,14 +261,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
                             : 'Vælg modtager'
                         }
                     </h2>
-                    <span className="text-xs text-gray-400 font-mono">(v3.2)</span>
+                    <span className="text-xs text-gray-400 font-mono">(v4.0)</span>
                 </div>
             </div>
 
 
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto p-4 pb-10 bg-gray-50"
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto p-4 pb-10 bg-gray-50 scroll-smooth"
             >
                 {!recipient ? (
                     <div className="flex items-center justify-center h-full text-gray-400">
@@ -232,7 +280,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ recipient, recipientType, messa
                         Ingen beskeder endnu.
                     </div>
                 ) : (
-                    messages.map(renderMessage)
+                    <>
+                        {hasMore && (
+                            <div className="flex justify-center py-4">
+                                {isLoadingMore ? (
+                                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <button onClick={onLoadMore} className="text-xs text-blue-600 hover:underline">Indlæs tidligere beskeder</button>
+                                )}
+                            </div>
+                        )}
+                        {messages.map(renderMessage)}
+                    </>
                 )}
                 <div ref={messagesEndRef} />
             </div>

@@ -14,10 +14,21 @@ export const KommunikationService = {
     },
 
     // Beskeder
-    getBeskeder: async (sinceId?: number, search?: string): Promise<Besked[]> => {
+    getBeskeder: async (
+        sinceId?: number,
+        search?: string,
+        recipientId?: number,
+        recipientType?: 'user' | 'team',
+        limit?: number,
+        beforeId?: number
+    ): Promise<Besked[]> => {
         const params = new URLSearchParams();
         if (sinceId) params.append('since_id', sinceId.toString());
         if (search) params.append('search', search);
+        if (recipientId) params.append('recipient_id', recipientId.toString());
+        if (recipientType) params.append('recipient_type', recipientType);
+        if (limit) params.append('limit', limit.toString());
+        if (beforeId) params.append('before_id', beforeId.toString());
 
         const url = `/kommunikation/beskeder/${params.toString() ? '?' + params.toString() : ''}`;
         const response = await api.get<Besked[]>(url);
@@ -32,6 +43,10 @@ export const KommunikationService = {
     },
     getUnreadCount: async (): Promise<{ unread_count: number }> => {
         const response = await api.get<{ unread_count: number }>('/kommunikation/beskeder/unread_count/');
+        return response;
+    },
+    getUnreadCountsDetailed: async (): Promise<{ [key: string]: number }> => {
+        const response = await api.get<{ [key: string]: number }>('/kommunikation/beskeder/unread_counts_detailed/');
         return response;
     },
     deleteBesked: async (id: number): Promise<void> => {
