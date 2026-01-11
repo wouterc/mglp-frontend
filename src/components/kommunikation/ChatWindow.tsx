@@ -18,6 +18,7 @@ interface ChatWindowProps {
     onLoadMore?: () => void;
     hasMore?: boolean;
     isLoadingMore?: boolean;
+    onBack?: () => void; // Add onBack prop
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -31,7 +32,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     onToVidensbank,
     onLoadMore,
     hasMore = false,
-    isLoadingMore = false
+    isLoadingMore = false,
+    onBack // Destructure onBack
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -255,7 +257,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative min-h-0">
             <div className="sticky top-0 z-10 p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-gray-800">
+                    {/* Back Button for Mobile */}
+                    <button
+                        onClick={onBack}
+                        className="md:hidden p-1 mr-[-4px] text-gray-500 hover:bg-gray-200 rounded-full"
+                        aria-label="Tilbage til oversigt"
+                    >
+                        <CornerUpLeft className="transform rotate-[-90deg]" size={20} />
+                    </button>
+
+                    <h2 className="text-lg font-semibold text-gray-800 truncate max-w-[200px] md:max-w-none">
                         {recipient
                             ? (recipientType === 'team' ? (recipient as Team).navn : `${(recipient as UserType).first_name} ${(recipient as UserType).last_name}`)
                             : 'Vælg modtager'

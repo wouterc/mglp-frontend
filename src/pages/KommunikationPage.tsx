@@ -252,6 +252,11 @@ const KommunikationPage: React.FC = () => {
         localStorage.setItem('chat_active_id', String(user.id));
     };
 
+    const handleBackToOverview = () => {
+        setActiveRecipient(undefined);
+        setActiveType(undefined);
+    };
+
     const handleSelectTeam = (team: Team) => {
         setActiveRecipient(team);
         setActiveType('team');
@@ -519,9 +524,10 @@ const KommunikationPage: React.FC = () => {
                 onlyActiveChat={onlyActiveChat}
                 onToggleOnlyActive={() => setOnlyActiveChat(!onlyActiveChat)}
                 onSelectMessage={handleSelectMessageSearchResult}
+                className={activeRecipient ? 'hidden md:flex' : 'flex'} // Hide on mobile if chat active
             />
 
-            <div className={`flex-1 flex min-w-0 min-h-0 overflow-hidden ${layoutMode === 'right' ? 'flex-row' : 'flex-col'}`}>
+            <div className={`flex-1 flex min-w-0 min-h-0 overflow-hidden ${layoutMode === 'right' ? 'flex-row' : 'flex-col'} ${activeRecipient ? 'flex' : 'hidden md:flex'}`}>
                 {/* Chat Window Container */}
                 <div className={`flex flex-col min-w-0 min-h-0 ${layoutMode === 'right' ? 'flex-[2] border-r border-gray-200 h-full' : 'flex-1'}`}>
                     <ChatWindow
@@ -536,6 +542,7 @@ const KommunikationPage: React.FC = () => {
                         onLoadMore={handleLoadMore}
                         isLoadingMore={isLoadingMore}
                         hasMore={hasMore}
+                        onBack={handleBackToOverview} // Pass back handler
                     />
                 </div>
 

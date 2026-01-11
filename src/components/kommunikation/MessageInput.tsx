@@ -143,7 +143,7 @@ const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({ 
                         onClick={() => setShowLinkInput(!showLinkInput)}
                         className={`text-xs px-2 py-1 rounded ${showLinkInput ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                        🔗 Link Context
+                        🔗 <span className="hidden sm:inline">Link Context</span><span className="inline sm:hidden">Link</span>
                     </button>
 
                     <div className="relative">

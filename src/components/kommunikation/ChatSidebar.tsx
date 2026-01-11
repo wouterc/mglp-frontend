@@ -26,6 +26,7 @@ interface ChatSidebarProps {
     onlyActiveChat: boolean;
     onToggleOnlyActive: () => void;
     onSelectMessage?: (msg: Besked) => void;
+    className?: string; // Add className prop
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -46,7 +47,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     searchResults,
     onlyActiveChat,
     onToggleOnlyActive,
-    onSelectMessage
+    onSelectMessage,
+    className = '' // Default to empty string
 }) => {
     const [dragOverTarget, setDragOverTarget] = useState<{ id: number, type: 'user' | 'team' } | null>(null);
 
@@ -71,7 +73,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     };
 
     return (
-        <div className="w-64 bg-gray-50 border-r border-gray-200 h-full flex flex-col shrink-0">
+        <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-200 h-full flex flex-col shrink-0 ${className}`}>
             <div className="p-4 font-bold text-gray-700 bg-gray-100 border-b border-gray-200">
                 <div className="flex justify-between items-center mb-2">
                     <span>ChatCha</span>
