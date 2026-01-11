@@ -8,6 +8,7 @@ import { useAppState } from '../StateContext';
 import KontaktForm from '../components/KontaktForm';
 import CsvImportModal from '../components/CsvImportModal';
 import useDebounce from '../hooks/useDebounce';
+import HelpButton from '../components/ui/HelpButton';
 import * as XLSX from 'xlsx';
 import KontaktRow from '../components/rows/KontaktRow';
 
@@ -221,7 +222,10 @@ function KontakterPage({ navigateTo }: KontakterPageProps): ReactElement {
             />
 
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Kontakter</h2>
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    Kontakter
+                    <HelpButton helpPointCode="KONTAKTER_HELP" />
+                </h2>
                 <div className="flex space-x-2">
                     <button
                         onClick={handleExport}

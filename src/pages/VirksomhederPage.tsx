@@ -7,6 +7,7 @@ import { useAppState } from '../StateContext';
 import VirksomhedForm from '../components/VirksomhedForm';
 import CsvImportModal from '../components/CsvImportModal';
 import useDebounce from '../hooks/useDebounce';
+import HelpButton from '../components/ui/HelpButton';
 import Tooltip from '../components/Tooltip';
 import * as XLSX from 'xlsx'; // Bruges til Excel eksport
 
@@ -259,7 +260,10 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
             />
 
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Virksomheder</h2>
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    Virksomheder
+                    <HelpButton helpPointCode="VIRKSOMHEDER_HELP" />
+                </h2>
                 <div className="flex space-x-2">
                     <button
                         onClick={handleExport}

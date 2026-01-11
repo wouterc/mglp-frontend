@@ -5,6 +5,7 @@ import { User as UserType } from '../../types';
 import { Users, User as UserIcon, Search, MessageSquare, X, Book, PlusCircle } from 'lucide-react';
 import { Besked } from '../../types_kommunikation';
 import dayjs from 'dayjs';
+import HelpButton from '../ui/HelpButton';
 
 interface ChatSidebarProps {
     currentUser: UserType;
@@ -12,7 +13,7 @@ interface ChatSidebarProps {
     teams: Team[];
     onSelectUser: (user: UserType) => void;
     onSelectTeam: (team: Team) => void;
-    activeRecipientId?: number; // ID of user or team
+    activeRecipientId?: number;
     activeType?: 'user' | 'team';
     onAddTeam?: () => void;
     unreadCounts?: { [key: string]: number };
@@ -26,7 +27,9 @@ interface ChatSidebarProps {
     onlyActiveChat: boolean;
     onToggleOnlyActive: () => void;
     onSelectMessage?: (msg: Besked) => void;
-    className?: string; // Add className prop
+    className?: string;
+    onEnableNotifications?: () => void;
+    onLogout?: () => void;
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -48,7 +51,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     onlyActiveChat,
     onToggleOnlyActive,
     onSelectMessage,
-    className = '' // Default to empty string
+    className = '',
+    onEnableNotifications,
+    onLogout
 }) => {
     const [dragOverTarget, setDragOverTarget] = useState<{ id: number, type: 'user' | 'team' } | null>(null);
 
@@ -76,7 +81,18 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-200 h-full flex flex-col shrink-0 ${className}`}>
             <div className="p-4 font-bold text-gray-700 bg-gray-100 border-b border-gray-200">
                 <div className="flex justify-between items-center mb-2">
-                    <span>ChatCha</span>
+                    <span className="flex items-center gap-2 text-blue-600">
+                        <MessageSquare className="w-5 h-5" />
+                        ChatCha
+                    </span>
+                    {onLogout && (
+                        <button
+                            onClick={onLogout}
+                            className="p-1 px-2.5 text-[11px] bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors border border-red-100 font-medium"
+                        >
+                            Log ud
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -99,8 +115,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             <line x1="15" y1="4" x2="15" y2="20" stroke="currentColor" strokeWidth="2" />
                         </svg>
                     </button>
+                    {onEnableNotifications && (
+                        <button
+                            onClick={onEnableNotifications}
+                            className="p-1.5 rounded hover:bg-gray-200 text-gray-500"
+                            title="Slå notifikationer til"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+                        </button>
+                    )}
                     {!isPopup && (
-                        <>
+                        <div className="hidden md:flex items-center">
                             <div className="w-px h-6 bg-gray-300 mx-1"></div>
                             <button
                                 onClick={() => {
@@ -120,12 +145,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             >
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                             </button>
-                        </>
+                        </div>
                     )}
+                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                    <HelpButton
+                        helpPointCode="CHAT_SIDEBAR_HELP"
+                        className="ml-auto"
+                    />
                 </div>
             </div>
-
-            {/* Search Bar */}
             <div className="p-4 border-b border-gray-200 bg-white">
                 <div className="relative group">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -160,7 +188,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     />
                     <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">Kun i denne chat</span>
                 </label>
-            </div>
+            </div >
 
             <div className="flex-1 overflow-y-auto">
                 {searchTerm ? (
@@ -307,7 +335,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     </>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 export default ChatSidebar;

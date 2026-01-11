@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { useDropzone } from 'react-dropzone';
-import { Viden, VidensKategori } from '../../types';
+import { Viden, VidensKategori, HjaelpPunkt } from '../../types';
 import { api } from '../../api';
 import Modal from '../Modal';
 import { X, Upload, Link as LinkIcon, FileText, Loader2, Save } from 'lucide-react';
@@ -22,7 +22,25 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
     const [link, setLink] = useState('');
     const [fil, setFil] = useState<File | null>(null);
     const [eksisterendeFil, setEksisterendeFil] = useState<string | null>(null);
+    const [hjaelpPunkter, setHjaelpPunkter] = useState<HjaelpPunkt[]>([]);
+    const [selectedHjaelpPunktIds, setSelectedHjaelpPunktIds] = useState<number[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+
+    const fetchHjaelpPunkter = useCallback(async () => {
+        try {
+            const res = await api.get<any>('/vidensbank/punkter/');
+            const list = Array.isArray(res.results) ? res.results : res;
+            setHjaelpPunkter(list);
+        } catch (error) {
+            console.error("Fejl ved hentning af hjælpepunkter", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchHjaelpPunkter();
+        }
+    }, [isOpen, fetchHjaelpPunkter]);
 
     useEffect(() => {
         if (isOpen) {
@@ -32,12 +50,14 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                 setIndhold(editingViden.indhold || '');
                 setLink(editingViden.link || '');
                 setEksisterendeFil(editingViden.fil);
+                setSelectedHjaelpPunktIds(editingViden.hjaelp_punkt_ids || []);
                 setFil(null);
             } else {
                 setTitel('');
                 setKategori('');
                 setIndhold('');
                 setLink('');
+                setSelectedHjaelpPunktIds([]);
                 setFil(null);
                 setEksisterendeFil(null);
             }
@@ -60,6 +80,11 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
             if (fil) {
                 formData.append('fil', fil);
             }
+
+            // Handle help point IDs - DRF PrimaryKeyRelatedField expects list of IDs
+            selectedHjaelpPunktIds.forEach(id => {
+                formData.append('hjaelp_punkt_ids', id.toString());
+            });
 
             if (editingViden) {
                 await api.patch(`/vidensbank/artikler/${editingViden.id}/`, formData);
@@ -212,6 +237,41 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2 text-left bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label className="text-xs font-black text-gray-700 uppercase flex items-center gap-2">
+                        <Save size={14} className="text-blue-600" />
+                        Tilknyt Hjælpepunkter
+                        <span className="text-[10px] font-normal lowercase text-gray-500">(Hvor skal denne artikel vises?)</span>
+                    </label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                        {hjaelpPunkter.map(punkt => (
+                            <label key={punkt.id} className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-all cursor-pointer group shadow-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedHjaelpPunktIds.includes(punkt.id)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedHjaelpPunktIds([...selectedHjaelpPunktIds, punkt.id]);
+                                        } else {
+                                            setSelectedHjaelpPunktIds(selectedHjaelpPunktIds.filter(id => id !== punkt.id));
+                                        }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-gray-700 group-hover:text-blue-700 transition-colors">{punkt.alias}</span>
+                                    <code className="text-[10px] text-gray-400">{punkt.kode_navn}</code>
+                                </div>
+                            </label>
+                        ))}
+                        {hjaelpPunkter.length === 0 && (
+                            <div className="col-span-full py-4 text-center text-gray-400 text-sm italic">
+                                Ingen hjælpepunkter defineret endnu.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

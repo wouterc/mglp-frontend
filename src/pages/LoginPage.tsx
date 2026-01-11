@@ -24,8 +24,9 @@ const LoginPage: React.FC = () => {
             // Gem i global state
             dispatch({ type: 'SET_CURRENT_USER', payload: user });
 
-            // Redirect til forsiden
-            window.location.href = '/';
+            // Redirect based on device/mode
+            const isPwa = window.matchMedia('(display-mode: standalone)').matches;
+            window.location.href = isPwa ? '/kommunikation' : '/';
         } catch (err: any) {
             console.error("Login fejl:", err);
             setError(err.message || 'Login fejlede');

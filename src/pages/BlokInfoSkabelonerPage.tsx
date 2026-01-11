@@ -7,6 +7,7 @@ import type { Blokinfo } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
+import HelpButton from '../components/ui/HelpButton';
 
 interface InlineEditorProps {
   value: string | null | undefined;
@@ -252,7 +253,10 @@ function BlokInfoSkabelonerPage(): ReactElement {
       />
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">BlokInfo Skabeloner</h2>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          BlokInfo Skabeloner
+          <HelpButton helpPointCode="SKABELONER_BLOK_HELP" />
+        </h2>
         <div className="flex space-x-2">
           {/* EKSPORT KNAP */}
           <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">

@@ -135,9 +135,9 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
   }
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden bg-gray-100 w-full">
+    <div className="flex h-full max-h-full overflow-hidden bg-gray-100 w-full">
       {/* @# 2025-09-15 18:20 - Ændret fra w-20 til w-16 for lukket tilstand. */}
-      <aside className={`bg-gray-800 text-white flex flex-col shrink-0 transition-all duration-300 ${erMenuAaben ? 'w-56' : 'w-16'} h-full overflow-hidden`}>
+      <aside className={`bg-gray-800 text-white flex-col shrink-0 transition-all duration-300 ${erMenuAaben ? 'w-56' : 'w-16'} h-full overflow-hidden hidden md:flex`}>
         <div className={`flex items-center ${erMenuAaben ? 'justify-between px-3' : 'justify-center'} p-4 border-b border-gray-700 h-16 transition-all`}>
           {erMenuAaben && (
             <div className="flex items-center gap-3 overflow-hidden">

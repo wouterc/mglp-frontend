@@ -12,6 +12,10 @@ export const KommunikationService = {
         const response = await api.post<Team>('/kommunikation/teams/', data);
         return response;
     },
+    updateTeam: async (id: number, data: Partial<Team>): Promise<Team> => {
+        const response = await api.patch<Team>(`/kommunikation/teams/${id}/`, data);
+        return response;
+    },
 
     // Beskeder
     getBeskeder: async (
@@ -34,12 +38,22 @@ export const KommunikationService = {
         const response = await api.get<Besked[]>(url);
         return response;
     },
+    getBesked: async (id: number): Promise<Besked> => {
+        const response = await api.get<Besked>(`/kommunikation/beskeder/${id}/`);
+        return response;
+    },
     sendBesked: async (data: Partial<Besked>): Promise<Besked> => {
         const response = await api.post<Besked>('/kommunikation/beskeder/', data);
         return response;
     },
     markAsRead: async (id: number): Promise<void> => {
         await api.post(`/kommunikation/beskeder/${id}/mark_somet_read/`);
+    },
+    markChatAsRead: async (recipientId: number, recipientType: 'user' | 'team'): Promise<void> => {
+        await api.post('/kommunikation/beskeder/mark_chat_as_read/', {
+            recipient_id: recipientId,
+            recipient_type: recipientType
+        });
     },
     getUnreadCount: async (): Promise<{ unread_count: number }> => {
         const response = await api.get<{ unread_count: number }>('/kommunikation/beskeder/unread_count/');
@@ -51,5 +65,16 @@ export const KommunikationService = {
     },
     deleteBesked: async (id: number): Promise<void> => {
         await api.delete(`/kommunikation/beskeder/${id}/`);
+    },
+    updateBesked: async (id: number, data: Partial<Besked>): Promise<Besked> => {
+        const response = await api.patch<Besked>(`/kommunikation/beskeder/${id}/`, data);
+        return response;
+    },
+    // New method for sync
+    getModifiedBeskeder: async (modifiedAfter: string): Promise<Besked[]> => {
+        const params = new URLSearchParams();
+        params.append('modified_after', modifiedAfter);
+        const response = await api.get<Besked[]>(`/kommunikation/beskeder/?${params.toString()}`);
+        return response;
     }
 };

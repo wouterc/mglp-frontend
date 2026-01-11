@@ -9,6 +9,7 @@ import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
 import { api } from '../api';
+import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
 
 interface InlineEditorProps {
@@ -384,7 +385,10 @@ function DokumentskabelonerPage(): ReactElement {
       {/* Header */}
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="flex items-baseline gap-6">
-          <h2 onClick={() => setActiveTab('oversigt')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'oversigt' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Dokumentskabeloner</h2>
+          <h2 onClick={() => setActiveTab('oversigt')} className={`text-2xl font-bold cursor-pointer transition-colors flex items-center gap-2 ${activeTab === 'oversigt' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>
+            Dokumentskabeloner
+            <HelpButton helpPointCode="SKABELONER_DOK_HELP" />
+          </h2>
           <h2 onClick={() => setActiveTab('linking')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'linking' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Link Aktiviteter</h2>
         </div>
         <div className="flex space-x-2">

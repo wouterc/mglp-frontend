@@ -4,6 +4,7 @@ import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { User, Shield, Mail, Key, Loader2, UserCircle, Monitor, Settings, AppWindow, ExternalLink, CircleHelp } from 'lucide-react';
 import Button from '../components/ui/Button';
+import HelpButton from '../components/ui/HelpButton';
 import Tooltip from '../components/Tooltip';
 import RedigerProfilModal from '../components/RedigerProfilModal';
 import SkiftAdgangskodeModal from '../components/SkiftAdgangskodeModal';
@@ -60,7 +61,10 @@ function MinKontoPage(): ReactElement {
 
     return (
         <div className="p-4 max-w-3xl mx-auto">
-            <h1 className="text-xl font-bold text-gray-800 mb-4">Min Konto</h1>
+            <h1 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                Min Konto
+                <HelpButton helpPointCode="MINKONTO_HELP" />
+            </h1>
 
             <div className="space-y-4">
 

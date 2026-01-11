@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ChatSidebar from '../components/kommunikation/ChatSidebar';
 import ChatWindow from '../components/kommunikation/ChatWindow';
@@ -6,7 +6,7 @@ import MessageInput from '../components/kommunikation/MessageInput';
 import { KommunikationService } from '../services/KommunikationService';
 import { User, Besked, Team, MessageType } from '../types_kommunikation';
 import { User as UserType } from '../types';
-import CreateTeamModal from '../components/kommunikation/CreateTeamModal';
+import TeamModal from '../components/kommunikation/TeamModal';
 import ForwardMessageModal from '../components/kommunikation/ForwardMessageModal';
 import Toast, { ToastType } from '../components/ui/Toast';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -21,18 +21,30 @@ const KommunikationPage: React.FC = () => {
 
     const setTeams = (payload: Team[]) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatTeams: payload } });
     const setMessages = (payload: Besked[] | ((prev: Besked[]) => Besked[])) => {
+        let newMessages: Besked[];
         if (typeof payload === 'function') {
-            dispatch({ type: 'SET_CHAT_STATE', payload: { chatMessages: payload(messages) } });
+            newMessages = payload(messages);
         } else {
-            dispatch({ type: 'SET_CHAT_STATE', payload: { chatMessages: payload } });
+            newMessages = payload;
         }
+
+        // Deduplicate by ID
+        const seen = new Set();
+        const uniqueMessages = newMessages.filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+        });
+
+        dispatch({ type: 'SET_CHAT_STATE', payload: { chatMessages: uniqueMessages } });
     };
     const setActiveRecipient = (payload: UserType | Team | undefined) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatActiveRecipient: payload } });
     const setActiveType = (payload: 'user' | 'team' | undefined) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatActiveType: payload } });
     const setUnreadCounts = (payload: { [key: string]: number }) => dispatch({ type: 'SET_CHAT_STATE', payload: { chatUnreadCounts: payload } });
 
 
-    const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+    const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<Team | undefined>(undefined);
     const [replyToMessage, setReplyToMessage] = useState<Besked | undefined>(undefined);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
@@ -40,12 +52,14 @@ const KommunikationPage: React.FC = () => {
     // Forwarding state
     const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
     const [forwardingMessage, setForwardingMessage] = useState<Besked | undefined>(undefined);
+    const [editingMessage, setEditingMessage] = useState<Besked | undefined>(undefined);
     const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
 
     // Search state
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<Besked[]>([]);
     const [onlyActiveChat, setOnlyActiveChat] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     // Vidensbank state
     const [isVidensbankModalOpen, setIsVidensbankModalOpen] = useState(false);
@@ -59,6 +73,38 @@ const KommunikationPage: React.FC = () => {
         isVisible: false
     });
 
+    const lastSyncRef = useRef<string>(new Date().toISOString());
+    const lastActivityRef = useRef<number>(Date.now());
+
+    // Activity tracking
+    useEffect(() => {
+        const updateActivity = () => {
+            lastActivityRef.current = Date.now();
+        };
+
+        window.addEventListener('mousemove', updateActivity);
+        window.addEventListener('mousedown', updateActivity);
+        window.addEventListener('keydown', updateActivity);
+        window.addEventListener('touchstart', updateActivity, { passive: true });
+        window.addEventListener('scroll', updateActivity, { capture: true, passive: true });
+
+        return () => {
+            window.removeEventListener('mousemove', updateActivity);
+            window.removeEventListener('mousedown', updateActivity);
+            window.removeEventListener('keydown', updateActivity);
+            window.removeEventListener('touchstart', updateActivity);
+            window.removeEventListener('scroll', updateActivity, { capture: true });
+        };
+    }, []);
+
+    const canMarkAsRead = () => {
+        const isVisible = document.visibilityState === 'visible';
+        // Check if user was active in the last 60 seconds
+        const isRecentActivity = (Date.now() - lastActivityRef.current) < 60000;
+        return isVisible && isRecentActivity;
+    };
+
+
     const showToast = (message: string, type: ToastType = 'info') => {
         setToast({ message, type, isVisible: true });
     };
@@ -71,6 +117,37 @@ const KommunikationPage: React.FC = () => {
             document.body.style.overflow = '';
         };
     }, []);
+
+    // Listen for Service Worker messages (Open Chat)
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'OPEN_CHAT') {
+                const { afsenderId, teamId } = event.data;
+                if (teamId) {
+                    const team = teams.find(t => t.id === teamId);
+                    if (team) {
+                        setActiveRecipient(team);
+                        setActiveType('team');
+                    }
+                } else if (afsenderId) {
+                    const user = users.find(u => u.id === afsenderId);
+                    if (user) {
+                        setActiveRecipient(user);
+                        setActiveType('user');
+                    }
+                }
+            }
+        };
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', handleMessage);
+        }
+        return () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.removeEventListener('message', handleMessage);
+            }
+        };
+    }, [teams, users]);
 
     // Initial Fetch
     useEffect(() => {
@@ -92,7 +169,20 @@ const KommunikationPage: React.FC = () => {
                 let currentRecipient = activeRecipient;
                 let currentType = activeType;
 
-                if (!currentRecipient) {
+                const searchParams = new URLSearchParams(location.search);
+                const paramId = searchParams.get('recipientId');
+                const paramType = searchParams.get('recipientType') as 'user' | 'team' | null;
+
+                if (paramId && paramType) {
+                    const id = Number(paramId);
+                    if (paramType === 'user') {
+                        currentRecipient = users.find(u => u.id === id);
+                        currentType = 'user';
+                    } else if (paramType === 'team') {
+                        currentRecipient = teamsData.find((t: Team) => t.id === id);
+                        currentType = 'team';
+                    }
+                } else if (!currentRecipient) {
                     const savedType = localStorage.getItem('chat_active_type');
                     const savedId = Number(localStorage.getItem('chat_active_id'));
 
@@ -116,6 +206,11 @@ const KommunikationPage: React.FC = () => {
                     // Backend returns descending for limit, so we reverse
                     setMessages(msgs.reverse());
                     setHasMore(msgs.length === 50);
+
+                    // Mark as read on initial load ONLY if tab is active/visible
+                    if (document.visibilityState === 'visible') {
+                        KommunikationService.markChatAsRead(currentRecipient.id, currentType as 'user' | 'team');
+                    }
                 } else {
                     // Try to fetch newest globally if no chat active? 
                     // Actually usually we just start empty.
@@ -145,13 +240,54 @@ const KommunikationPage: React.FC = () => {
                 const lastId = messages.length > 0 ? Math.max(...messages.map(m => m.id)) : 0;
                 const newMsgs = await KommunikationService.getBeskeder(lastId);
 
-                if (newMsgs.length > 0) {
+                // 3. Poll for UPDATED messages (edits, labeling) since last check
+                // We use a safe margin or just the last sync time
+                const now = new Date();
+                const modifiedMsgs = await KommunikationService.getModifiedBeskeder(lastSyncRef.current);
+                lastSyncRef.current = now.toISOString();
+
+                if (newMsgs.length > 0 || modifiedMsgs.length > 0) {
                     setMessages(prev => {
-                        const existingIds = new Set(prev.map(m => m.id));
-                        const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
-                        if (uniqueNew.length === 0) return prev;
-                        return [...prev, ...uniqueNew];
+                        let newMessages = [...prev];
+
+                        // Handle modifications to existing messages
+                        if (modifiedMsgs.length > 0) {
+                            const updatesMap = new Map(modifiedMsgs.map(m => [m.id, m]));
+                            newMessages = newMessages.map(m => updatesMap.has(m.id) ? updatesMap.get(m.id)! : m);
+                        }
+
+                        // Handle completely new messages
+                        if (newMsgs.length > 0) {
+                            const existingIds = new Set(newMessages.map(m => m.id));
+                            const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
+                            if (uniqueNew.length > 0) {
+                                newMessages = [...newMessages, ...uniqueNew];
+                            }
+                        }
+
+                        // Final Safety Deduplication (just in case)
+                        const seen = new Set();
+                        return newMessages.filter(m => {
+                            if (seen.has(m.id)) return false;
+                            seen.add(m.id);
+                            return true;
+                        });
                     });
+
+                    // Auto-mark as read if new messages arrive for ACTIVE chat AND user is active
+                    if (activeRecipient && activeType) {
+                        const activeKey = activeType === 'user' ? `user-${activeRecipient.id}` : `team-${activeRecipient.id}`;
+                        const hasUnread = (unreadData[activeKey] || 0) > 0;
+
+                        if (hasUnread && canMarkAsRead()) {
+                            KommunikationService.markChatAsRead(activeRecipient.id, activeType).then(() => {
+                                // Refresh unread count locally for instant feedback
+                                setUnreadCounts(Object.fromEntries(
+                                    Object.entries(unreadData).filter(([key]) => key !== activeKey)
+                                ));
+                            });
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Polling error", error);
@@ -250,6 +386,14 @@ const KommunikationPage: React.FC = () => {
         setReplyToMessage(undefined);
         localStorage.setItem('chat_active_type', 'user');
         localStorage.setItem('chat_active_id', String(user.id));
+
+        // Mark as read immediately
+        KommunikationService.markChatAsRead(user.id, 'user').then(() => {
+            // Update counts locally for instant feedback
+            const next = { ...unreadCounts };
+            delete next[`user-${user.id}`];
+            setUnreadCounts(next);
+        });
     };
 
     const handleBackToOverview = () => {
@@ -263,6 +407,13 @@ const KommunikationPage: React.FC = () => {
         setReplyToMessage(undefined);
         localStorage.setItem('chat_active_type', 'team');
         localStorage.setItem('chat_active_id', String(team.id));
+
+        // Mark as read immediately
+        KommunikationService.markChatAsRead(team.id, 'team').then(() => {
+            const next = { ...unreadCounts };
+            delete next[`team-${team.id}`];
+            setUnreadCounts(next);
+        });
     };
 
     const handleSendMessage = async (content: string, type: MessageType, linkUrl?: string, linkTitle?: string, parentId?: number) => {
@@ -329,15 +480,28 @@ const KommunikationPage: React.FC = () => {
         }
     };
 
-    const handleCreateTeam = async (teamData: Partial<Team>) => {
+    const handleSaveTeam = async (teamData: Partial<Team>) => {
         try {
-            await KommunikationService.createTeam(teamData);
+            if (teamData.id) {
+                await KommunikationService.updateTeam(teamData.id, teamData);
+                showToast("Team opdateret", "success");
+            } else {
+                await KommunikationService.createTeam(teamData);
+                showToast("Team oprettet", "success");
+            }
             const updatedTeams = await KommunikationService.getTeams();
             setTeams(updatedTeams);
-            setIsCreateTeamOpen(false);
+            setIsTeamModalOpen(false);
+            setEditingTeam(undefined);
+
+            // If the active recipient was the edited team, update it
+            if (activeType === 'team' && activeRecipient?.id === teamData.id) {
+                const updated = updatedTeams.find(t => t.id === teamData.id);
+                if (updated) setActiveRecipient(updated);
+            }
         } catch (error) {
-            console.error("Failed to create team", error);
-            alert("Fejl ved oprettelse af team");
+            console.error("Failed to save team", error);
+            showToast("Fejl ved gem af team", "error");
         }
     };
 
@@ -494,6 +658,105 @@ const KommunikationPage: React.FC = () => {
         }
     };
 
+    const handleEnableNotifications = async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            showToast('Push notifikationer understøttes ikke i denne browser.', 'error');
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            showToast('Du skal give tilladelse for at modtage notifikationer.', 'info');
+            return;
+        }
+
+        try {
+            const response = await api.get<{ publicKey: string }>('/kommunikation/push-subscriptions/public_key/');
+            const publicKey = response.publicKey;
+            if (!publicKey) {
+                showToast('Kunne ikke hente VAPID nøgle.', 'error');
+                return;
+            }
+
+            const registration = await navigator.serviceWorker.ready;
+            const convertedVapidKey = urlBase64ToUint8Array(publicKey);
+
+            let subscription = await registration.pushManager.getSubscription();
+            if (!subscription) {
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedVapidKey
+                });
+            }
+
+            const subJson = subscription.toJSON();
+            await api.post('/kommunikation/push-subscriptions/', {
+                endpoint: subJson.endpoint,
+                p256dh: subJson.keys?.p256dh,
+                auth: subJson.keys?.auth,
+                user_agent: navigator.userAgent
+            });
+
+            showToast('Notifikationer er nu aktiveret!', 'success');
+        } catch (error) {
+            console.error('Push Subscription Error:', error);
+            showToast('Fejl ved aktivering af notifikationer.', 'error');
+        }
+    };
+
+    const performLogout = async () => {
+        try {
+            await api.post('/kerne/logout/');
+        } catch (e) {
+            console.error("Logout fejl:", e);
+        }
+        dispatch({ type: 'SET_CURRENT_USER', payload: null });
+        window.location.href = '/login';
+    };
+
+    const handleUpdateType = async (id: number, type: MessageType) => {
+        // Optimistic Update
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, type } : m));
+
+        try {
+            const updatedMsg = await KommunikationService.updateBesked(id, { type });
+            // Confirm with server response
+            setMessages(prev => prev.map(m => m.id === id ? updatedMsg : m));
+        } catch (error) {
+            console.error("Failed to update message type", error);
+            showToast("Kunne ikke opdatere besked type", "error");
+            // Revert on failure
+            try {
+                const original = await KommunikationService.getBesked(id);
+                setMessages(prev => prev.map(m => m.id === id ? original : m));
+            } catch (e) {
+                // If fetch fails, we can't revert perfectly, potentially reload chat
+            }
+        }
+    };
+
+    const handleEditMessage = (msg: Besked) => {
+        setEditingMessage(msg);
+        setReplyToMessage(undefined); // Clear reply if editing
+    };
+
+    const handleUpdateMessageContent = async (id: number, content: string, type: MessageType, linkUrl?: string, linkTitle?: string) => {
+        try {
+            const updatedMsg = await KommunikationService.updateBesked(id, {
+                indhold: content,
+                type,
+                link_url: linkUrl,
+                link_titel: linkTitle
+            });
+            setMessages(prev => prev.map(m => m.id === id ? updatedMsg : m));
+            setEditingMessage(undefined);
+            showToast("Besked opdateret", "success");
+        } catch (error) {
+            console.error("Failed to update message", error);
+            showToast("Kunne ikke opdatere besked", "error");
+        }
+    };
+
     if (!currentUser) return <div>Loading...</div>;
 
     return (
@@ -512,7 +775,7 @@ const KommunikationPage: React.FC = () => {
                 onSelectTeam={handleSelectTeam}
                 activeRecipientId={activeRecipient?.id}
                 activeType={activeType}
-                onAddTeam={() => setIsCreateTeamOpen(true)}
+                onAddTeam={() => { setEditingTeam(undefined); setIsTeamModalOpen(true); }}
                 unreadCounts={unreadCounts}
                 layoutMode={layoutMode}
                 onToggleLayout={toggleLayout}
@@ -524,6 +787,8 @@ const KommunikationPage: React.FC = () => {
                 onlyActiveChat={onlyActiveChat}
                 onToggleOnlyActive={() => setOnlyActiveChat(!onlyActiveChat)}
                 onSelectMessage={handleSelectMessageSearchResult}
+                onEnableNotifications={handleEnableNotifications}
+                onLogout={() => setShowLogoutConfirm(true)}
                 className={activeRecipient ? 'hidden md:flex' : 'flex'} // Hide on mobile if chat active
             />
 
@@ -539,10 +804,18 @@ const KommunikationPage: React.FC = () => {
                         onDelete={handleDeleteMessage}
                         onForward={(msg) => { setForwardingMessage(msg); setIsForwardModalOpen(true); }}
                         onToVidensbank={handleToVidensbank}
+                        onUpdateType={handleUpdateType}
+                        onEdit={handleEditMessage}
                         onLoadMore={handleLoadMore}
                         isLoadingMore={isLoadingMore}
                         hasMore={hasMore}
                         onBack={handleBackToOverview} // Pass back handler
+                        onSettings={() => {
+                            if (activeType === 'team') {
+                                setEditingTeam(activeRecipient as Team);
+                                setIsTeamModalOpen(true);
+                            }
+                        }}
                     />
                 </div>
 
@@ -557,17 +830,20 @@ const KommunikationPage: React.FC = () => {
                             onDropMessage={handleDropMessageOnInput}
                             initialContent={(location.state as any)?.initialMessage}
                             initialLinkUrl={(location.state as any)?.initialLinkUrl}
-                            initialLinkTitle={(location.state as any)?.initialLinkTitle}
+                            editingMessage={editingMessage}
+                            onUpdate={handleUpdateMessageContent}
+                            onCancelEdit={() => setEditingMessage(undefined)}
                         />
                     </div>
                 )}
             </div>
 
-            <CreateTeamModal
-                isOpen={isCreateTeamOpen}
-                onClose={() => setIsCreateTeamOpen(false)}
-                onSave={handleCreateTeam}
+            <TeamModal
+                isOpen={isTeamModalOpen}
+                onClose={() => { setIsTeamModalOpen(false); setEditingTeam(undefined); }}
+                onSave={handleSaveTeam}
                 users={users.filter(u => u.id !== currentUser.id)}
+                editingTeam={editingTeam}
             />
 
             <ForwardMessageModal
@@ -596,8 +872,33 @@ const KommunikationPage: React.FC = () => {
                 confirmText="Slet"
                 isDestructive={true}
             />
+
+            <ConfirmModal
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={performLogout}
+                title="Log ud"
+                message="Er du sikker på, at du vil logge ud?"
+                confirmText="Log ud"
+                isDestructive={true}
+            />
         </div>
     );
 };
 
 export default KommunikationPage;
+
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}

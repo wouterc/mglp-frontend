@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, LibraryBig, Filter, Trash2, Edit, ExternalLink, Copy, Share2, FileText, Loader2, ChevronRight, X, MessageCircleHeart } from 'lucide-react';
 import { api } from '../api';
+import HelpButton from '../components/ui/HelpButton';
 import { Viden, VidensKategori } from '../types';
 import { useAppState } from '../StateContext';
 // Layout is provided by App.tsx
@@ -10,8 +13,13 @@ import VidensbankViewModal from '../components/vidensbank/VidensbankViewModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Toast, { ToastType } from '../components/ui/Toast';
 import DOMPurify from 'dompurify';
+import 'react-quill-new/dist/quill.snow.css';
 
-const VidensbankPage: React.FC = () => {
+interface VidensbankPageProps {
+    standalone?: boolean;
+}
+
+const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) => {
     const navigate = useNavigate();
     const { state } = useAppState();
     const { currentUser } = state;
@@ -134,19 +142,30 @@ const VidensbankPage: React.FC = () => {
     };
 
     // Deep linking: Open modal if ID is in URL
+    // Deep linking: Open modal if ID is in URL
     useEffect(() => {
-        if (!loading && vidensbank.length > 0) {
-            const params = new URLSearchParams(window.location.search);
-            const id = params.get('id');
-            if (id) {
-                const article = vidensbank.find(v => v.id === Number(id));
-                if (article) {
-                    setViewingViden(article);
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        if (!id) return;
+
+        const articleInList = vidensbank.find(v => v.id === Number(id));
+        if (articleInList) {
+            setViewingViden(articleInList);
+            setIsViewModalOpen(true);
+        } else if (!loading && !loadingMore) {
+            // Fetch single article if not in list
+            const fetchSingle = async () => {
+                try {
+                    const res = await api.get<Viden>(`/vidensbank/artikler/${id}/`);
+                    setViewingViden(res);
                     setIsViewModalOpen(true);
+                } catch (error) {
+                    console.error('Fejl ved hentning af specifik artikel', error);
                 }
-            }
+            };
+            fetchSingle();
         }
-    }, [loading, vidensbank]);
+    }, [loading, vidensbank, window.location.search]);
 
     const filteredViden = React.useMemo(() => vidensbank, [vidensbank]);
 
@@ -184,6 +203,72 @@ const VidensbankPage: React.FC = () => {
         setEditingViden(undefined);
     };
 
+    if (standalone) {
+        return (
+            <div className="h-full bg-gray-50 flex flex-col overflow-hidden relative">
+                {!viewingViden && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                        <Loader2 className="animate-spin mb-2" size={32} />
+                        <p>Henter vejledning...</p>
+                    </div>
+                )}
+                {viewingViden && (
+                    <div className="flex-1 overflow-y-auto bg-white article-preview-container">
+                        <div className="p-8 max-w-4xl mx-auto">
+                            <h1 className="text-3xl font-black text-gray-900 border-b-4 pb-4 mb-6" style={{ borderColor: viewingViden.kategori_details?.farve || '#2563eb' }}>
+                                {viewingViden.titel}
+                            </h1>
+
+                            <div className="bg-blue-50/50 rounded-2xl border border-blue-100 shadow-sm mb-10 overflow-hidden vidensbank-view-read-only">
+                                <ReactQuill
+                                    value={viewingViden.indhold}
+                                    readOnly={true}
+                                    theme="bubble"
+                                    modules={{ toolbar: false }}
+                                    className="text-gray-900"
+                                />
+                            </div>
+
+                            {/* Attachments & Links */}
+                            {(viewingViden.link || viewingViden.fil) && (
+                                <div className="mt-8 pt-8 border-t border-gray-100 flex flex-wrap gap-4">
+                                    {viewingViden.link && (
+                                        <a
+                                            href={viewingViden.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-all font-bold text-sm border-2 border-blue-100 shadow-sm"
+                                        >
+                                            <ExternalLink size={20} />
+                                            Åbn Eksternt Link
+                                        </a>
+                                    )}
+                                    {viewingViden.fil && (
+                                        <a
+                                            href={viewingViden.fil}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-6 py-3 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-all font-bold text-sm border-2 border-green-100 shadow-sm"
+                                        >
+                                            <FileText size={20} />
+                                            Se Vedhæftet Dokument
+                                        </a>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    isVisible={toast.isVisible}
+                    onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+                />
+            </div>
+        );
+    }
+
     return (
         <>
             <div className="p-6 max-w-7xl mx-auto h-full flex flex-col">
@@ -192,6 +277,7 @@ const VidensbankPage: React.FC = () => {
                         <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
                             <LibraryBig className="text-blue-600" size={32} />
                             Vidensbank
+                            <HelpButton helpPointCode="VIDENSBANK_HELP" className="ml-2" />
                         </h1>
                         <p className="text-gray-500 mt-1">Samling af viden, skabeloner og vejledninger til sagsbehandling.</p>
                     </div>

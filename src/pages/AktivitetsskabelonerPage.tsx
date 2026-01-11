@@ -11,6 +11,7 @@ import Tooltip from '../components/Tooltip';
 import { api } from '../api';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
+import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
 import ActivityDocLinkerPanel from '../components/panels/ActivityDocLinkerPanel.tsx';
 import { Link as LinkIcon, Columns } from 'lucide-react';
@@ -592,7 +593,10 @@ function AktivitetsskabelonerPage(): ReactElement {
       />
 
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
-        <h2 className="text-2xl font-bold text-gray-800">Aktivitetsskabeloner</h2>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          Aktivitetsskabeloner
+          <HelpButton helpPointCode="SKABELONER_AKTIV_HELP" />
+        </h2>
         <div className="flex space-x-2">
           <button onClick={() => setVisImportModal(true)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Importer fra Excel">
             <UploadCloud size={20} />

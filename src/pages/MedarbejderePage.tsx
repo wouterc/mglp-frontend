@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useAppState } from '../StateContext';
 import { Mail, Phone, User, Users } from 'lucide-react';
+import HelpButton from '../components/ui/HelpButton';
 
 interface Employee {
     id: number;
@@ -48,6 +49,7 @@ const MedarbejderePage: React.FC = () => {
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                     <Users className="text-blue-600" /> Medarbejdere
+                    <HelpButton helpPointCode="MEDARBEJDERE_HELP" />
                 </h1>
                 <p className="text-gray-500">Oversigt over dine kollegaer.</p>
             </div>

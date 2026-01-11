@@ -65,6 +65,15 @@ function App() {
     }
   }, [currentUser, dispatch]);
 
+  // Auto-naviger til Kommunikation i PWA/Standalone mode ELLER på mobil hvis vi er på roden
+  useEffect(() => {
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches;
+    const isMobile = window.innerWidth <= 768;
+    if ((isPwa || isMobile) && currentUser && (location.pathname === '/' || location.pathname === '/sagsoversigt')) {
+      navigate('/kommunikation');
+    }
+  }, [currentUser, location.pathname, navigate]);
+
 
   const handleLogout = async () => {
     setShowLogoutConfirm(true);
@@ -140,7 +149,8 @@ function App() {
       <Route path="/glemt-adgangskode" element={<GlemtAdgangskodePage />} />
       <Route path="/reset-password/:uid/:token" element={<NulstilAdgangskodePage />} />
 
-      <Route path="/chat-popup" element={<div className="h-screen bg-gray-100 overflow-hidden"><KommunikationPage /></div>} />
+      <Route path="/chat-popup" element={<div className="h-full bg-gray-100 overflow-hidden"><KommunikationPage /></div>} />
+      <Route path="/vidensbank-popup" element={<div className="h-full bg-gray-100 overflow-hidden"><VidensbankPage standalone /></div>} />
       <Route path="*" element={
         <Layout
           aktivSide={aktivSideForLayout}

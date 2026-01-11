@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import Modal from '../Modal';
 import { Viden } from '../../types';
 import { X, ExternalLink, FileText, Calendar, User, Tag } from 'lucide-react';
 import DOMPurify from 'dompurify';
+import 'react-quill-new/dist/quill.snow.css';
 
 interface VidensbankViewModalProps {
     isOpen: boolean;
@@ -14,12 +17,25 @@ const VidensbankViewModal: React.FC<VidensbankViewModalProps> = ({ isOpen, onClo
     if (!viden) return null;
 
     const headerBtn = (
-        <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 font-bold transition-all shadow-md text-sm mr-2"
-        >
-            Luk visning
-        </button>
+        <div className="flex gap-2 mr-2">
+            <button
+                onClick={() => {
+                    const features = 'width=900,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes';
+                    window.open(`/vidensbank-popup?id=${viden.id}`, 'Vejledning', features);
+                }}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all shadow-md text-sm flex items-center gap-2"
+                title="Åbn i nyt vindue"
+            >
+                <ExternalLink size={16} />
+                Nyt vindue
+            </button>
+            <button
+                onClick={onClose}
+                className="px-4 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 font-bold transition-all shadow-md text-sm"
+            >
+                Luk visning
+            </button>
+        </div>
     );
 
     return (
@@ -48,10 +64,15 @@ const VidensbankViewModal: React.FC<VidensbankViewModalProps> = ({ isOpen, onClo
                 </div>
 
                 {/* Content Area */}
-                <div
-                    className="prose prose-blue max-w-none text-gray-800 vidensbank-content ql-editor !p-0"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(viden.indhold) }}
-                />
+                <div className="bg-gray-50 rounded-xl border border-gray-100 shadow-inner overflow-hidden vidensbank-view-read-only">
+                    <ReactQuill
+                        value={viden.indhold}
+                        readOnly={true}
+                        theme="bubble"
+                        modules={{ toolbar: false }}
+                        className="text-gray-900"
+                    />
+                </div>
 
                 {/* Attachments & Links Footer */}
                 {(viden.link || viden.fil) && (

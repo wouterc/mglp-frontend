@@ -11,6 +11,7 @@ import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
 import { api } from '../../api';
+import HelpButton from '../ui/HelpButton';
 
 export type TabType = 'overblik' | 'processer' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
@@ -144,8 +145,9 @@ function SagsdetaljerLayout({
                     </button>
 
                     <div className="flex flex-col min-w-0">
-                        <h1 className="text-xl font-bold text-gray-800 truncate">
+                        <h1 className="text-xl font-bold text-gray-800 truncate flex items-center gap-2">
                             Sag {sag.sags_nr}: {sag.alias}
+                            <HelpButton helpPointCode="SAGSDETALJER_HELP" />
                         </h1>
                         <div className="text-sm text-gray-500 flex items-center space-x-2 truncate">
                             <span className="truncate">{sag.adresse_vej} {sag.adresse_husnr}</span>

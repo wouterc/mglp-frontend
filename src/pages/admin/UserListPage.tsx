@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button';
 import { Plus, Edit, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 
 import { CreateEditUserModal } from '../../components/admin/CreateEditUserModal';
+import { UserActivityModal } from '../../components/admin/UserActivityModal';
 
 interface User {
     id: number;
@@ -16,6 +17,7 @@ interface User {
     is_superuser: boolean; // Superadmin
     is_active: boolean;
     last_login: string | null;
+    is_online: boolean; // Added
 }
 
 const UserListPage: React.FC = () => {
@@ -26,6 +28,7 @@ const UserListPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
     const fetchUsers = async () => {
@@ -55,6 +58,11 @@ const UserListPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
+    const handleShowActivity = (user: User) => {
+        setSelectedUser(user);
+        setIsActivityModalOpen(true);
+    };
+
     const handleUserSaved = () => {
         fetchUsers();
     };
@@ -72,8 +80,8 @@ const UserListPage: React.FC = () => {
                     </h1>
                     <p className="text-gray-500">Administrer brugere og rettigheder.</p>
                 </div>
-                <Button variant="primary" onClick={handleCreate} className="flex items-center whitespace-nowrap">
-                    <Plus size={18} className="mr-2" /> Opret Bruger
+                <Button variant="primary" onClick={handleCreate} ikon={Plus}>
+                    Opret Bruger
                 </Button>
             </div>
 
@@ -89,6 +97,7 @@ const UserListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bruger</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Navn</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Online</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Handlinger</th>
                             </tr>
@@ -117,6 +126,15 @@ const UserListPage: React.FC = () => {
                                                 Bruger
                                             </span>
                                         )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <button
+                                            onClick={() => handleShowActivity(user)}
+                                            title="Klik for at se login historik"
+                                            className="focus:outline-none transition-transform hover:scale-110"
+                                        >
+                                            <div className={`h-3 w-3 rounded-full mx-auto shadow-sm ${user.is_online ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                                        </button>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         {user.is_active ? (
@@ -149,6 +167,12 @@ const UserListPage: React.FC = () => {
                 onClose={() => setIsModalOpen(false)}
                 userToEdit={selectedUser}
                 onUserSaved={handleUserSaved}
+            />
+
+            <UserActivityModal
+                isOpen={isActivityModalOpen}
+                onClose={() => setIsActivityModalOpen(false)}
+                user={selectedUser}
             />
         </div>
     );

@@ -4,6 +4,7 @@ import { useAppState } from '../StateContext';
 import { useNavigate } from 'react-router-dom';
 import MailKurvTab from '../components/sagsdetaljer/tabs/MailKurvTab';
 import CaseSelector from '../components/ui/CaseSelector';
+import HelpButton from '../components/ui/HelpButton';
 import { MailPlus, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { Sag } from '../types';
@@ -47,6 +48,7 @@ export default function MailKurvPage(): ReactElement {
                         <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                             <MailPlus size={18} className="text-blue-600" />
                             Mail Kurv
+                            <HelpButton helpPointCode="MAILKURV_HELP" />
                         </h2>
                     </div>
                     <div className="text-xs text-gray-500 mb-2">

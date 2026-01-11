@@ -409,6 +409,7 @@ export interface VidensKategori {
 export interface Viden {
   id: number;
   titel: string;
+  slug: string | null;
   kategori: number;
   kategori_details?: VidensKategori;
   indhold: string;
@@ -418,4 +419,12 @@ export interface Viden {
   oprettet_af_details?: User;
   oprettet: string;
   opdateret: string;
+  hjaelp_punkt_ids?: number[];
+}
+
+export interface HjaelpPunkt {
+  id: number;
+  kode_navn: string;
+  alias: string;
+  artikler: number[];
 }

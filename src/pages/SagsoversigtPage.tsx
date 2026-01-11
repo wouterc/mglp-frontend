@@ -14,6 +14,7 @@ import { useTableNavigation } from '../hooks/useTableNavigation';
 import Button from '../components/ui/Button';
 import SagsRow from '../components/rows/SagsRow';
 import useDebounce from '../hooks/useDebounce';
+import HelpButton from '../components/ui/HelpButton';
 
 interface SagsoversigtPageProps {
   navigateTo: (side: string, sag: Sag | null) => void;
@@ -257,7 +258,15 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
         {modalInfo.message}
       </Modal>
 
-      <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2><button onClick={handleOpretNySag} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Sag"><PlusCircle size={20} /></button></div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2>
+        <div className="flex items-center gap-2">
+          <HelpButton helpPointCode="SAGSOVERSIGT_HELP" />
+          <button onClick={handleOpretNySag} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Sag">
+            <PlusCircle size={20} />
+          </button>
+        </div>
+      </div>
 
       <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">

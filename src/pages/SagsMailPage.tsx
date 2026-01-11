@@ -10,6 +10,7 @@ import Modal from '../components/Modal';
 import Tooltip from '../components/Tooltip';
 import { useAppState } from '../StateContext';
 import CaseSelector from '../components/ui/CaseSelector';
+import HelpButton from '../components/ui/HelpButton';
 
 interface Attachment {
     id: number;
@@ -314,6 +315,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                         <h2 className="text-sm font-bold text-gray-800 flex items-center">
                             <Inbox size={18} className="mr-2 text-blue-600" />
                             Sags Mail
+                            <HelpButton helpPointCode="SAGSMAIL_HELP" className="ml-2" />
                         </h2>
                     </div>
 

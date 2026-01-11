@@ -15,6 +15,7 @@ import SmartDateInput from '../../SmartDateInput';
 import { User as UserType } from '../../../types';
 
 import CaseSelector from '../../ui/CaseSelector';
+import HelpButton from '../../ui/HelpButton';
 
 interface DokumenterTabProps {
     sag: Sag;
@@ -608,6 +609,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                     </button>
                                 </Tooltip>
                                 <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                                <HelpButton helpPointCode="DOKUMENTER_HELP" />
                                 {sag && (nyeDokumenterFindes || syncing) && (
                                     <Tooltip content="Nye dokumenter fundet - Klik for at synkronisere">
                                         <button

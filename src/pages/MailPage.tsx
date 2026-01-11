@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Mail, Settings, Inbox, Loader2, ChevronRight, User, Folder, Layout, RefreshCw, FileText } from 'lucide-react';
 import OutlookAccountSettings, { OutlookAccount } from '../components/OutlookAccountSettings';
 import EmailList from '../components/EmailList';
+import HelpButton from '../components/ui/HelpButton';
 import CaseSelector from '../components/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import MailTemplatesSettings from '../components/MailTemplatesSettings';
@@ -212,7 +213,10 @@ export default function MailPage() {
                 <div className={`p-4 border-b border-gray-200/50 flex justify-between items-center ${isJournalizing ? 'justify-center p-2' : ''}`}>
                     {!isJournalizing && (
                         <div className="flex items-center justify-between w-full">
-                            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Postkasser</h2>
+                            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                Postkasser
+                                <HelpButton helpPointCode="INBOX_HELP" />
+                            </h2>
                         </div>
                     )}
                     {/* Toggle Button for Journaliser Mode */}

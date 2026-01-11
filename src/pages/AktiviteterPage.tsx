@@ -20,6 +20,7 @@ import ActivityDocumentLinkerModal from '../components/modals/ActivityDocumentLi
 import { SagsDokument } from '../types'; // @# New Import
 import { Link as LinkIcon } from 'lucide-react'; // @# New Import
 import LinkOpenPreferenceModal from '../components/modals/LinkOpenPreferenceModal';
+import HelpButton from '../components/ui/HelpButton';
 
 
 interface AktiviteterPageProps {
@@ -514,6 +515,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                     </button>
                                 </Tooltip>
                                 <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                                <HelpButton helpPointCode="AKTIVITETER_HELP" />
                                 {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
                                     <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
                                         <button
