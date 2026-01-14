@@ -64,13 +64,15 @@ const VidensbankViewModal: React.FC<VidensbankViewModalProps> = ({ isOpen, onClo
                 </div>
 
                 {/* Content Area */}
-                <div className="bg-gray-50 rounded-xl border border-gray-100 shadow-inner overflow-hidden vidensbank-view-read-only">
-                    <ReactQuill
-                        value={viden.indhold}
-                        readOnly={true}
-                        theme="bubble"
-                        modules={{ toolbar: false }}
-                        className="text-gray-900"
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden vidensbank-view-read-only p-8">
+                    <div
+                        className="ql-editor p-0 prose max-w-none text-gray-900"
+                        dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(viden.indhold, {
+                                ALLOWED_ATTR: ['style', 'width', 'height', 'href', 'target', 'class', 'src', 'alt', 'border', 'cellpadding', 'cellspacing'],
+                                ALLOWED_TAGS: ['p', 'br', 'span', 'b', 'i', 'u', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'a', 'img', 'strong', 'em', 'blockquote', 'code', 'pre']
+                            })
+                        }}
                     />
                 </div>
 

@@ -98,14 +98,101 @@ table td select {
     }
 }
 
-.quill-editor .ql-toolbar {
+.quill-editor .ql-toolbar,
+.ql-toolbar.ql-snow {
     border-top-left-radius: 0.375rem;
     border-top-right-radius: 0.375rem;
     background-color: #f8fafc;
+    position: sticky !important;
+    top: 20px;
+    /* Vigtigt: Ligger lige under Tabel-værktøjet */
+    z-index: 10;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
-.quill-editor .ql-editor {
+
+/* --- Tabel-redigering (Kun i Editoren) --- */
+.vidensbank-editor-rich-text .ql-editor table td {
+    border: 1px solid #ccc !important;
+    padding: 10px 12px !important;
+    /* Synkroniseret med visning */
+    min-width: 40px;
+    position: relative;
+    resize: horizontal;
+    /* Tillad manuel bredde i editor */
+    overflow: auto;
+}
+
+/* --- Tabel-visning (Kun i Læse-tilstand/Popups) --- */
+.vidensbank-view-read-only .ql-editor table td,
+.vidensbank-view-read-only table td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 10px 12px !important;
+    resize: none !important;
+    /* Fjern lilla/grå håndtag */
+    overflow: visible !important;
+    background-color: transparent !important;
+}
+
+/* Fjern hover-effekt i læse-visning */
+.vidensbank-view-read-only .ql-editor table tr:hover td {
+    background-color: transparent !important;
+}
+
+.ql-editor table td:hover:not(.vidensbank-view-read-only *) {
+    background-color: #f8fafc;
+    border-color: #3b82f6 !important;
+}
+
+.ql-editor {
     height: 100%;
+}
+
+
+/* Custom Indent Sizes - Default is 3em, which is a bit much. Here we use 1.5em intervals. */
+.ql-editor .ql-indent-1:not(.ql-direction-rtl) {
+    padding-left: 1.5em !important;
+}
+
+.ql-editor .ql-indent-2:not(.ql-direction-rtl) {
+    padding-left: 3em !important;
+}
+
+.ql-editor .ql-indent-3:not(.ql-direction-rtl) {
+    padding-left: 4.5em !important;
+}
+
+.ql-editor .ql-indent-4:not(.ql-direction-rtl) {
+    padding-left: 6em !important;
+}
+
+.ql-editor .ql-indent-5:not(.ql-direction-rtl) {
+    padding-left: 7.5em !important;
+}
+
+.ql-editor .ql-indent-6:not(.ql-direction-rtl) {
+    padding-left: 9em !important;
+}
+
+.ql-editor .ql-indent-7:not(.ql-direction-rtl) {
+    padding-left: 10.5em !important;
+}
+
+.ql-editor .ql-indent-8:not(.ql-direction-rtl) {
+    padding-left: 12em !important;
+}
+
+/* Custom Font Sizes if needed (Quill classes) */
+.ql-editor .ql-size-small {
+    font-size: 0.75rem !important;
+}
+
+.ql-editor .ql-size-large {
+    font-size: 1.25rem !important;
+}
+
+.ql-editor .ql-size-huge {
+    font-size: 2rem !important;
 }
 
 /* Base layout fixes for mobile to avoid bottom cutoff */
@@ -178,6 +265,37 @@ main::-webkit-scrollbar-thumb {
 .vidensbank-view-read-only .ql-editor li {
     padding-left: 0.5rem !important;
 }
+
+/* --- Premium Tabel Styling (Nu med understøttelse af manuelle bredder) --- */
+.vidensbank-view-read-only .ql-editor table,
+.vidensbank-editor-rich-text .ql-editor table {
+    width: auto !important;
+    min-width: 400px;
+    max-width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    margin: 2rem 0 !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+.vidensbank-view-read-only .ql-editor table th,
+.vidensbank-editor-rich-text .ql-editor table th {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.05em !important;
+    padding: 1rem !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    text-align: left !important;
+}
+
+
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover,
 main::-webkit-scrollbar-thumb:hover {

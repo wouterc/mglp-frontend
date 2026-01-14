@@ -23,7 +23,8 @@ const HelpButton: React.FC<HelpButtonProps> = ({ helpPointCode, label, className
         setLoading(true);
         try {
             const res = await api.get<any>(`/vidensbank/punkter/?kode_navn=${helpPointCode}`);
-            const fetched = res[0]?.artikler_details || [];
+            const list = Array.isArray(res.results) ? res.results : res;
+            const fetched = list[0]?.artikler_details || [];
 
             setArticles(fetched);
             return fetched;
@@ -75,7 +76,7 @@ const HelpButton: React.FC<HelpButtonProps> = ({ helpPointCode, label, className
                     <div className="px-4 py-3 bg-amber-400 text-amber-950">
                         <span className="text-[10px] font-black uppercase tracking-widest">Vælg vejledning</span>
                     </div>
-                    <div className="py-1 bg-amber-50">
+                    <div className="py-1 bg-amber-50 max-h-96 overflow-y-auto custom-scrollbar">
                         {articles.map(v => (
                             <button
                                 key={v.id}

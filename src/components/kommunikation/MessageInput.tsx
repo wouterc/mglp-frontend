@@ -132,8 +132,12 @@ const MessageInput: React.FC<MessageInputProps & { fullHeight?: boolean }> = ({
 
     const modules = {
         toolbar: [
+            [{ 'size': ['small', false, 'large', 'huge'] }],
             ['bold', 'italic', 'underline', 'strike'],
             [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'indent': '-1' }, { 'indent': '+1' }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'align': [] }],
             ['link', 'image'],
             ['clean']
         ],

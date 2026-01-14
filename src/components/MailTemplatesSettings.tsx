@@ -228,6 +228,7 @@ export default function MailTemplatesSettings() {
             [{ 'header': [1, 2, 3, false] }],
             ['bold', 'italic', 'underline', 'strike'],
             [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'indent': '-1' }, { 'indent': '+1' }],
             ['link', 'clean'],
             [{ 'color': [] }, { 'background': [] }],
             [{ 'align': [] }]

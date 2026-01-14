@@ -404,6 +404,7 @@ export interface VidensKategori {
   navn: string;
   beskrivelse: string | null;
   farve: string;
+  artikler_count?: number;
 }
 
 export interface Viden {
@@ -427,4 +428,5 @@ export interface HjaelpPunkt {
   kode_navn: string;
   alias: string;
   artikler: number[];
+  artikler_details?: Viden[];
 }

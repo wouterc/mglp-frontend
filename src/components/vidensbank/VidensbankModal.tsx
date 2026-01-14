@@ -6,6 +6,29 @@ import { Viden, VidensKategori, HjaelpPunkt } from '../../types';
 import { api } from '../../api';
 import Modal from '../Modal';
 import { X, Upload, Link as LinkIcon, FileText, Loader2, Save } from 'lucide-react';
+import { Quill } from 'react-quill-new';
+
+// @# 2024-03-20 - Tving Quill til at acceptere 'style' og 'width' på tabel-celler
+const Style = Quill.import('attributors/style/width') as any;
+if (Style) {
+    Quill.register(Style, true);
+}
+
+const TableCell = Quill.import('formats/table-cell') as any;
+if (TableCell) {
+    // Tillad 'width' som en gyldig attribut i Quills interne model
+    const oldFormats = TableCell.formats;
+    TableCell.formats = function (domNode: HTMLElement) {
+        const formats = oldFormats(domNode) || {};
+        if (domNode.hasAttribute('width')) {
+            formats.width = domNode.getAttribute('width');
+        } else if (domNode.style.width) {
+            formats.width = domNode.style.width;
+        }
+        return formats;
+    };
+    Quill.register(TableCell, true);
+}
 
 interface VidensbankModalProps {
     isOpen: boolean;
@@ -65,7 +88,22 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
     }, [editingViden, isOpen]);
 
     const handleSave = async () => {
-        if (!titel || !kategori || !indhold) {
+        // @# 2024-03-20 - Vigtigt: Træk indholdet direkte fra Quill-editoren ved gemning.
+        const editor = quillRef.current?.getEditor();
+        if (!editor) return;
+
+        // "Fastfrys" kolonnebredder: Gennemgå alle TD'er og konverter deres 'style.width' (fra resize) 
+        // til en permanent 'width' attribut, som Quill og databasen ikke smider væk.
+        const tdElements = editor.root.querySelectorAll('td');
+        tdElements.forEach((td: HTMLElement) => {
+            if (td.style.width) {
+                td.setAttribute('width', td.style.width);
+            }
+        });
+
+        const currentContent = editor.root.innerHTML;
+
+        if (!titel || !kategori || !currentContent) {
             alert("Udfyld venligst titel, kategori og indhold.");
             return;
         }
@@ -75,7 +113,7 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
             const formData = new FormData();
             formData.append('titel', titel);
             formData.append('kategori', kategori.toString());
-            formData.append('indhold', indhold);
+            formData.append('indhold', currentContent);
             formData.append('link', link);
             if (fil) {
                 formData.append('fil', fil);
@@ -132,13 +170,38 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
     });
 
     const quillModules = {
-        toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-            ['link', 'image'],
-            ['clean']
-        ],
+        toolbar: {
+            container: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'align': [] }],
+                ['link', 'image', 'table'], // @# Added 'table'
+                ['clean']
+            ],
+        },
+        table: true // @# Enable table module
+    };
+
+    const quillRef = React.useRef<any>(null);
+
+    const handleTableAction = (action: string) => {
+        const quill = quillRef.current?.getEditor();
+        const table = quill?.getModule('table');
+        if (!table) return;
+
+        switch (action) {
+            case 'insert-row-above': table.insertRowAbove(); break;
+            case 'insert-row-below': table.insertRowBelow(); break;
+            case 'insert-column-left': table.insertColumnLeft(); break;
+            case 'insert-column-right': table.insertColumnRight(); break;
+            case 'delete-row': table.deleteRow(); break;
+            case 'delete-column': table.deleteColumn(); break;
+            case 'delete-table': table.deleteTable(); break;
+            default: break;
+        }
     };
 
     return (
@@ -179,14 +242,56 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                 </div>
 
                 <div className="flex flex-col gap-1 text-left">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Indhold</label>
-                    <div className="border border-gray-300 rounded-lg overflow-hidden flex flex-col min-h-[400px]">
+                    <div className="flex justify-between items-end mb-1 sticky top-[-24px] bg-white z-20 py-1 border-b border-gray-100">
+                        <label className="text-xs font-bold text-gray-500 uppercase">Indhold</label>
+                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md border border-gray-200 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-400 px-2 uppercase">Tabel værktøj:</span>
+                            <button
+                                onClick={() => handleTableAction('insert-row-below')}
+                                className="px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-blue-50 hover:text-blue-600 transition-colors font-bold"
+                                title="Indsæt række under"
+                            >
+                                + Række
+                            </button>
+                            <button
+                                onClick={() => handleTableAction('insert-column-right')}
+                                className="px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-blue-50 hover:text-blue-600 transition-colors font-bold"
+                                title="Indsæt kolonne til højre"
+                            >
+                                + Kolonne
+                            </button>
+                            <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                            <button
+                                onClick={() => handleTableAction('delete-row')}
+                                className="px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-red-50 hover:text-red-600 transition-colors font-bold"
+                                title="Slet række"
+                            >
+                                - Række
+                            </button>
+                            <button
+                                onClick={() => handleTableAction('delete-column')}
+                                className="px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-red-50 hover:text-red-600 transition-colors font-bold"
+                                title="Slet kolonne"
+                            >
+                                - Kolonne
+                            </button>
+                            <button
+                                onClick={() => handleTableAction('delete-table')}
+                                className="px-2 py-1 text-[10px] bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-bold ml-2"
+                                title="SLET HELE TABELLEN"
+                            >
+                                Slet tabel
+                            </button>
+                        </div>
+                    </div>
+                    <div className="border border-gray-300 rounded-lg flex flex-col min-h-[400px]">
                         <ReactQuill
+                            ref={quillRef}
                             theme="snow"
                             value={indhold}
                             onChange={(content) => setIndhold(content)}
                             modules={quillModules}
-                            className="flex-1 flex flex-col [&>.ql-container]:flex-1 [&>.ql-container]:overflow-visible [&>.ql-editor]:min-h-[350px]"
+                            className="flex-1 flex flex-col vidensbank-editor-rich-text [&>.ql-container]:flex-1 [&>.ql-container]:overflow-visible [&>.ql-editor]:min-h-[350px]"
                         />
                     </div>
                 </div>
