@@ -405,6 +405,7 @@ export interface VidensKategori {
   beskrivelse: string | null;
   farve: string;
   artikler_count?: number;
+  er_privat: boolean;
 }
 
 export interface Viden {
@@ -421,6 +422,8 @@ export interface Viden {
   oprettet: string;
   opdateret: string;
   hjaelp_punkt_ids?: number[];
+  arkiveret: boolean;
+  favorit: boolean;
 }
 
 export interface HjaelpPunkt {

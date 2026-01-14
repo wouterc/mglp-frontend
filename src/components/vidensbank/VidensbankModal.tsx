@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { Viden, VidensKategori, HjaelpPunkt } from '../../types';
 import { api } from '../../api';
 import Modal from '../Modal';
-import { X, Upload, Link as LinkIcon, FileText, Loader2, Save } from 'lucide-react';
+import { X, Upload, Link as LinkIcon, FileText, Loader2, Save, Star, Archive } from 'lucide-react';
 import { Quill } from 'react-quill-new';
 
 // @# 2024-03-20 - Tving Quill til at acceptere 'style' og 'width' på tabel-celler
@@ -47,6 +47,8 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
     const [eksisterendeFil, setEksisterendeFil] = useState<string | null>(null);
     const [hjaelpPunkter, setHjaelpPunkter] = useState<HjaelpPunkt[]>([]);
     const [selectedHjaelpPunktIds, setSelectedHjaelpPunktIds] = useState<number[]>([]);
+    const [arkiveret, setArkiveret] = useState(false);
+    const [favorit, setFavorit] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     const fetchHjaelpPunkter = useCallback(async () => {
@@ -74,6 +76,8 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                 setLink(editingViden.link || '');
                 setEksisterendeFil(editingViden.fil);
                 setSelectedHjaelpPunktIds(editingViden.hjaelp_punkt_ids || []);
+                setArkiveret(editingViden.arkiveret);
+                setFavorit(editingViden.favorit);
                 setFil(null);
             } else {
                 setTitel('');
@@ -83,6 +87,8 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                 setSelectedHjaelpPunktIds([]);
                 setFil(null);
                 setEksisterendeFil(null);
+                setArkiveret(false);
+                setFavorit(false);
             }
         }
     }, [editingViden, isOpen]);
@@ -118,6 +124,8 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
             if (fil) {
                 formData.append('fil', fil);
             }
+            formData.append('arkiveret', arkiveret.toString());
+            formData.append('favorit', favorit.toString());
 
             // Handle help point IDs - DRF PrimaryKeyRelatedField expects list of IDs
             selectedHjaelpPunktIds.forEach(id => {
@@ -239,6 +247,34 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                             ))}
                         </select>
                     </div>
+                </div>
+
+                <div className="flex gap-6 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                            type="checkbox"
+                            checked={favorit}
+                            onChange={(e) => setFavorit(e.target.checked)}
+                            className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500"
+                        />
+                        <div className="flex items-center gap-1.5">
+                            <Star size={16} className={favorit ? "text-amber-500 fill-amber-500" : "text-gray-400"} />
+                            <span className="text-sm font-bold text-gray-700 group-hover:text-amber-600 transition-colors">Vigtig / Favorit</span>
+                        </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                            type="checkbox"
+                            checked={arkiveret}
+                            onChange={(e) => setArkiveret(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <div className="flex items-center gap-1.5">
+                            <Archive size={16} className={arkiveret ? "text-blue-600" : "text-gray-400"} />
+                            <span className="text-sm font-bold text-gray-700 group-hover:text-blue-600 transition-colors">Arkiveret</span>
+                        </div>
+                    </label>
                 </div>
 
                 <div className="flex flex-col gap-1 text-left">

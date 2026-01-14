@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, LibraryBig, Filter, Trash2, Edit, ExternalLink, Copy, Share2, FileText, Loader2, ChevronRight, X, MessageCircleHeart, GripVertical, HelpCircle, Save, ChevronDown, Unlink } from 'lucide-react';
+import { Search, Plus, LibraryBig, Filter, Trash2, Edit, ExternalLink, Copy, Share2, FileText, Loader2, ChevronRight, X, MessageCircleHeart, GripVertical, HelpCircle, Save, ChevronDown, Unlink, Archive, Star, ArchiveRestore, Lock } from 'lucide-react';
 import { api } from '../api';
 import HelpButton from '../components/ui/HelpButton';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, useDraggable, useDroppable, DragOverlay } from '@dnd-kit/core';
@@ -29,10 +29,12 @@ interface SortableArticleItemProps {
     onCopy: (v: Viden) => void;
     onSend: (v: Viden) => void;
     onUnlink: (v: Viden) => void;
+    onArchive: (v: Viden) => void;
+    onToggleFavorite: (v: Viden) => void;
     onDelete?: (id: number) => void;
 }
 
-const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView, onEdit, onCopy, onSend, onUnlink }) => {
+const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView, onEdit, onCopy, onSend, onUnlink, onArchive, onToggleFavorite }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: viden.id,
         data: { type: 'sortable-article', viden }
@@ -48,7 +50,7 @@ const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView
     return (
         <div
             ref={setNodeRef}
-            className="bg-white rounded-xl shadow-md border border-gray-300 border-l-4 p-4 hover:shadow-lg transition-all group relative flex items-center gap-4"
+            className={`bg-white rounded-xl shadow-md border border-gray-300 border-l-4 p-4 hover:shadow-lg transition-all group relative flex items-center gap-4 ${viden.arkiveret ? 'opacity-60 grayscale-[0.5]' : ''}`}
             style={{ ...style, borderLeftColor: viden.kategori_details?.farve || '#2563eb' }}
         >
             <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-blue-500 p-1">
@@ -58,21 +60,38 @@ const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView
             <div className="flex-1 min-w-0" onClick={() => onView(viden)}>
                 <div className="flex justify-between items-start">
                     <div>
-                        <span
-                            className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded mb-1 inline-block"
-                            style={{
-                                backgroundColor: (viden.kategori_details?.farve || '#2563eb') + '15',
-                                color: viden.kategori_details?.farve || '#2563eb'
-                            }}
-                        >
-                            {viden.kategori_details?.navn || 'Ukendt kategori'}
-                        </span>
-                        <h3 className="text-lg font-bold text-gray-800 leading-tight truncate">{viden.titel}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span
+                                className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded inline-block"
+                                style={{
+                                    backgroundColor: (viden.kategori_details?.farve || '#2563eb') + '15',
+                                    color: viden.kategori_details?.farve || '#2563eb'
+                                }}
+                            >
+                                {viden.kategori_details?.navn || 'Ukendt kategori'}
+                            </span>
+                            {viden.arkiveret && (
+                                <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                    Arkiveret
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-gray-800 leading-tight truncate">{viden.titel}</h3>
+                            {viden.favorit && <Star size={16} className="text-amber-400 fill-amber-400 shrink-0" />}
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(viden); }}
+                    className={`p-2 rounded-lg ${viden.favorit ? 'text-amber-500 bg-amber-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                    title={viden.favorit ? "Fjern fra favoritter" : "Marker som favorit"}
+                >
+                    <Star size={18} className={viden.favorit ? "fill-amber-500" : ""} />
+                </button>
                 <button onClick={() => onSend(viden)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Send til Chat">
                     <MessageCircleHeart size={18} />
                 </button>
@@ -82,6 +101,13 @@ const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView
                 <button onClick={() => onEdit(viden)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Rediger">
                     <Edit size={18} />
                 </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onArchive(viden); }}
+                    className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                    title={viden.arkiveret ? "Gendan fra arkiv" : "Arkiver"}
+                >
+                    {viden.arkiveret ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+                </button>
                 <button onClick={() => onUnlink(viden)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Fjern tilknytning">
                     <Unlink size={18} />
                 </button>
@@ -90,7 +116,7 @@ const SortableArticleItem: React.FC<SortableArticleItemProps> = ({ viden, onView
     );
 };
 
-const DraggableArticleCard: React.FC<{ viden: Viden; onClick: () => void; onSend: (v: Viden) => void; onCopy: (v: Viden) => void; onEdit: (v: Viden) => void; onDelete: (id: number) => void }> = ({ viden, onClick, onSend, onCopy, onEdit, onDelete }) => {
+const DraggableArticleCard: React.FC<{ viden: Viden; onClick: () => void; onSend: (v: Viden) => void; onCopy: (v: Viden) => void; onEdit: (v: Viden) => void; onDelete: (id: number) => void; onArchive: (v: Viden) => void; onToggleFavorite: (v: Viden) => void }> = ({ viden, onClick, onSend, onCopy, onEdit, onDelete, onArchive, onToggleFavorite }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `draggable-${viden.id}`,
         data: { type: 'article', viden }
@@ -107,24 +133,41 @@ const DraggableArticleCard: React.FC<{ viden: Viden; onClick: () => void; onSend
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`bg-white rounded-xl shadow-md border border-gray-300 border-l-4 p-5 hover:shadow-xl hover:bg-slate-50 transition-all group relative flex flex-col h-full cursor-grab active:cursor-grabbing ${isDragging ? 'rotate-1 shadow-2xl scale-105 border-blue-500' : ''}`}
+            className={`bg-white rounded-xl shadow-md border border-gray-300 border-l-4 p-5 hover:shadow-xl hover:bg-slate-50 transition-all group relative flex flex-col h-full cursor-grab active:cursor-grabbing ${isDragging ? 'rotate-1 shadow-2xl scale-105 border-blue-500' : ''} ${viden.arkiveret ? 'opacity-60 grayscale-[0.5]' : ''}`}
             style={{ ...style, borderLeftColor: viden.kategori_details?.farve || '#2563eb' }}
             onClick={onClick}
         >
             <div className="flex justify-between items-start mb-3">
                 <div className="flex-1 min-w-0 pr-4 pointer-events-none">
-                    <span
-                        className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded mb-2 inline-block shadow-sm"
-                        style={{
-                            backgroundColor: (viden.kategori_details?.farve || '#2563eb') + '15',
-                            color: viden.kategori_details?.farve || '#2563eb'
-                        }}
-                    >
-                        {viden.kategori_details?.navn || 'Ukendt kategori'}
-                    </span>
-                    <h3 className="text-xl font-bold text-gray-800 leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">{viden.titel}</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                        <span
+                            className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded inline-block shadow-sm"
+                            style={{
+                                backgroundColor: (viden.kategori_details?.farve || '#2563eb') + '15',
+                                color: viden.kategori_details?.farve || '#2563eb'
+                            }}
+                        >
+                            {viden.kategori_details?.navn || 'Ukendt kategori'}
+                        </span>
+                        {viden.arkiveret && (
+                            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                Arkiveret
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-gray-800 leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">{viden.titel}</h3>
+                        {viden.favorit && <Star size={18} className="text-amber-400 fill-amber-400 shrink-0" />}
+                    </div>
                 </div>
                 <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleFavorite(viden); }}
+                        className={`p-2 rounded-lg ${viden.favorit ? 'text-amber-500 bg-amber-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                        title={viden.favorit ? "Fjern fra favoritter" : "Marker som favorit"}
+                    >
+                        <Star size={18} className={viden.favorit ? "fill-amber-500" : ""} />
+                    </button>
                     <button onClick={() => onSend(viden)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Send til Chat">
                         <MessageCircleHeart size={18} />
                     </button>
@@ -133,6 +176,13 @@ const DraggableArticleCard: React.FC<{ viden: Viden; onClick: () => void; onSend
                     </button>
                     <button onClick={() => onEdit(viden)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Rediger">
                         <Edit size={18} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onArchive(viden); }}
+                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                        title={viden.arkiveret ? "Gendan fra arkiv" : "Arkiver"}
+                    >
+                        {viden.arkiveret ? <ArchiveRestore size={18} /> : <Archive size={18} />}
                     </button>
                     <button onClick={() => onDelete(viden.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Slet">
                         <Trash2 size={18} />
@@ -195,6 +245,7 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
     const [valgtKategoriId, setValgtKategoriId] = useState<number | null>(null);
     const [valgtHjaelpPunktId, setValgtHjaelpPunktId] = useState<number | null>(null);
     const [orderedArticles, setOrderedArticles] = useState<Viden[]>([]);
+    const [showArchived, setShowArchived] = useState(false);
 
     // Pagination state
     const [hasMore, setHasMore] = useState(true);
@@ -348,6 +399,7 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
             if (valgtKategoriId) params.append('kategori', valgtKategoriId.toString());
+            if (showArchived) params.append('show_archived', 'true');
 
             params.append('limit', ARTICLES_PER_PAGE.toString());
             const currentOffset = isLoadMore ? vidensbank.length : 0;
@@ -403,7 +455,7 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                 });
             }
         }
-    }, [searchTerm, valgtKategoriId, valgtHjaelpPunktId, hjaelpPunkter]);
+    }, [searchTerm, valgtKategoriId, valgtHjaelpPunktId, hjaelpPunkter, showArchived]);
 
     const handleScroll = () => {
         if (!scrollContainerRef.current || loading || loadingMore || !hasMore) return;
@@ -499,6 +551,56 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
         await loadInitialData(); // Refresh counts
         setIsModalOpen(false);
         setEditingViden(undefined);
+    };
+
+    const handleArchive = async (v: Viden) => {
+        try {
+            const newValue = !v.arkiveret;
+            await api.patch(`/vidensbank/artikler/${v.id}/`, { arkiveret: newValue });
+            showToast(newValue ? "Artikel arkiveret" : "Artikel gendannet", "success");
+
+            // Opdater listen lokalt eller genindlæs
+            if (!showArchived && newValue) {
+                // Hvis vi ikke viser arkiverede og den blev arkiveret, fjern den fra listen
+                setVidensbank(prev => prev.filter(item => item.id !== v.id));
+                setOrderedArticles(prev => prev.filter(item => item.id !== v.id));
+            } else {
+                // Ellers bare opdater flaget
+                const updater = (prev: Viden[]) => prev.map(item => item.id === v.id ? { ...item, arkiveret: newValue } : item);
+                setVidensbank(updater);
+                setOrderedArticles(updater);
+            }
+            loadInitialData(); // Refresh counts
+        } catch (error) {
+            showToast("Kunne ikke opdatere arkiv-status", "error");
+        }
+    };
+
+    const handleToggleFavorite = async (v: Viden) => {
+        try {
+            const newValue = !v.favorit;
+            await api.patch(`/vidensbank/artikler/${v.id}/`, { favorit: newValue });
+            showToast(newValue ? "Tilføjet til favoritter" : "Fjernet fra favoritter", "success");
+
+            // Opdater listen lokalt
+            const updater = (prev: Viden[]) => {
+                const updated = prev.map(item => item.id === v.id ? { ...item, favorit: newValue } : item);
+                // Sorter hvis vi ikke er i et hjælpepunkt (hvor rækkefølgen er manuel)
+                if (!valgtHjaelpPunktId) {
+                    return [...updated].sort((a, b) => {
+                        if (a.favorit === b.favorit) {
+                            return new Date(b.oprettet).getTime() - new Date(a.oprettet).getTime();
+                        }
+                        return a.favorit ? -1 : 1;
+                    });
+                }
+                return updated;
+            };
+            setVidensbank(updater);
+            setOrderedArticles(updater);
+        } catch (error) {
+            showToast("Kunne ikke opdatere favorit-status", "error");
+        }
     };
 
     if (standalone) {
@@ -598,7 +700,7 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                         {/* Sidebar / Filter */}
                         <aside className="w-64 flex flex-col gap-6 shrink-0">
                             <div className="bg-white p-4 rounded-xl shadow-md border border-gray-300">
-                                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                                     <Filter size={14} />
                                     Kategorier
                                     {valgtKategoriId && (
@@ -610,6 +712,21 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                                         </button>
                                     )}
                                 </h2>
+                                <div className="mb-2 pb-2 border-b border-gray-100">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className="relative">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only"
+                                                checked={showArchived}
+                                                onChange={() => setShowArchived(!showArchived)}
+                                            />
+                                            <div className={`block w-9 h-5 rounded-full transition-colors ${showArchived ? 'bg-amber-500' : 'bg-gray-300'}`}></div>
+                                            <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${showArchived ? 'translate-x-4' : ''}`}></div>
+                                        </div>
+                                        <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900 transition-colors">Vis arkiverede</span>
+                                    </label>
+                                </div>
                                 <ul className="space-y-1">
                                     <li
                                         className={`px-3 py-2 rounded-md cursor-pointer text-sm transition-colors ${(!valgtKategoriId && !valgtHjaelpPunktId) ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-600'}`}
@@ -617,21 +734,24 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                                     >
                                         Alle
                                     </li>
-                                    {kategorier.map(kat => (
-                                        <li
-                                            key={kat.id}
-                                            className={`px-3 py-2 rounded-md cursor-pointer text-sm transition-colors flex items-center justify-between gap-2 ${valgtKategoriId === kat.id ? 'bg-blue-100 text-blue-700 font-semibold shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}
-                                            onClick={() => { setValgtKategoriId(kat.id); setValgtHjaelpPunktId(null); }}
-                                        >
-                                            <div className="flex items-center gap-2 truncate">
-                                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kat.farve }}></span>
-                                                <span className="truncate">{kat.navn}</span>
-                                            </div>
-                                            <span className={`shrink-0 text-[10px] min-w-[1.25rem] h-5 flex items-center justify-center rounded-full px-1.5 font-bold ${valgtKategoriId === kat.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-400 opacity-60'} transition-all`}>
-                                                {kat.artikler_count || 0}
-                                            </span>
-                                        </li>
-                                    ))}
+                                    {kategorier
+                                        .filter(kat => !kat.er_privat || (kat.artikler_count && kat.artikler_count > 0))
+                                        .map(kat => (
+                                            <li
+                                                key={kat.id}
+                                                className={`px-3 py-2 rounded-md cursor-pointer text-sm transition-colors flex items-center justify-between gap-2 ${valgtKategoriId === kat.id ? 'bg-blue-100 text-blue-700 font-semibold shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}
+                                                onClick={() => { setValgtKategoriId(kat.id); setValgtHjaelpPunktId(null); }}
+                                            >
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kat.farve }}></span>
+                                                    <span className="truncate">{kat.navn}</span>
+                                                    {kat.er_privat && <Lock size={12} className="text-gray-400 shrink-0" />}
+                                                </div>
+                                                <span className={`shrink-0 text-[10px] min-w-[1.25rem] h-5 flex items-center justify-center rounded-full px-1.5 font-bold ${valgtKategoriId === kat.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-400 opacity-60'} transition-all`}>
+                                                    {kat.artikler_count || 0}
+                                                </span>
+                                            </li>
+                                        ))}
                                 </ul>
                             </div>
 
@@ -731,6 +851,8 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                                                         onCopy={handleCopyLink}
                                                         onSend={handleSendToChat}
                                                         onUnlink={handleUnlink}
+                                                        onArchive={handleArchive}
+                                                        onToggleFavorite={handleToggleFavorite}
                                                     />
                                                 ))}
                                                 {orderedArticles.length === 0 && (
@@ -770,6 +892,8 @@ const VidensbankPage: React.FC<VidensbankPageProps> = ({ standalone = false }) =
                                                 onCopy={handleCopyLink}
                                                 onEdit={(v) => { setEditingViden(v); setIsModalOpen(true); }}
                                                 onDelete={(id) => setDeletingVidenId(id)}
+                                                onArchive={handleArchive}
+                                                onToggleFavorite={handleToggleFavorite}
                                             />
                                         ))}
                                         {loadingMore && (
