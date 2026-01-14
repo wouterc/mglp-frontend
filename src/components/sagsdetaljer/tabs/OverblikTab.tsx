@@ -183,14 +183,35 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         </div>
                     </div>
 
-                    {/* Rad 4: BBR og Anpart */}
+                    {/* Rad 4: Bolig Link og Anpart */}
                     <div className="md:col-span-2">
-                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</div>
-                        <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Bolig system</div>
+                        <div className="flex items-center">
+                            {sag.bolig_link && <CopyButton text={sag.bolig_link} id="bolig_link" />}
+                            {sag.bolig_link ? (
+                                <a
+                                    href={sag.bolig_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline text-sm font-medium truncate"
+                                    title={sag.bolig_link}
+                                >
+                                    {sag.bolig_link}
+                                </a>
+                            ) : (
+                                <p className="text-gray-900 text-sm font-medium">-</p>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Anpart</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_anpart || '-'}</p>
+                    </div>
+
+                    {/* Rad 5: BBR */}
+                    <div className="md:col-span-3">
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</div>
+                        <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
                     </div>
 
                     {/* Sagsnumre sektion - Samlet på én række (3 kolonner) */}

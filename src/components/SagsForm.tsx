@@ -50,6 +50,7 @@ interface SagsDataState {
   bolig_matrikel: string;
   bolig_anpart: string;
   bolig_anvendelse_id: string;
+  bolig_link: string;
   kommentar: string;
   byggeaar: string;
   boligareal: string;
@@ -81,6 +82,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     bolig_matrikel: '',
     bolig_anpart: '',
     bolig_anvendelse_id: '',
+    bolig_link: '',
     kommentar: '',
     byggeaar: '',
     boligareal: '',
@@ -126,6 +128,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         bolig_matrikel: sagTilRedigering.bolig_matrikel || '',
         bolig_anpart: sagTilRedigering.bolig_anpart || '',
         bolig_anvendelse_id: sagTilRedigering.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : '',
+        bolig_link: sagTilRedigering.bolig_link || '',
 
         kommentar: sagTilRedigering.kommentar || '',
         maegler_sagsnr: sagTilRedigering.maegler_sagsnr || '',
@@ -383,6 +386,11 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             </div>
 
             <div className="md:col-span-2">
+              <label htmlFor="bolig_link" className="block text-xs font-medium text-gray-500">Bolig system</label>
+              <input type="text" id="bolig_link" name="bolig_link" value={sagsData.bolig_link || ''} onChange={handleChange} placeholder="https://..." className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
               <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
               <select
                 id="bolig_anvendelse_id"

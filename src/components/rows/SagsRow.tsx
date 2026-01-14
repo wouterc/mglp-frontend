@@ -186,6 +186,41 @@ export default function SagsRow({
                                     </div>
                                 )}
                             </div>
+                            <div>
+                                {sag.bolig_link && (
+                                    <>
+                                        <h4 className="font-bold text-gray-700 text-xs uppercase mb-1">Bolig system</h4>
+                                        <div className="flex items-center space-x-1">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigator.clipboard.writeText(sag.bolig_link!);
+                                                    setCopiedEmailId(`link-${sag.id}`);
+                                                    setTimeout(() => setCopiedEmailId(null), 2000);
+                                                }}
+                                                className="p-1 rounded-md hover:bg-gray-200"
+                                                title="Kopier link"
+                                            >
+                                                {copiedEmailId === `link-${sag.id}` ? (
+                                                    <Check size={14} className="text-green-500" />
+                                                ) : (
+                                                    <Copy size={14} className="text-blue-500 hover:text-blue-700" />
+                                                )}
+                                            </button>
+                                            <a
+                                                href={sag.bolig_link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 hover:underline truncate max-w-[250px]"
+                                                onClick={(e) => e.stopPropagation()}
+                                                title={sag.bolig_link}
+                                            >
+                                                {sag.bolig_link}
+                                            </a>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Kommentar-række */}

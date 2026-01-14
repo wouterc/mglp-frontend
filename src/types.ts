@@ -143,6 +143,7 @@ export interface Sag {
   bolig_anvendelse: BbrAnvendelse | null;
   bolig_bfe: string | null;
   bolig_anpart: string | null; // Django DecimalField serialiseres som string
+  bolig_link: string | null;
 
   opgaver_oprettet: boolean;
   mappen_oprettet: boolean;
