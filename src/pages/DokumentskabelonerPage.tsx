@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeE
 import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
 import LinkingTab from '../components/skabeloner/LinkingTab';
-import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2 } from 'lucide-react';
+import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2, UploadCloud, Download } from 'lucide-react';
 import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
@@ -11,6 +11,8 @@ import Tooltip from '../components/Tooltip';
 import { api } from '../api';
 import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
+import CsvImportModal from '../components/CsvImportModal';
+import * as XLSX from 'xlsx';
 
 interface InlineEditorProps {
   value: string | null | undefined;
@@ -108,6 +110,10 @@ function DokumentskabelonerPage(): ReactElement {
   const [nyDokumentNr, setNyDokumentNr] = useState('');
   const [nyDokumentNavn, setNyDokumentNavn] = useState('');
   const [isSavingNy, setIsSavingNy] = useState(false);
+
+  // State til Import/Export
+  const [visImportModal, setVisImportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Synkroniserings-state
   const [manglerSync, setManglerSync] = useState<Record<number, boolean>>({});
@@ -360,6 +366,40 @@ function DokumentskabelonerPage(): ReactElement {
     });
   };
 
+  // --- EKSPORT FUNKTION ---
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const data = await api.get<any>(`/skabeloner/dokumenter/?limit=5000`);
+      const exportList: SkabDokument[] = Array.isArray(data) ? data : data.results;
+
+      const excelData = exportList.map(d => ({
+        id: d.id,
+        gruppe_nr: d.gruppe?.nr,
+        gruppe_titel: d.gruppe?.titel_kort,
+        dokument_nr: d.dokument_nr,
+        dokument: d.dokument,
+        link: d.link,
+        filnavn: d.filnavn,
+        kilde: d.informations_kilde?.navn,
+        aktiv: d.aktiv,
+        udgaaet: d.udgaaet,
+        kommentar: d.kommentar
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Dokumentskabeloner");
+      XLSX.writeFile(workbook, `dokumentskabeloner_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+    } catch (e) {
+      console.error(e);
+      alert("Fejl ved eksport");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleRediger = (dok: SkabDokument) => {
     setDokumentTilRedigering(dok);
     setVisForm(true);
@@ -382,6 +422,16 @@ function DokumentskabelonerPage(): ReactElement {
 
   return (
     <div className="flex flex-col h-full bg-gray-100">
+      <CsvImportModal
+        isOpen={visImportModal}
+        onClose={() => setVisImportModal(false)}
+        onImportComplete={() => {
+          setVisImportModal(false);
+          hentData(filters);
+        }}
+        title="Importer Dokumenter (Excel)"
+        type="dokumentskabelon"
+      />
       {/* Header */}
       <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="flex items-baseline gap-6">
@@ -392,6 +442,14 @@ function DokumentskabelonerPage(): ReactElement {
           <h2 onClick={() => setActiveTab('linking')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'linking' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Link Aktiviteter</h2>
         </div>
         <div className="flex space-x-2">
+          {/* EKSPORT / IMPORT KNAPPER */}
+          <button onClick={() => setVisImportModal(true)} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50" title="Importer fra Excel">
+            <UploadCloud size={20} />
+          </button>
+          <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">
+            {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+          </button>
+
           {(nyeDokumenterFindes || isSyncingAlle) && (
             <button
               onClick={handleSynkroniserAlleSager}

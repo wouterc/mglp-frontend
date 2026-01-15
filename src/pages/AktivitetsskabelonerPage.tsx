@@ -602,6 +602,10 @@ function AktivitetsskabelonerPage(): ReactElement {
             <UploadCloud size={20} />
           </button>
 
+          <button onClick={handleExport} disabled={isExporting} className="p-2 bg-white text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50" title="Eksportér til Excel">
+            {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+          </button>
+
 
 
           {(nyeAktiviteterFindes || isSyncingAlle) && (

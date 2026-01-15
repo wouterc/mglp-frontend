@@ -13,7 +13,7 @@ interface CsvImportModalProps {
     onClose: () => void;
     onImportComplete: () => void;
     title: string;
-    type: 'virksomhed' | 'kontakt' | 'blokinfo' | 'aktivitetsskabelon'; // <--- Tilføjet 'aktivitetsskabelon'
+    type: 'virksomhed' | 'kontakt' | 'blokinfo' | 'aktivitetsskabelon' | 'dokumentskabelon';
 }
 
 interface ImportLog {
@@ -101,6 +101,14 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
         } catch (e) { return null; }
     };
 
+    const findExistingDokumentskabelon = async (gruppeNr: number, dokNr: number): Promise<number | null> => {
+        try {
+            const data = await api.get<any>(`/skabeloner/dokumenter/?gruppe_nr=${gruppeNr}&dokument_nr=${dokNr}`);
+            const results = Array.isArray(data) ? data : data.results;
+            return (results && results.length > 0) ? results[0].id : null;
+        } catch (e) { return null; }
+    };
+
     const fetchCvrData = async (cvr: string): Promise<any | null> => {
         try {
             return await api.get<any>(`/register/cvr_opslag/${cvr}/`);
@@ -119,6 +127,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
         else if (type === 'kontakt') endpoint = 'register/kontakter';
         else if (type === 'blokinfo') endpoint = 'skabeloner/blokinfo';
         else if (type === 'aktivitetsskabelon') endpoint = 'skabeloner/aktiviteter';
+        else if (type === 'dokumentskabelon') endpoint = 'skabeloner/dokumenter';
 
         for (let i = 0; i < parsedData.length; i++) {
             const row = parsedData[i];
@@ -128,7 +137,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
             // Rens data og konverter tal
             Object.keys(row).forEach(key => {
                 if (row[key] === '' || row[key] === undefined) delete row[key];
-                else if (['id', 'formaal', 'nr', 'proces_nr', 'gruppe_nr', 'aktivitet_nr', 'frist', 'kommunekode'].includes(key)) {
+                else if (['id', 'formaal', 'nr', 'proces_nr', 'gruppe_nr', 'aktivitet_nr', 'dokument_nr', 'frist', 'kommunekode'].includes(key)) {
                     const val = parseInt(row[key], 10);
                     if (!isNaN(val)) row[key] = val;
                 }
@@ -160,6 +169,19 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                 delete row.gruppe_nr;
             }
 
+            // --- SPECIAL LOGIK FOR DOKUMENTSSKABELONER ---
+            if (type === 'dokumentskabelon') {
+                if (row.gruppe_nr) {
+                    const gruppeId = await findExistingBlokinfo(3, row.gruppe_nr);
+                    if (gruppeId) row.gruppe_id = gruppeId;
+                    else {
+                        logMsg(rowNum, `Ukendt Gruppe Nr: ${row.gruppe_nr} (formål 3)`, 'error');
+                        continue;
+                    }
+                }
+                delete row.gruppe_nr;
+            }
+
             try {
                 // TRIN 1: Tjek ID
                 if (row.id) {
@@ -178,6 +200,11 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                         const origRow = parsedData[i];
                         if (origRow.proces_nr && origRow.gruppe_nr && origRow.aktivitet_nr) {
                             idToUpdate = await findExistingAktivitet(origRow.proces_nr, origRow.gruppe_nr, origRow.aktivitet_nr);
+                        }
+                    } else if (type === 'dokumentskabelon') {
+                        const origRow = parsedData[i];
+                        if (origRow.gruppe_nr && origRow.dokument_nr) {
+                            idToUpdate = await findExistingDokumentskabelon(origRow.gruppe_nr, origRow.dokument_nr);
                         }
                     }
                 }
@@ -210,7 +237,7 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
 
                     try {
                         const created = await api.post<any>(`/${endpoint}/`, row);
-                        let navn = created.navn || created.fulde_navn || created.titel_kort || created.aktivitet || '';
+                        let navn = created.navn || created.fulde_navn || created.titel_kort || created.aktivitet || created.dokument || '';
                         logMsg(rowNum, `Oprettet ny: ${navn} (ID: ${created.id})`, 'success');
                     } catch (err: any) {
                         logMsg(rowNum, `Fejl ved oprettelse: ${err.message}`, 'error');
@@ -290,8 +317,8 @@ export default function CsvImportModal({ isOpen, onClose, onImportComplete, titl
                     <div className="mt-4 border rounded-md max-h-60 overflow-y-auto bg-slate-900 text-slate-50 font-mono text-xs p-2 shadow-inner">
                         {logs.map((log, idx) => (
                             <div key={idx} className={`flex items-center mb-1 last:mb-0 ${log.status === 'error' ? 'text-red-400' :
-                                    log.status === 'update' ? 'text-blue-300' :
-                                        'text-green-400'
+                                log.status === 'update' ? 'text-blue-300' :
+                                    'text-green-400'
                                 }`}>
                                 <span className="mr-2 flex-shrink-0">
                                     {log.status === 'success' && <CheckCircle size={12} />}
