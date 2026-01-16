@@ -4,7 +4,7 @@ import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
 import LinkingTab from '../components/skabeloner/LinkingTab';
 import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2, UploadCloud, Download } from 'lucide-react';
-import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState } from '../types.ts';
+import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState, StandardMappe } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
@@ -94,6 +94,7 @@ function DokumentskabelonerPage(): ReactElement {
     dokumentskabelonerError: error,
     erDokumentskabelonerHentet,
     informationsKilder,
+    standardMapper,
   } = state;
 
   const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
@@ -577,6 +578,7 @@ function DokumentskabelonerPage(): ReactElement {
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Link</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
+                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Default Submappe</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
                     <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
                   </tr>
@@ -775,6 +777,38 @@ function DokumentskabelonerPage(): ReactElement {
                                   onClick={() => setActiveCell({ id: dok.id, field: 'informations_kilde_id', value: dok.informations_kilde?.id })}
                                 >
                                   {dok.informations_kilde?.navn || <span className="text-gray-300 italic">Vælg kilde...</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-sm text-gray-600 truncate">
+                              {isCellActive('default_undermappe_id') ? (
+                                <select
+                                  id={`select-mappe-${dok.id}`}
+                                  name="default_undermappe_id"
+                                  autoFocus
+                                  value={activeCell?.value ?? ''}
+                                  className="w-full text-black px-1 py-1 text-xs rounded border border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none bg-white font-sans"
+                                  onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
+                                  onBlur={() => {
+                                    if (activeCell?.value !== undefined) {
+                                      handleQuickUpdate(dok, { default_undermappe_id: activeCell.value ? Number(activeCell.value) : null });
+                                    }
+                                    setActiveCell(null);
+                                  }}
+                                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                  aria-label="Vælg default submappe"
+                                >
+                                  <option value="">Vælg mappe...</option>
+                                  {standardMapper.map(m => (
+                                    <option key={m.id} value={m.id}>{m.navn}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div
+                                  className="cursor-text py-1 rounded hover:bg-blue-50/50"
+                                  onClick={() => setActiveCell({ id: dok.id, field: 'default_undermappe_id', value: dok.default_undermappe?.id })}
+                                >
+                                  {dok.default_undermappe?.navn || <span className="text-gray-300 italic">Ingen...</span>}
                                 </div>
                               )}
                             </td>

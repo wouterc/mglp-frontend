@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Sag, SagsDokument, Blokinfo, InformationsKilde } from '../../../types';
+import { Sag, SagsDokument, Blokinfo, InformationsKilde, StandardMappe } from '../../../types';
 import { api } from '../../../api';
 import { ChevronDown, ChevronUp, RefreshCw, FileText, CheckCircle2, AlertCircle, PlusCircle, Mail, Loader2, ChevronsDown, ChevronsUp, ChevronRight, Save } from 'lucide-react';
 import DokumentRow from '../../rows/DokumentRow';
@@ -24,9 +24,9 @@ interface DokumenterTabProps {
 
 interface DokumentFilterState {
     tekst: string;
-    ansvarlig: string;
     status: string; // "alle", "mangler_fil", "har_fil"
     informations_kilde: string;
+    undermappe: string;
     aktiv_filter: string; // "kun_aktive", "alle"
     overskredet: boolean;
     vigtige: boolean;
@@ -36,7 +36,7 @@ interface DokumentFilterState {
 
 export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const { state, dispatch } = useAppState();
-    const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner } = state;
+    const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner, standardMapper } = state;
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -91,9 +91,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // Filters
     const [filters, setFilters] = useState<DokumentFilterState>({
         tekst: '',
-        ansvarlig: '',
         status: 'alle',
         informations_kilde: '',
+        undermappe: '',
         aktiv_filter: 'kun_aktive',
         overskredet: false,
         vigtige: false
@@ -111,9 +111,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const resetFilters = () => {
         setFilters({
             tekst: '',
-            ansvarlig: '',
             status: 'alle',
             informations_kilde: '',
+            undermappe: '',
             aktiv_filter: 'kun_aktive',
             overskredet: false,
             vigtige: false
@@ -141,6 +141,13 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     // State for Save to Template Modal
     const [confirmTemplateDoc, setConfirmTemplateDoc] = useState<SagsDokument | null>(null);
     const [feedbackModal, setFeedbackModal] = useState<{ title: string, message: string, type: 'success' | 'error' } | null>(null);
+    const [copyNotify, setCopyNotify] = useState<{ message: string } | null>(null);
+
+    // Line Actions State
+    const [renamingTitleDoc, setRenamingTitleDoc] = useState<SagsDokument | null>(null);
+    const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<SagsDokument | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [isRenamingTitle, setIsRenamingTitle] = useState(false);
 
 
     const fetchDokumenter = useCallback(async (arg?: boolean | number) => {
@@ -187,7 +194,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         }
     };
 
-    const handleUploadFile = async (docId: number, file: File) => {
+    const handleUploadFile = async (docId: number, file: File, undermappeId?: number) => {
         const doc = cachedDocs?.find(d => d.id === docId);
         let fileToUpload = file;
 
@@ -209,6 +216,10 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             const status80 = statusser.find(s => s.status_nummer === 80);
             if (status80) {
                 formData.append('status_id', status80.id.toString());
+            }
+
+            if (undermappeId !== undefined) {
+                formData.append('undermappe_id', undermappeId ? undermappeId.toString() : '');
             }
 
             await api.patch(`/sager/sagsdokumenter/${docId}/`, formData);
@@ -360,6 +371,140 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         setConfirmTemplateDoc(doc);
     };
 
+    const handleCopyDokument = async (sourceDoc: SagsDokument) => {
+        // Find the group ID (it might be an object or a number depending on the serializer state)
+        const gruppeId = typeof sourceDoc.gruppe === 'object' ? sourceDoc.gruppe?.id : sourceDoc.gruppe;
+
+        if (!gruppeId) {
+            console.error("Dokumentet mangler en gruppe og kan ikke kopieres i sin nuværende form.");
+            return;
+        }
+
+        const groupDocs = (cachedDocs || []).filter(d => {
+            const dGroupId = typeof d.gruppe === 'object' ? d.gruppe?.id : d.gruppe;
+            return dGroupId === gruppeId;
+        });
+
+        // 1. Titel logik: Navn - 2, Navn - 3 osv.
+        const currentTitle = sourceDoc.titel || sourceDoc.filnavn || "Uden navn";
+        const suffixRegex = /(.*) - (\d+)$/;
+        const match = currentTitle.match(suffixRegex);
+
+        let baseTitle = currentTitle;
+        if (match) {
+            baseTitle = match[1];
+        }
+
+        // Find alle eksisterende titler der starter med baseTitle og har eventuelt suffix
+        const relatedTitles = groupDocs
+            .map(d => d.titel || d.filnavn || "")
+            .filter(t => t === baseTitle || t.startsWith(baseTitle + " - "));
+
+        let maxSuffix = 1; // 1 betyder selve basetitlen uden suffix
+        relatedTitles.forEach(t => {
+            const m = t.match(/ - (\d+)$/);
+            if (m) {
+                const s = parseInt(m[1]);
+                if (s > maxSuffix) maxSuffix = s;
+            } else if (t === baseTitle) {
+                // maxSuffix forbliver 1 hvis vi finder basetitlen
+            }
+        });
+
+        const nextSuffix = maxSuffix + 1;
+        const newTitle = `${baseTitle} - ${nextSuffix}`;
+
+        // 2. Nummer logik: 100+ strategien
+        const maxNr = Math.max(0, ...groupDocs.map(d => d.dokument_nr || 0));
+        const nextNr = maxNr < 100 ? 101 : maxNr + 1;
+
+        // 3. Gem via API
+        try {
+            const response = await api.post<SagsDokument>('/sager/sagsdokumenter/', {
+                sag: sag.id,
+                gruppe: gruppeId, // Brug 'gruppe' som i handleQuickAdd
+                titel: newTitle,
+                dokument_nr: nextNr,
+                aktiv: true,
+                status_id: statusser.find((s: any) => s.status_nummer === 10)?.id || null,
+                informations_kilde_id: sourceDoc.informations_kilde?.id,
+                undermappe_id: sourceDoc.undermappe?.id
+            });
+
+            // Vis besked
+            setCopyNotify({ message: `Linjen er kopieret til ${newTitle} - nr. ${nextNr}` });
+            setTimeout(() => setCopyNotify(null), 3000);
+
+            // Opdater listen med det samme i cachen
+            dispatch({
+                type: 'SET_CACHED_DOKUMENTER',
+                payload: {
+                    sagId: sag.id,
+                    dokumenter: [...(cachedDocs || []), response]
+                }
+            });
+
+            // Hent data i baggrunden for at sikre fuldstændighed (fx hvis backend beregnede ting)
+            fetchDokumenter(true);
+        } catch (e) {
+            console.error("Fejl ved kopiering af dokument:", e);
+            alert("Kunne ikke kopiere dokumentet.");
+        }
+    };
+
+    const handleDeleteLine = (docId: number) => {
+        const doc = cachedDocs?.find(d => d.id === docId);
+        if (doc) setDeleteConfirmDoc(doc);
+    };
+
+    const performDeleteLine = async () => {
+        if (!deleteConfirmDoc) return;
+        const docId = deleteConfirmDoc.id;
+        try {
+            await api.delete(`/sager/sagsdokumenter/${docId}/`);
+            dispatch({
+                type: 'SET_CACHED_DOKUMENTER',
+                payload: {
+                    sagId: sag.id,
+                    dokumenter: (cachedDocs || []).filter(d => d.id !== docId)
+                }
+            });
+            setCopyNotify({ message: "Dokumentrækken er slettet." });
+            setTimeout(() => setCopyNotify(null), 3000);
+            setDeleteConfirmDoc(null);
+        } catch (e) {
+            console.error("Fejl ved sletning af dokumentrække:", e);
+            alert("Kunne ikke slette dokumentrækken.");
+        }
+    };
+
+    const handleSaveTitleRename = async () => {
+        if (!renamingTitleDoc) return;
+        setIsRenamingTitle(true);
+        try {
+            await api.patch(`/sager/sagsdokumenter/${renamingTitleDoc.id}/`, { titel: editTitle });
+            dispatch({
+                type: 'UPDATE_CACHED_DOKUMENT',
+                payload: {
+                    sagId: sag.id,
+                    docId: renamingTitleDoc.id,
+                    updates: { titel: editTitle }
+                }
+            });
+            setRenamingTitleDoc(null);
+        } catch (e) {
+            console.error("Fejl ved omdøbning af titel:", e);
+            alert("Kunne ikke omdøbe dokumentet.");
+        } finally {
+            setIsRenamingTitle(false);
+        }
+    };
+
+    const openRenameTitleModal = (doc: SagsDokument) => {
+        setRenamingTitleDoc(doc);
+        setEditTitle(doc.titel || doc.filnavn || '');
+    };
+
     const performGemTilSkabelon = async () => {
         if (!confirmTemplateDoc) return;
 
@@ -453,9 +598,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             );
             if (!matchesText) return false;
 
-            // Ansvarlig Filter
-            if (filters.ansvarlig) {
-                if (doc.ansvarlig_username !== filters.ansvarlig) return false;
+            // Mappe Filter
+            if (filters.undermappe) {
+                if (doc.undermappe?.id?.toString() !== filters.undermappe) return false;
             }
 
             // Status Filter
@@ -610,6 +755,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                 </Tooltip>
                                 <div className="h-4 w-px bg-gray-300 mx-1"></div>
                                 <HelpButton helpPointCode="DOKUMENTER_HELP" />
+                                {copyNotify && (
+                                    <div className="ml-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
+                                        <CheckCircle2 size={14} />
+                                        {copyNotify.message}
+                                    </div>
+                                )}
                                 {sag && (nyeDokumenterFindes || syncing) && (
                                     <Tooltip content="Nye dokumenter fundet - Klik for at synkronisere">
                                         <button
@@ -653,12 +804,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                 <th className="px-2 py-3 w-52 border-b border-gray-700">Dokument</th>
                                 <th className="px-2 py-3 w-20 border-b border-gray-700 text-center">Dato Int.</th>
                                 <th className="px-2 py-3 w-20 border-b border-gray-700 text-center">Dato Ekst.</th>
-                                <th className="px-1 py-3 w-20 border-b border-gray-700 text-center">Info</th>
+                                <th className="px-1 py-3 w-24 border-b border-gray-700 text-center">Info</th>
                                 <th className="px-2 py-3 w-40 border-b border-gray-700">Status</th>
                                 <th className="px-2 py-3 w-auto border-b border-gray-700">Fil</th>
+                                <th className="px-2 py-3 w-24 text-left border-b border-gray-700">Mappe</th>
                                 <th className="px-0 py-3 w-8 text-center border-b border-gray-700"><Mail className="inline h-4 w-4" /></th>
                                 <th className="px-2 py-3 w-20 text-left border-b border-gray-700">Kilde</th>
-                                <th className="px-2 py-3 w-24 text-left border-b border-gray-700">Ansvarlig</th>
                                 <th className="px-2 py-3 text-right w-8 border-b border-gray-700"></th>
                             </tr>
                         </thead>
@@ -699,11 +850,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 </div>
                                             </td>
                                         </tr>
-                                        {isGroupExpanded(group.name) && group.docs.map(doc => (
+                                        {isGroupExpanded(group.name) && group.docs.map((doc, idx) => (
                                             <DokumentRow
                                                 key={doc.id}
                                                 doc={doc}
                                                 sag={sag}
+                                                isLast={idx >= group.docs.length - 2}
                                                 colleagues={colleagues}
                                                 statusser={statusser}
                                                 onStatusToggle={handleStatusToggle}
@@ -713,8 +865,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 onRename={openRenameModal}
                                                 onInlineSave={handleInlineSave}
                                                 onSaveToTemplate={handleGemTilSkabelon}
+                                                onCopy={handleCopyDokument}
+                                                onRenameLine={openRenameTitleModal}
+                                                onDeleteLine={handleDeleteLine}
                                                 onLinkClick={handleLinkClick}
                                                 informationsKilder={informationsKilder}
+                                                standardMapper={standardMapper}
                                                 isActive={activeRow === doc.id}
                                                 onFocus={() => setActiveRow(doc.id)}
                                                 onBlur={() => setActiveRow(null)}
@@ -780,18 +936,6 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         className="p-2 w-full border border-slate-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
                     />
                     <select
-                        name="ansvarlig"
-                        value={filters.ansvarlig}
-                        onChange={handleFilterChange}
-                        className="p-2 w-full border border-slate-400 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="">Alle ansvarlige</option>
-                        {colleagues.map(u => (
-                            <option key={u.id} value={u.username}>{u.username}</option>
-                        ))}
-                    </select>
-
-                    <select
                         name="status"
                         value={filters.status}
                         onChange={handleFilterChange}
@@ -800,6 +944,18 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         <option value="alle">Alle statusser</option>
                         <option value="mangler_fil">Mangler fil</option>
                         <option value="har_fil">Har fil</option>
+                    </select>
+
+                    <select
+                        name="undermappe"
+                        value={filters.undermappe}
+                        onChange={handleFilterChange}
+                        className="p-2 w-full border border-slate-400 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option value="">Alle mapper</option>
+                        {standardMapper.map(m => (
+                            <option key={m.id} value={m.id}>{m.navn}</option>
+                        ))}
                     </select>
 
                     <select
@@ -1026,6 +1182,56 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             </Modal>
 
 
+
+            {/* Rename Title Modal */}
+            <Modal
+                isOpen={!!renamingTitleDoc}
+                onClose={() => setRenamingTitleDoc(null)}
+                title="Omdøb dokumentrække"
+                footer={
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setRenamingTitleDoc(null)}
+                            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                            Annuller
+                        </button>
+                        <button
+                            onClick={handleSaveTitleRename}
+                            disabled={isRenamingTitle}
+                            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {isRenamingTitle ? 'Gemmer...' : 'Gem'}
+                        </button>
+                    </div>
+                }
+            >
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nyt navn (titel)
+                    </label>
+                    <input
+                        autoFocus
+                        type="text"
+                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveTitleRename();
+                        }}
+                    />
+                </div>
+            </Modal>
+
+            <ConfirmModal
+                isOpen={!!deleteConfirmDoc}
+                onClose={() => setDeleteConfirmDoc(null)}
+                onConfirm={performDeleteLine}
+                title="Slet dokumentrække"
+                message={`Er du sikker på, at du vil slette "${deleteConfirmDoc?.titel || deleteConfirmDoc?.filnavn || 'denne række'}"? Alle tilknyttede data og eventuelle filer vil gå tabt.`}
+                confirmText="Slet"
+                isDestructive={true}
+            />
 
         </div >
     );

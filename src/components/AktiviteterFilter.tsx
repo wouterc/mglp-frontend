@@ -36,7 +36,6 @@ function AktiviteterFilter() {
     const handleNulstilFiltre = () => {
         const nulstilletState: AktiviteterFilterState = {
             aktivitet: '',
-            ansvarlig: '',
             status: '',
             informations_kilde: '',
             aktiv_filter: 'kun_aktive',
@@ -66,20 +65,6 @@ function AktiviteterFilter() {
                     className="p-2 w-full border rounded-md text-sm"
                     aria-label="Søg i aktivitet"
                 />
-
-                <select
-                    id="filter-ansvarlig"
-                    name="ansvarlig"
-                    value={aktiviteterFilters.ansvarlig || ''}
-                    onChange={handleFilterChange}
-                    className="p-2 w-full border rounded-md text-sm bg-white"
-                    aria-label="Vælg ansvarlig"
-                >
-                    <option value="">Alle ansvarlige</option>
-                    {colleagues.map(u => (
-                        <option key={u.id} value={u.username}>{u.username}</option>
-                    ))}
-                </select>
 
                 <select
                     id="filter-status"

@@ -12,7 +12,8 @@ import type {
   VirksomhedFilterState, KontaktFilterState,
   SagsDokument,
   User,
-  InformationsKilde
+  InformationsKilde,
+  StandardMappe
 } from './types';
 
 // --- 1. Definer formen på din globale state ---
@@ -97,6 +98,7 @@ interface AppState {
   sagsStatusser: Status[]; // @# Tilføjet sags-statusser
   dokumentStatusser: Status[]; // @# Tilføjet dokument-statusser
   informationsKilder: InformationsKilde[];
+  standardMapper: StandardMappe[];
 
   // Chat / Kommunikation
   chatTeams: any[];
@@ -163,7 +165,7 @@ const initialState: AppState = {
   gruppeLoadingStatus: {},
   aktiviteterIsLoading: false,
   aktiviteterError: null,
-  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', ansvarlig: '', status: '', informations_kilde: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
+  aktiviteterFilters: getSavedState('mglp_aktiviteterFilters', { aktivitet: '', status: '', informations_kilde: '', aktiv_filter: 'kun_aktive', dato_intern_efter: '', dato_intern_foer: '', dato_ekstern_efter: '', dato_ekstern_foer: '', overskredet: false, vigtige: false }),
   aktiviteterUdvidedeGrupper: getSavedState('mglp_udvidedeGrupper', {}),
   cachedAktiviteter: {},
   cachedDokumenter: {},
@@ -173,6 +175,7 @@ const initialState: AppState = {
   sagsStatusser: [],
   dokumentStatusser: [],
   informationsKilder: [],
+  standardMapper: [],
   chatTeams: [],
   chatMessages: [],
   chatActiveRecipient: undefined,
@@ -367,13 +370,14 @@ export const StateProvider = ({ children }: StateProviderProps) => {
 
     const fetchLookups = async () => {
       try {
-        const [users, actStatuses, sagStatuses, docStatuses, sources, groups] = await Promise.all([
+        const [users, actStatuses, sagStatuses, docStatuses, sources, groups, mappers] = await Promise.all([
           api.get<User[]>('/kerne/users/'),
           api.get<any>('/kerne/status/?formaal=2'),
           api.get<any>('/kerne/status/?formaal=1'),
           api.get<any>('/kerne/status/?formaal=3'),
           api.get<InformationsKilde[]>('/kerne/informationskilder/'),
-          api.get<Blokinfo[]>('/skabeloner/blokinfo/')
+          api.get<Blokinfo[]>('/skabeloner/blokinfo/'),
+          api.get<StandardMappe[]>('/kerne/standardmapper/')
         ]);
         dispatch({
           type: 'SET_LOOKUPS',
@@ -383,7 +387,8 @@ export const StateProvider = ({ children }: StateProviderProps) => {
             sagsStatusser: sagStatuses.results || sagStatuses,
             dokumentStatusser: docStatuses.results || docStatuses,
             informationsKilder: sources,
-            blokinfoSkabeloner: groups
+            blokinfoSkabeloner: groups,
+            standardMapper: mappers || []
           }
         });
       } catch (e) {

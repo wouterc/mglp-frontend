@@ -26,7 +26,6 @@ interface FormDataState {
   aktiv: boolean;
   udgaaet: boolean;
   note: string;
-  ansvarlig: string;
   frist: string;
   informations_kilde_id: string;
   mail_titel: string;
@@ -41,7 +40,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
     aktiv: true,
     udgaaet: false,
     note: '',
-    ansvarlig: '',
     frist: '',
     informations_kilde_id: '',
     mail_titel: '',
@@ -75,7 +73,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
         aktiv: aktivitetTilRedigering.aktiv === null ? true : aktivitetTilRedigering.aktiv,
         udgaaet: aktivitetTilRedigering.udgaaet || false,
         note: aktivitetTilRedigering.note || '',
-        ansvarlig: aktivitetTilRedigering.ansvarlig || '',
         frist: aktivitetTilRedigering.frist?.toString() || '',
         informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id?.toString() || '',
         mail_titel: aktivitetTilRedigering.mail_titel || '',
@@ -377,15 +374,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
           </div>
 
           <div className="flex items-start space-x-4">
-            <div className="w-1/2">
-              <label htmlFor="ansvarlig" className="block text-sm font-medium">Ansvarlig</label>
-              <select name="ansvarlig" value={formData.ansvarlig} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md bg-white text-[12px]">
-                <option value="">Ingen</option>
-                {colleagues.map(u => (
-                  <option key={u.id} value={u.username}>{u.username}</option>
-                ))}
-              </select>
-            </div>
             <div className="w-1/2">
               <label htmlFor="frist" className="block text-sm font-medium">Frist (dage)</label>
               <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />

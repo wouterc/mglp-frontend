@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../api';
-import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail, MoreVertical, Copy, Edit3, Trash2, CheckCircle2 } from 'lucide-react';
 import { useAppState } from '../StateContext';
 import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState, User, InformationsKilde } from '../types';
 import SagsAktivitetForm from '../components/SagsAktivitetForm';
@@ -21,6 +21,7 @@ import { SagsDokument } from '../types'; // @# New Import
 import { Link as LinkIcon } from 'lucide-react'; // @# New Import
 import LinkOpenPreferenceModal from '../components/modals/LinkOpenPreferenceModal';
 import HelpButton from '../components/ui/HelpButton';
+import Modal from '../components/Modal';
 
 
 interface AktiviteterPageProps {
@@ -43,6 +44,13 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     // Modal states
     const [confirmTemplateActivity, setConfirmTemplateActivity] = useState<Aktivitet | null>(null);
     const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean; title: string; message: string; type?: 'info' | 'success' | 'error' } | null>(null);
+    const [copyNotify, setCopyNotify] = useState<{ message: string } | null>(null);
+
+    // Line Actions State
+    const [renamingAktivitet, setRenamingAktivitet] = useState<Aktivitet | null>(null);
+    const [deleteConfirmAktivitet, setDeleteConfirmAktivitet] = useState<Aktivitet | null>(null);
+    const [editAktivitetNavn, setEditAktivitetNavn] = useState('');
+    const [isRenamingAktivitet, setIsRenamingAktivitet] = useState(false);
 
 
     // State for Link Preference Modal
@@ -215,6 +223,106 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         setConfirmTemplateActivity(aktivitet);
     }, []);
 
+    const handleCopyAktivitet = async (sourceAktivitet: Aktivitet) => {
+        if (!valgtSag) return;
+
+        // 1. Navne logik: Find base navn og tilføj nummer
+        const currentNavn = sourceAktivitet.aktivitet || "Ny aktivitet";
+        const baseNavn = currentNavn.replace(/ - \d+$/, '');
+        const groupAktiviteter = allActivities.filter(a =>
+            (a.proces?.id || a.gruppe?.proces_id) === (sourceAktivitet.proces?.id || sourceAktivitet.gruppe?.proces_id) &&
+            a.gruppe?.id === sourceAktivitet.gruppe?.id
+        );
+
+        const relatedNames = groupAktiviteter
+            .map(a => a.aktivitet)
+            .filter((t): t is string => !!t && (t === baseNavn || t.startsWith(baseNavn + " - ")));
+
+        let maxSuffix = 1;
+        relatedNames.forEach(t => {
+            const m = t.match(/ - (\d+)$/);
+            if (m) {
+                const s = parseInt(m[1]);
+                if (s > maxSuffix) maxSuffix = s;
+            }
+        });
+
+        const nextSuffix = maxSuffix + 1;
+        const newNavn = `${baseNavn} - ${nextSuffix}`;
+
+        // 2. Nummer logik: 100+ strategien
+        const maxNr = Math.max(0, ...groupAktiviteter.map(a => a.aktivitet_nr || 0));
+        const nextNr = maxNr < 100 ? 101 : maxNr + 1;
+
+        // 3. Gem via API
+        try {
+            const response = await api.post<Aktivitet>('/aktiviteter/', {
+                sag_id: valgtSag.id,
+                gruppe_id: sourceAktivitet.gruppe?.id,
+                proces_id: sourceAktivitet.proces?.id || sourceAktivitet.gruppe?.proces_id,
+                aktivitet_nr: nextNr,
+                aktivitet: newNavn,
+                aktiv: true,
+                informations_kilde_id: sourceAktivitet.informations_kilde?.id
+            });
+
+            setCopyNotify({ message: `Linjen er kopieret til ${newNavn} - nr. ${nextNr}` });
+            setTimeout(() => setCopyNotify(null), 3000);
+
+            // Opdater cache & state
+            const updated = [...allActivities, response];
+            setAllActivities(updated);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+
+        } catch (e: any) {
+            console.error("Fejl ved kopiering:", e);
+            showAlert('Systemet siger', "Kunne ikke kopiere aktivitet.");
+        }
+    };
+
+    const handleDeleteAktivitet = (act: Aktivitet) => {
+        setDeleteConfirmAktivitet(act);
+    };
+
+    const performDeleteAktivitet = async () => {
+        if (!deleteConfirmAktivitet || !valgtSag) return;
+        const id = deleteConfirmAktivitet.id;
+        try {
+            await api.delete(`/aktiviteter/${id}/`);
+            const updated = allActivities.filter(a => a.id !== id);
+            setAllActivities(updated);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+            setCopyNotify({ message: "Aktiviteten er slettet." });
+            setTimeout(() => setCopyNotify(null), 3000);
+            setDeleteConfirmAktivitet(null);
+        } catch (e: any) {
+            console.error("Fejl ved sletning:", e);
+            showAlert('Systemet siger', "Kunne ikke slette aktivitet.");
+        }
+    };
+
+    const handleSaveAktivitetRename = async () => {
+        if (!renamingAktivitet || !valgtSag) return;
+        setIsRenamingAktivitet(true);
+        try {
+            const updatedDoc = await api.patch<Aktivitet>(`/aktiviteter/${renamingAktivitet.id}/`, { aktivitet: editAktivitetNavn });
+            const updated = allActivities.map(a => a.id === updatedDoc.id ? updatedDoc : a);
+            setAllActivities(updated);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+            setRenamingAktivitet(null);
+        } catch (e) {
+            console.error("Fejl ved omdøbning:", e);
+            alert("Kunne ikke omdøbe aktiviteten.");
+        } finally {
+            setIsRenamingAktivitet(false);
+        }
+    };
+
+    const openRenameAktivitetModal = (act: Aktivitet) => {
+        setRenamingAktivitet(act);
+        setEditAktivitetNavn(act.aktivitet || '');
+    };
+
     const performGemTilSkabelon = async () => {
         if (!confirmTemplateActivity) return;
 
@@ -256,7 +364,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
         const filters = aktiviteterFilters;
         const lowerAkt = filters.aktivitet.toLowerCase();
-        const lowerAns = filters.ansvarlig.toLowerCase();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const dayOfWeek = today.getDay();
@@ -307,8 +414,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
             // Apply Filters
             if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
-            if (lowerAns && !a.ansvarlig?.toLowerCase().includes(lowerAns)) continue;
-
             if (filters.status) {
                 if (filters.status === 'ikke-faerdigmeldt') {
                     if (a.status?.status_kategori === 1) continue;
@@ -516,6 +621,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                 </Tooltip>
                                 <div className="h-4 w-px bg-gray-300 mx-1"></div>
                                 <HelpButton helpPointCode="AKTIVITETER_HELP" />
+                                {copyNotify && (
+                                    <div className="ml-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
+                                        <CheckCircle2 size={14} />
+                                        {copyNotify.message}
+                                    </div>
+                                )}
                                 {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
                                     <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
                                         <button
@@ -558,7 +669,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                 <th className="py-2 px-2 w-[18%] text-left">Resultat</th>
                                 <th className="py-2 px-0.5 w-[3%] text-center"><Mail className="inline h-4 w-4" /></th>
                                 <th className="py-2 px-2 w-[7%] text-left">Kilde</th>
-                                <th className="py-2 px-2 w-[9%] text-left">Ansvarlig</th>
+                                <th className="py-2 px-2 w-8 text-right"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -594,7 +705,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 )}
                                             </td>
                                         </tr>
-                                        {erUdvidet && aktiviteter.map((aktivitet: Aktivitet) => (
+                                        {erUdvidet && aktiviteter.map((aktivitet: Aktivitet, idx: number) => (
                                             <AktivitetRow
                                                 key={aktivitet.id}
                                                 aktivitet={aktivitet}
@@ -605,6 +716,10 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                 onEditComment={handleEditComment}
                                                 onEditResultat={handleEditResultat}
                                                 onGemTilSkabelon={handleGemTilSkabelon}
+                                                onCopy={handleCopyAktivitet}
+                                                onRenameLine={openRenameAktivitetModal}
+                                                onDeleteLine={handleDeleteAktivitet}
+                                                isLast={idx >= aktiviteter.length - 2}
                                                 onLinkClick={handleLinkAppClick}
                                                 informationsKilder={informationsKilder}
                                                 isActive={activeRow === aktivitet.id}
@@ -646,8 +761,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                                         TILFØJ
                                                     </button>
                                                 </td>
-                                                {/* Resultat, Mail, Kilde, Ansvarlig: Empty */}
-                                                <td className="py-1 px-2"></td>
                                                 <td className="py-1 px-2"></td>
                                                 <td className="py-1 px-2"></td>
                                                 <td className="py-1 px-2"></td>
@@ -683,6 +796,56 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 confirmText="OK"
                 cancelText={undefined} // Hide cancel button
                 isDestructive={feedbackModal?.type === 'error'}
+            />
+
+            {/* Rename Title Modal */}
+            <Modal
+                isOpen={!!renamingAktivitet}
+                onClose={() => setRenamingAktivitet(null)}
+                title="Omdøb aktivitet"
+                footer={
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setRenamingAktivitet(null)}
+                            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                            Annuller
+                        </button>
+                        <button
+                            onClick={handleSaveAktivitetRename}
+                            disabled={isRenamingAktivitet}
+                            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {isRenamingAktivitet ? 'Gemmer...' : 'Gem'}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="p-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nyt navn på aktivitet
+                    </label>
+                    <input
+                        autoFocus
+                        type="text"
+                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        value={editAktivitetNavn}
+                        onChange={(e) => setEditAktivitetNavn(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveAktivitetRename();
+                        }}
+                    />
+                </div>
+            </Modal>
+
+            <ConfirmModal
+                isOpen={!!deleteConfirmAktivitet}
+                onClose={() => setDeleteConfirmAktivitet(null)}
+                onConfirm={performDeleteAktivitet}
+                title="Slet aktivitet?"
+                message={`Er du sikker på, at du vil slette "${deleteConfirmAktivitet?.aktivitet}"?`}
+                confirmText="Slet"
+                isDestructive={true}
             />
 
             {/* Link Preference Modal */}

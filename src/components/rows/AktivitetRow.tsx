@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2, Link as LinkIcon } from 'lucide-react';
+import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2, Link as LinkIcon, MoreVertical, Copy, Trash2, Edit3 } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import { Aktivitet, User, Status, InformationsKilde } from '../../types';
@@ -14,7 +14,11 @@ interface AktivitetRowProps {
     onEditComment: (aktivitet: Aktivitet) => void;
     onEditResultat?: (aktivitet: Aktivitet) => void;
     onGemTilSkabelon?: (aktivitet: Aktivitet) => void;
-    onLinkClick?: (aktivitet: Aktivitet) => void; // @# New Prop
+    onCopy: (aktivitet: Aktivitet) => void;
+    onRenameLine?: (aktivitet: Aktivitet) => void;
+    onDeleteLine?: (aktivitet: Aktivitet) => void;
+    isLast?: boolean;
+    onLinkClick?: (aktivitet: Aktivitet) => void;
     informationsKilder: InformationsKilde[];
     isActive?: boolean;
     onFocus?: () => void;
@@ -72,13 +76,30 @@ function AktivitetRow({
     onEditComment,
     onEditResultat,
     onGemTilSkabelon,
-    onLinkClick, // @# New Prop
+    onCopy,
+    onRenameLine,
+    onDeleteLine,
+    isLast,
+    onLinkClick,
     informationsKilder,
     isActive,
     onFocus,
     onBlur
 }: AktivitetRowProps) {
     const isDone = aktivitet.status?.status_nummer === 80;
+
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const getDateColorClass = (dateStr: string | null) => {
         if (!dateStr || isDone) return '';
@@ -156,17 +177,22 @@ function AktivitetRow({
                     className={`w-full py-0.5 px-1 border border-gray-300 rounded-md text-[11px] bg-white focus:text-gray-700 focus:border-black focus:ring-0 ${getDateColorClass(aktivitet.dato_ekstern)} ${!aktivitet.dato_ekstern ? 'text-transparent hover:text-gray-400' : ''}`}
                 />
             </td>
-            <td className="py-0.5 px-2 text-center">
-                <div className="flex items-center justify-center gap-1.5 h-full">
-                    <div className="w-4 flex justify-center">
+            <td className="py-0.5 px-2 text-center relative">
+                <div className="flex items-center justify-center gap-0.5 h-full">
+                    {/* Slot 1: Skabelon Note */}
+                    <div className="flex justify-center">
                         {(aktivitet.skabelon_note || aktivitet.note) && (
-                            <Tooltip content={aktivitet.skabelon_note || aktivitet.note}>
+                            <div className="relative group/info inline-block">
                                 <Info size={14} className="text-amber-500 cursor-help" />
-                            </Tooltip>
+                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible z-50 transition-all pointer-events-none text-left">
+                                    {aktivitet.skabelon_note || aktivitet.note}
+                                </div>
+                            </div>
                         )}
                     </div>
-                    <div className="w-5 flex justify-center">
-                        {/* Link Icon */}
+
+                    {/* Slot 2: Link Icon */}
+                    <div className="flex justify-center">
                         <Tooltip content={aktivitet.har_links ? "Vis linkede dokumenter" : "Link dokumenter"}>
                             <button
                                 onClick={(e) => { e.stopPropagation(); onLinkClick?.(aktivitet); }}
@@ -175,11 +201,13 @@ function AktivitetRow({
                                     : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
-                                <LinkIcon size={16} fill={aktivitet.har_links ? "currentColor" : "none"} />
+                                <LinkIcon size={14} fill={aktivitet.har_links ? "currentColor" : "none"} />
                             </button>
                         </Tooltip>
                     </div>
-                    <div className="w-5 flex justify-center">
+
+                    {/* Slot 3: User Comment */}
+                    <div className="flex justify-center">
                         <Tooltip content={aktivitet.kommentar || "Tilføj kommentar"}>
                             <button
                                 id={`cell-${aktivitet.id}-3`}
@@ -191,20 +219,80 @@ function AktivitetRow({
                                         : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
-                                <MessageSquare size={16} fill={aktivitet.kommentar ? "currentColor" : "none"} />
+                                <MessageSquare size={14} fill={aktivitet.kommentar ? "currentColor" : "none"} />
                             </button>
                         </Tooltip>
                     </div>
-                    <div className="w-5 flex justify-center">
+
+                    {/* Slot 4: Gem til skabelon / Upload */}
+                    <div className="flex justify-center">
                         {aktivitet.er_ny && onGemTilSkabelon && (
                             <Tooltip content="Denne aktivitet er kun på denne sag. Klik for at gemme den som en global skabelon.">
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onGemTilSkabelon(aktivitet); }}
                                     className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                                 >
-                                    <UploadCloud size={16} />
+                                    <UploadCloud size={14} />
                                 </button>
                             </Tooltip>
+                        )}
+                    </div>
+
+                    {/* Slot 5: Action Menu Dropdown */}
+                    <div className={`relative flex-shrink-0 ${isMenuOpen ? 'z-[60]' : 'z-10'}`} ref={menuRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsMenuOpen(!isMenuOpen);
+                            }}
+                            className={`p-1 rounded-md shadow-sm border transition-all ${isMenuOpen ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-white border-gray-200 hover:border-gray-300'}`}
+                            title="Flere handlinger"
+                        >
+                            <MoreVertical size={16} />
+                        </button>
+
+                        {isMenuOpen && (
+                            <div
+                                className={`absolute right-0 ${isLast ? 'bottom-full mb-2' : 'top-full mt-2'} w-48 bg-amber-100 border-2 border-amber-400 rounded-lg shadow-2xl z-50 overflow-hidden`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button
+                                    onClick={() => {
+                                        onCopy(aktivitet);
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-amber-950 hover:bg-amber-200 transition-colors group border-b border-amber-200"
+                                >
+                                    <Copy size={15} className="text-amber-700 group-hover:text-amber-900" />
+                                    <span className="font-bold">Kopier linje</span>
+                                </button>
+
+                                {aktivitet.er_ny && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                onRenameLine?.(aktivitet);
+                                                setIsMenuOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-amber-950 hover:bg-amber-200 transition-colors group border-b border-amber-200"
+                                        >
+                                            <Edit3 size={15} className="text-amber-700 group-hover:text-amber-900" />
+                                            <span className="font-bold">Omdøb linje</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                onDeleteLine?.(aktivitet);
+                                                setIsMenuOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-700 hover:bg-red-100 transition-colors group"
+                                        >
+                                            <Trash2 size={15} className="text-red-500 group-hover:text-red-700" />
+                                            <span className="font-bold">Slet linje</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -270,20 +358,7 @@ function AktivitetRow({
                     ))}
                 </select>
             </td>
-            <td className="py-0.5 px-2">
-                <select
-                    id={`a-${aktivitet.id}-f7`}
-                    value={aktivitet.ansvarlig || ''}
-                    onChange={(e) => onInlineSave(aktivitet, 'ansvarlig', e.target.value)}
-                    className="w-full py-0.5 px-1 border border-gray-300 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
-                >
-                    <option value="">Ingen</option>
-                    {colleagues.map(u => (
-                        <option key={u.id} value={u.username}>{u.username}</option>
-                    ))}
-                </select>
-            </td>
-        </tr >
+        </tr>
     );
 }
 

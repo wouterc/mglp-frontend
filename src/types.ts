@@ -19,6 +19,13 @@ export interface InformationsKilde {
   beskrivelse: string | null;
 }
 
+export interface StandardMappe {
+  id: number;
+  navn: string;
+  beskrivelse: string | null;
+  sortering: number;
+}
+
 export interface SkabAktivitet {
   id: number;
   proces: Blokinfo | null;
@@ -28,7 +35,6 @@ export interface SkabAktivitet {
   aktiv: boolean | null;
   udgaaet: boolean | null;
   note: string | null;
-  ansvarlig: string | null;
   frist: number | null;
   informations_kilde?: InformationsKilde | null;
   informations_kilde_id?: number | null;
@@ -208,7 +214,6 @@ export interface Aktivitet {
 
 export interface AktiviteterFilterState {
   aktivitet: string;
-  ansvarlig: string;
   status: string;
   informations_kilde: string;
   aktiv_filter: string;
@@ -303,7 +308,10 @@ export interface SkabDokument {
   mail_titel?: string | null;
   er_ny?: boolean;
   dokumenter?: number[]; // IDs of linked SkabDokumenter
+  default_undermappe?: StandardMappe | null;
+  default_undermappe_id?: number | null;
 }
+
 
 export interface DokumentskabelonerFilterState {
   gruppe_nr: string;
@@ -360,6 +368,8 @@ export interface SagsDokument {
   skal_mailes?: boolean;
   aktiviteter?: number[]; // IDs of linked Aktiviteter (reverse relation)
   har_links?: boolean;
+  undermappe?: StandardMappe | null;
+  undermappe_id?: number | null;
 }
 
 export interface MailSkabelon {

@@ -1,25 +1,31 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink, Link as LinkIcon, Copy, MoreVertical, Edit3 } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
-import { SagsDokument, Sag, User, InformationsKilde } from '../../types';
+import ConfirmModal from '../ui/ConfirmModal';
+import { SagsDokument, Sag, User, InformationsKilde, StandardMappe } from '../../types';
 
 interface DokumentRowProps {
     doc: SagsDokument;
     sag: Sag;
     colleagues: User[];
-    onUpload: (docId: number, file: File) => Promise<void>;
+    onUpload: (docId: number, file: File, undermappeId?: number) => Promise<void>;
     onDelete: (docId: number) => Promise<void>;
     onEditComment: (doc: SagsDokument) => void;
     onRename: (doc: SagsDokument) => void;
     onInlineSave: (docId: number, field: string, value: any) => Promise<void>;
     onSaveToTemplate: (doc: SagsDokument) => void;
+    onCopy: (doc: SagsDokument) => void;
+    onRenameLine?: (doc: SagsDokument) => void;
+    onDeleteLine?: (docId: number) => void;
+    isLast?: boolean;
     statusser: any[];
     onStatusToggle: (doc: SagsDokument) => void;
     onLinkClick?: (doc: SagsDokument) => void; // @# New Prop
     informationsKilder: InformationsKilde[];
+    standardMapper: StandardMappe[];
     isActive?: boolean;
     onFocus?: () => void;
     onBlur?: () => void;
@@ -35,15 +41,36 @@ const DokumentRow = React.memo(function DokumentRow({
     onRename,
     onInlineSave,
     onSaveToTemplate,
+    onCopy,
+    onRenameLine,
+    onDeleteLine,
+    isLast,
     statusser,
     onStatusToggle,
     onLinkClick, // @# New Prop
     informationsKilder,
+    standardMapper,
     isActive,
     onFocus,
     onBlur
 }: DokumentRowProps) {
     const isDone = doc.status?.status_nummer === 80;
+    const dropHandledRef = useRef(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const getDateColorClass = (dateStr: string | null) => {
         if (!dateStr || isDone) return '';
@@ -88,11 +115,31 @@ const DokumentRow = React.memo(function DokumentRow({
     }, [doc.link, sag.bolig_bfe]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
+        if (dropHandledRef.current) {
+            dropHandledRef.current = false;
+            return;
+        }
         if (acceptedFiles.length > 0) {
             setIsUploading(true);
-            onUpload(doc.id, acceptedFiles[0]).finally(() => setIsUploading(false));
+            // Brug eksisterende undermappe hvis tildelt
+            const currentMappeId = doc.undermappe?.id;
+            onUpload(doc.id, acceptedFiles[0], currentMappeId).finally(() => setIsUploading(false));
         }
-    }, [doc.id, onUpload]);
+    }, [doc.id, doc.undermappe?.id, onUpload]);
+
+    // Funktion til upload til specifik mappe fra overlay
+    const handleFolderDrop = (e: React.DragEvent, mappenId?: number) => {
+        e.preventDefault();
+        // Vi stopper IKKE propagation her, for at lade react-dropzone nulstille isDragActive
+        // Men vi sætter et flag så onDrop ikke kører igen
+        dropHandledRef.current = true;
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            setIsUploading(true);
+            onUpload(doc.id, files[0], mappenId).finally(() => setIsUploading(false));
+        }
+    };
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
         onDrop,
@@ -101,15 +148,17 @@ const DokumentRow = React.memo(function DokumentRow({
         multiple: false
     });
 
-    const handleDeleteClick = async (e: React.MouseEvent) => {
+    const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (window.confirm('Er du sikker på, at du vil slette denne fil?')) {
-            setIsDeleting(true);
-            try {
-                await onDelete(doc.id);
-            } finally {
-                setIsDeleting(false);
-            }
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await onDelete(doc.id);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -121,7 +170,7 @@ const DokumentRow = React.memo(function DokumentRow({
     return (
         <tr
             {...getRootProps()}
-            className={`group transition-colors relative ${isDragActive ? 'bg-blue-50 ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
+            className={`group transition-colors relative ${isDragActive ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
             style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
             onClick={onFocus}
             onFocus={onFocus}
@@ -171,9 +220,9 @@ const DokumentRow = React.memo(function DokumentRow({
             </td>
             <td className="px-0 py-1.5 w-20 relative align-middle">
                 {/* Combined Meta Column: Info, Link, Comment, Template */}
-                <div className="flex items-center justify-center gap-1.5 h-full">
+                <div className="flex items-center justify-center gap-0.5 h-full">
                     {/* Slot 1: Skabelon Info */}
-                    <div className="w-4 flex justify-center">
+                    <div className="flex justify-center">
                         {doc.skabelon_kommentar ? (
                             <div className="relative group/info inline-block">
                                 <Info size={14} className="text-amber-500 cursor-help" />
@@ -185,7 +234,7 @@ const DokumentRow = React.memo(function DokumentRow({
                     </div>
 
                     {/* Slot 2: Link */}
-                    <div className="w-4 flex justify-center">
+                    <div className="flex justify-center">
                         {doc.har_links && (
                             <Tooltip content="Vis linkede aktiviteter">
                                 <button
@@ -206,7 +255,7 @@ const DokumentRow = React.memo(function DokumentRow({
                     </div>
 
                     {/* Slot 3: User Comment */}
-                    <div className="w-5 flex justify-center">
+                    <div className="flex justify-center">
                         <Tooltip content={doc.kommentar || "Tilføj kommentar"}>
                             <button
                                 onClick={() => onEditComment(doc)}
@@ -224,7 +273,7 @@ const DokumentRow = React.memo(function DokumentRow({
 
                     {/* Slot 4: Template Upload */}
                     {!doc.skabelon && (
-                        <div className="w-5 flex justify-center">
+                        <div className="flex justify-center">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onSaveToTemplate(doc); }}
                                 className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
@@ -233,6 +282,64 @@ const DokumentRow = React.memo(function DokumentRow({
                             </button>
                         </div>
                     )}
+
+                    {/* Slot 5: Action Menu Dropdown */}
+                    <div className={`relative flex-shrink-0 ${isMenuOpen ? 'z-[60]' : 'z-10'}`} ref={menuRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsMenuOpen(!isMenuOpen);
+                            }}
+                            className={`p-1 rounded-md shadow-sm border transition-all ${isMenuOpen ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-white border-gray-200 hover:border-gray-300'}`}
+                            title="Flere handlinger"
+                        >
+                            <MoreVertical size={16} />
+                        </button>
+
+                        {isMenuOpen && (
+                            <div
+                                className={`absolute right-0 ${isLast ? 'bottom-full mb-2' : 'top-full mt-2'} w-48 bg-amber-100 border-2 border-amber-400 rounded-lg shadow-2xl z-50 overflow-hidden`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button
+                                    onClick={() => {
+                                        onCopy(doc);
+                                        setIsMenuOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-amber-950 hover:bg-amber-200 transition-colors group border-b border-amber-200"
+                                >
+                                    <Copy size={15} className="text-amber-700 group-hover:text-amber-900" />
+                                    <span className="font-bold">Kopier linje</span>
+                                </button>
+
+                                {!doc.skabelon && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                onRenameLine?.(doc);
+                                                setIsMenuOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-amber-950 hover:bg-amber-200 transition-colors group border-b border-amber-200"
+                                        >
+                                            <Edit3 size={15} className="text-amber-700 group-hover:text-amber-900" />
+                                            <span className="font-bold">Omdøb linje</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                onDeleteLine?.(doc.id);
+                                                setIsMenuOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-700 hover:bg-red-100 transition-colors group"
+                                        >
+                                            <Trash2 size={15} className="text-red-500 group-hover:text-red-700" />
+                                            <span className="font-bold">Slet linje</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </td>
             <td className={`px-2 py-1.5 w-40 relative transition-colors align-middle overflow-hidden ${doc.status?.status_nummer === 80 ? 'bg-green-50' : ''}`}>
@@ -259,8 +366,8 @@ const DokumentRow = React.memo(function DokumentRow({
             </td>
             <td className="px-2 py-1.5 w-auto relative align-middle overflow-hidden">
                 {/* Fil Column */}
-                <div className={`flex items-center gap-2 border rounded px-1 py-1 transition-all shadow-sm min-h-[32px] bg-white overflow-hidden
-                    ${isDragActive ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-400 hover:border-blue-400'}
+                <div className={`flex items-center gap-2 border rounded px-1 py-1 transition-all shadow-sm min-h-[32px] overflow-hidden
+                    ${isDragActive ? 'border-blue-600 ring-2 ring-green-200 bg-green-100' : 'border-slate-400 hover:border-blue-400 bg-white'}
                 `}>
                     <div className="flex-1 flex items-center min-w-0">
                         {isUploading ? (
@@ -309,12 +416,32 @@ const DokumentRow = React.memo(function DokumentRow({
                     </div>
                 </div>
 
-                {/* Drag Overlay */}
+                {/* Drag Overlay - Simple and Green */}
                 {isDragActive && (
-                    <div className="absolute inset-0 bg-blue-100 bg-opacity-90 flex items-center justify-center text-blue-700 font-semibold border-2 border-blue-500 rounded z-20">
-                        <UploadCloud className="mr-2" size={16} /> Uploader til "{doc.titel}"
+                    <div
+                        className="absolute inset-0 bg-green-200/95 flex items-center justify-center border-2 border-green-600 rounded z-20 p-2 overflow-hidden pointer-events-none"
+                    >
+                        <div className="flex items-center gap-2 text-green-900 font-bold text-[11px] text-center px-2">
+                            <UploadCloud size={14} className="flex-shrink-0" />
+                            <span>Slip filen for at uploade til "{doc.titel || 'dokumentet'}"</span>
+                        </div>
                     </div>
                 )}
+            </td>
+            <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
+                <select
+                    value={doc.undermappe?.id || ''}
+                    onChange={(e) => onInlineSave(doc.id, 'undermappe_id', e.target.value === '' ? null : parseInt(e.target.value))}
+                    className={`w-full py-0.5 px-1 border rounded-md text-[10px] focus:border-black focus:ring-0 transition-colors ${doc.undermappe ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'border-slate-400 bg-white'}`}
+                    title="Undermappe"
+                >
+                    <option value="">(Ingen)</option>
+                    {standardMapper.map(m => (
+                        <option key={m.id} value={m.id}>
+                            {m.navn}
+                        </option>
+                    ))}
+                </select>
             </td>
             <td className="px-0 py-1.5 align-middle text-center w-8">
                 <input
@@ -322,7 +449,6 @@ const DokumentRow = React.memo(function DokumentRow({
                     type="checkbox"
                     checked={!!doc.skal_mailes}
                     onChange={(e) => onInlineSave(doc.id, 'skal_mailes', e.target.checked)}
-                    onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f5`)}
                     className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 mt-1"
                     title="Vælg til næste mail"
                 />
@@ -343,20 +469,19 @@ const DokumentRow = React.memo(function DokumentRow({
                     ))}
                 </select>
             </td>
-            <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
-                <select
-                    id={`d-${doc.id}-f6`}
-                    value={doc.ansvarlig || ''}
-                    onChange={(e) => onInlineSave(doc.id, 'ansvarlig', e.target.value === '' ? null : parseInt(e.target.value))}
-                    className="w-full py-0.5 px-1 border border-slate-400 rounded-md text-[12px] bg-white focus:border-black focus:ring-0"
-                >
-                    <option value="">Alle</option>
-                    {colleagues.map(user => (
-                        <option key={user.id} value={user.id}>{user.first_name || user.username}</option>
-                    ))}
-                </select>
-            </td>
             <td className="px-2 py-3 text-right w-8">
+                {showDeleteConfirm && (
+                    <ConfirmModal
+                        isOpen={showDeleteConfirm}
+                        onClose={() => setShowDeleteConfirm(false)}
+                        onConfirm={confirmDelete}
+                        title="Slet fil"
+                        message={`Er du sikker på, at du vil slette filen "${doc.filnavn}"?`}
+                        confirmText="Slet fil"
+                        cancelText="Annuller"
+                        isDestructive={true}
+                    />
+                )}
             </td>
         </tr>
     );
