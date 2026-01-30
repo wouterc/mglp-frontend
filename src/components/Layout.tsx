@@ -129,7 +129,8 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     menuSektioner.push({
       titel: 'ADMINISTRATION',
       items: [
-        { id: 'admin/users', navn: 'Brugerstyring', ikon: ShieldAlert } // Kræver ShieldAlert import
+        { id: 'admin/users', navn: 'Brugerstyring', ikon: ShieldAlert },
+        { id: 'admin/standardmapper', navn: 'Standard Mapper', ikon: Settings }
       ]
     });
   }

@@ -4,8 +4,10 @@ import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { Sag } from '../types';
 import DokumenterTab from '../components/sagsdetaljer/tabs/DokumenterTab';
-import { Loader2 } from 'lucide-react';
+import StifinderTab from '../components/sagsdetaljer/tabs/StifinderTab';
+import { Loader2, ListChecks, FolderSearch } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import CaseSelector from '../components/ui/CaseSelector';
 
 interface DokumenterPageProps {
   sagId: number | null;
@@ -15,15 +17,32 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const { state, dispatch } = useAppState();
   const { valgtSag } = state;
   const navigate = useNavigate();
-  const location = useLocation(); // @# Added hook
+  const location = useLocation();
 
   // @# Resolve effective sagId (prop > URL)
   const queryParams = new URLSearchParams(location.search);
   const urlSagId = queryParams.get('sag_id');
   const effectiveSagId = sagId || (urlSagId ? parseInt(urlSagId, 10) : null);
 
+  const [activeTab, setActiveTab] = useState<'tjekliste' | 'stifinder'>((queryParams.get('tab') as any) || 'tjekliste');
+
   const [localSag, setLocalSag] = useState<Sag | null>(valgtSag);
   const [loading, setLoading] = useState(!valgtSag && !!effectiveSagId);
+
+  const handleTabChange = (tab: 'tjekliste' | 'stifinder') => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
+
+  // Sync tab from URL if it changes (e.g. browser back button)
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab') as 'tjekliste' | 'stifinder';
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.search, activeTab]);
 
   const hasToggledRef = useRef(false);
 
@@ -35,22 +54,18 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
       dispatch({ type: 'TOGGLE_FILTER_MENU' });
       hasToggledRef.current = true;
     }
-    // Vi vil kun køre dette ved mount, så vi ignorerer dependency-warning
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-next-line react-hooks/exhaustive-deps
 
 
   useEffect(() => {
     if (!effectiveSagId) return;
 
-    // 1. Hvis valgtSag matcher sagId, brug den og stop fetch
     if (valgtSag && valgtSag.id === effectiveSagId) {
       setLocalSag(valgtSag);
       setLoading(false);
       return;
     }
 
-    // 2. Fetch hvis vi mangler sagen eller id ikke matcher
     setLoading(true);
     api.get<Sag>(`/sager/${effectiveSagId}/`).then(data => {
       setLocalSag(data);
@@ -60,8 +75,24 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
       console.error("Fejl ved hentning af sag i DokumenterPage:", err);
       setLoading(false);
     });
-
   }, [effectiveSagId, valgtSag, dispatch]);
+
+  const handleSelectSag = async (id: number) => {
+    setLoading(true);
+    try {
+      const fuldSag = await api.get<Sag>(`/sager/${id}/`);
+      dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
+
+      // Update URL so navigation/refresh works
+      const params = new URLSearchParams(location.search);
+      params.set('sag_id', id.toString());
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    } catch (e: any) {
+      console.error("Fejl ved sags-skift:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!effectiveSagId) {
     return (
@@ -88,10 +119,54 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
 
   return (
     <div className="flex-1 h-full overflow-y-auto p-6 scroll-smooth">
-      <div className="max-w-7xl mx-auto">
-        <DokumenterTab sag={localSag} />
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Top Header Row with Tabs and Case Selector */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-2 bg-gray-200/50 p-1 rounded-xl w-fit shadow-inner">
+            <button
+              onClick={() => handleTabChange('tjekliste')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'tjekliste'
+                ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5 scale-[1.02]'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
+            >
+              <ListChecks size={20} />
+              Tjekliste
+            </button>
+            <button
+              onClick={() => handleTabChange('stifinder')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'stifinder'
+                ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5 scale-[1.02]'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
+            >
+              <FolderSearch size={20} />
+              Stifinder
+            </button>
+          </div>
+
+          {/* Large Case Selector */}
+          <div className="w-full sm:w-96 lg:w-[450px]">
+            <CaseSelector
+              value={localSag.id}
+              onChange={handleSelectSag}
+              label={`${localSag.sags_nr}${localSag.alias ? ' - ' + localSag.alias : ''}`}
+              className="shadow-sm"
+              placeholder="Skift til en anden sag..."
+            />
+          </div>
+        </div>
+
+        {activeTab === 'tjekliste' ? (
+          <DokumenterTab sag={localSag} />
+        ) : (
+          <StifinderTab sag={localSag} />
+        )}
       </div>
-    </div >
+    </div>
   );
 }
 

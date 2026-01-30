@@ -14,8 +14,8 @@ import Tooltip from '../../Tooltip';
 import SmartDateInput from '../../SmartDateInput';
 import { User as UserType } from '../../../types';
 
-import CaseSelector from '../../ui/CaseSelector';
 import HelpButton from '../../ui/HelpButton';
+import RenameFileModal from '../../ui/RenameFileModal';
 
 interface DokumenterTabProps {
     sag: Sag;
@@ -60,14 +60,6 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         return blokinfoSkabeloner.filter(g => g.formaal === 3);
     }, [blokinfoSkabeloner]);
 
-    const handleSelectSag = async (id: number) => {
-        try {
-            const fuldSag = await api.get<Sag>(`/sager/${id}/`);
-            dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
-        } catch (e: any) {
-            console.error("Fejl ved sags-skift i DokumenterTab:", e);
-        }
-    };
 
     const cachedDocs = state.cachedDokumenter[sag.id];
 
@@ -211,6 +203,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         try {
             const formData = new FormData();
             formData.append('fil', fileToUpload);
+            formData.append('last_modified', file.lastModified.toString());
 
             // Auto-set status to 80 (Udført) when file is uploaded
             const status80 = statusser.find(s => s.status_nummer === 80);
@@ -284,23 +277,36 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         setRenameFilePrefix(prefix);
 
         let currentName = doc.filnavn || '';
-        // Strip the prefix if it exists - potentially multiple times if it was double-prefixed before
+
+        // Strip prefix
         if (prefix) {
             while (currentName.startsWith(prefix)) {
                 currentName = currentName.substring(prefix.length);
             }
         }
+
+        // Strip extension
+        const lastDotIndex = currentName.lastIndexOf('.');
+        if (lastDotIndex > 0) {
+            currentName = currentName.substring(0, lastDotIndex);
+        }
+
         setRenameFilename(currentName);
     };
 
-    const handleSaveRename = async () => {
+    const handleSaveRename = async (finalName: string) => {
         if (!renamingDoc) return;
 
-        const fullNewName = `${renameFilePrefix}${renameFilename}`;
+        // Enforce sagsnummer_ prefix
+        const prefix = sag.sags_nr ? `${sag.sags_nr}_` : '';
+        let prefName = finalName;
+        if (prefix && !prefName.startsWith(prefix)) {
+            prefName = prefix + prefName;
+        }
 
         setIsRenaming(true);
         try {
-            await api.patch(`/sager/sagsdokumenter/${renamingDoc.id}/`, { filnavn: fullNewName });
+            await api.patch(`/sager/sagsdokumenter/${renamingDoc.id}/`, { filnavn: prefName });
             await fetchDokumenter(true);
             setRenamingDoc(null);
         } catch (e) {
@@ -728,12 +734,13 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         );
     }
 
+    const hasIdFilter = !!new URLSearchParams(location.search).get('ids');
+
     return (
         <div className="flex h-full gap-4">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0 flex flex-col gap-4">
-                {/* Header Section */}
-                <div className="flex justify-between items-start bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
@@ -778,15 +785,19 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                             </div>
                         </div>
 
-                    </div>
-
-                    {/* Sag Search Box (Skift sag) */}
-                    <div className="min-w-72">
-                        <CaseSelector
-                            value={sag.id}
-                            onChange={handleSelectSag}
-                            label={`${sag.sags_nr}${sag.alias ? ' - ' + sag.alias : ''}`}
-                        />
+                        {hasIdFilter && (
+                            <button
+                                onClick={() => {
+                                    const params = new URLSearchParams(location.search);
+                                    params.delete('ids');
+                                    navigate(`${location.pathname}?${params.toString()}`);
+                                }}
+                                className="w-fit text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-full border border-blue-200 transition-colors flex items-center gap-1.5"
+                            >
+                                <RefreshCw size={12} className="inline" />
+                                Nulstil filter (Vis alle emner)
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -953,7 +964,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                         className="p-2 w-full border border-slate-400 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
                     >
                         <option value="">Alle mapper</option>
-                        {standardMapper.map(m => (
+                        {standardMapper.filter(m => m.formaal === 'DOK').map(m => (
                             <option key={m.id} value={m.id}>{m.navn}</option>
                         ))}
                     </select>
@@ -1131,55 +1142,16 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                 </div>
             </Modal>
 
-            <Modal
+            <RenameFileModal
                 isOpen={!!renamingDoc}
                 onClose={() => setRenamingDoc(null)}
+                onConfirm={handleSaveRename}
                 title="Omdøb fil"
-                footer={
-                    <div className="flex justify-end gap-2">
-                        <button
-                            onClick={() => setRenamingDoc(null)}
-                            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                            Annuller
-                        </button>
-                        <button
-                            onClick={handleSaveRename}
-                            disabled={isRenaming}
-                            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {isRenaming ? 'Gemmer...' : 'Gem'}
-                        </button>
-                    </div>
-                }
-            >
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nyt filnavn
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <div className="text-gray-500 font-mono text-sm select-none bg-gray-100 px-2 py-2 rounded border border-gray-300">
-                            {renameFilePrefix}
-                        </div>
-                        <input
-                            id="rename-filename-input"
-                            name="rename-filename-input"
-                            autoFocus
-                            type="text"
-                            className="flex-1 border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            value={renameFilename}
-                            onChange={(e) => setRenameFilename(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveRename();
-                            }}
-                            aria-label="Nyt filnavn"
-                        />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Filnavnet vil automatisk starte med sagsnummeret.
-                    </p>
-                </div>
-            </Modal>
+                prefix={renameFilePrefix}
+                initialName={renameFilename}
+                extension={renamingDoc?.filnavn && renamingDoc.filnavn.lastIndexOf('.') > 0 ? renamingDoc.filnavn.substring(renamingDoc.filnavn.lastIndexOf('.')) : ''}
+                isLoading={isRenaming}
+            />
 
 
 

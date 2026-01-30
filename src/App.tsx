@@ -29,6 +29,7 @@ import NulstilAdgangskodePage from './pages/NulstilAdgangskodePage';
 import LandingPage from './pages/LandingPage';
 import UserListPage from './pages/admin/UserListPage';
 import MedarbejderePage from './pages/MedarbejderePage'; // @# Import
+import StandardMapperPage from './pages/admin/StandardMapperPage';
 import MailPage from './pages/MailPage';
 import SagsMailPage from './pages/SagsMailPage';
 import MailKurvPage from './pages/MailKurvPage';
@@ -176,6 +177,7 @@ function App() {
 
             {/* Admin Routes */}
             <Route path="/admin/users" element={<UserListPage />} />
+            <Route path="/admin/standardmapper" element={<StandardMapperPage />} />
 
             <Route path="/mail" element={<MailPage />} />
             <Route path="/kommunikation" element={<KommunikationPage />} />

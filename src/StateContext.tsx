@@ -133,7 +133,8 @@ type AppAction =
   | { type: 'UPDATE_CACHED_DOKUMENT'; payload: { sagId: number; docId: number; updates: Partial<SagsDokument> } }
   | { type: 'SET_MAIL_BASKET_CACHE'; payload: { sagId: number; data: { aktiviteter: Aktivitet[], dokumenter: SagsDokument[], timestamp: number } } }
   | { type: 'SET_LOOKUPS'; payload: Partial<AppState> }
-  | { type: 'SET_CHAT_STATE'; payload: Partial<AppState> };
+  | { type: 'SET_CHAT_STATE'; payload: Partial<AppState> }
+  | { type: 'SET_STANDARD_MAPPER'; payload: StandardMappe[] };
 
 const initialVirksomhedFilters: VirksomhedFilterState = {
   navn: '', afdeling: '', gruppe: '', telefon: '', email: ''
@@ -336,6 +337,8 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
     case 'SET_LOOKUPS':
     case 'SET_CHAT_STATE':
       return { ...state, ...action.payload };
+    case 'SET_STANDARD_MAPPER':
+      return { ...state, standardMapper: action.payload };
     default:
       return state;
   }

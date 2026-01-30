@@ -572,15 +572,15 @@ function DokumentskabelonerPage(): ReactElement {
               <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Aktiv</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-20 text-left border-b">Nr</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[25%] border-b text-left">Dokument</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Link</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Default Submappe</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
-                    <th className="py-2 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Aktiv</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-20 text-left border-b">Nr</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[25%] border-b text-left">Dokument</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Link</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Default Submappe</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
                   </tr>
                 </thead>
                 <tbody className="">
@@ -610,7 +610,7 @@ function DokumentskabelonerPage(): ReactElement {
                             key={dok.id}
                             className={`border-b transition-all group ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'} ${dok.udgaaet ? 'opacity-60' : ''}`}
                           >
-                            <td className="py-2 px-3 text-center">
+                            <td className="py-1 px-3 text-center">
                               <input
                                 id={`aktiv-checkbox-${dok.id}`}
                                 name={`aktiv-${dok.id}`}
@@ -621,7 +621,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 aria-label="Toggle aktiv status"
                               />
                             </td>
-                            <td className="py-2 px-3 text-sm text-gray-600">
+                            <td className="py-1 px-3 text-sm text-gray-600">
                               {isCellActive('dokument_nr') ? (
                                 <input
                                   id={`edit-nr-${dok.id}`}
@@ -649,7 +649,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
+                            <td className="py-1 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
                               <div className="flex items-center gap-2 overflow-hidden">
                                 {isCellActive('dokument') ? (
                                   <input
@@ -692,7 +692,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 )}
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-sm text-blue-600 max-w-0">
+                            <td className="py-1 px-3 text-sm text-blue-600 max-w-0">
                               <InlineTextEditor
                                 value={dok.link}
                                 placeholder="Tilføj link..."
@@ -720,7 +720,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-sm text-gray-600 max-w-0">
+                            <td className="py-1 px-3 text-sm text-gray-600 max-w-0">
                               <InlineTextEditor
                                 value={dok.filnavn}
                                 placeholder="Navne-mønster..."
@@ -748,7 +748,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-sm text-gray-600 truncate">
+                            <td className="py-1 px-3 text-sm text-gray-600 truncate">
                               {isCellActive('informations_kilde_id') ? (
                                 <select
                                   id={`select-kilde-${dok.id}`}
@@ -780,7 +780,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-sm text-gray-600 truncate">
+                            <td className="py-1 px-3 text-sm text-gray-600 truncate">
                               {isCellActive('default_undermappe_id') ? (
                                 <select
                                   id={`select-mappe-${dok.id}`}
@@ -799,7 +799,7 @@ function DokumentskabelonerPage(): ReactElement {
                                   aria-label="Vælg default submappe"
                                 >
                                   <option value="">Vælg mappe...</option>
-                                  {standardMapper.map(m => (
+                                  {standardMapper.filter(m => m.formaal === 'DOK').map(m => (
                                     <option key={m.id} value={m.id}>{m.navn}</option>
                                   ))}
                                 </select>
@@ -812,7 +812,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-center">
+                            <td className="py-1 px-3 text-center">
                               <Tooltip content={dok.kommentar || 'Ingen kommentar'}>
                                 <div
                                   className="cursor-pointer p-1 hover:bg-gray-100 rounded inline-block"
@@ -840,7 +840,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-3 text-center">
+                            <td className="py-1 px-3 text-center">
                               <button onClick={() => handleRediger(dok)} className="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100">
                                 <Edit size={18} />
                               </button>

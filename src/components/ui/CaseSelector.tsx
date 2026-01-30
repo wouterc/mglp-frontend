@@ -114,7 +114,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
     return (
         <div className={`relative ${className}`} ref={wrapperRef}>
             <div
-                className="flex items-center border border-gray-300 rounded px-2 py-1 bg-white cursor-pointer hover:border-blue-500"
+                className="flex items-center border border-gray-300 rounded-lg px-3 py-2.5 bg-white cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <Search size={16} className="text-gray-400 mr-2" />

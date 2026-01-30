@@ -33,7 +33,7 @@ const InlineTextEditor = ({ value, onSave, onEdit, onBlur, onExpand, placeholder
   if (!isEditing) {
     return (
       <div
-        className="cursor-text py-1 px-2 rounded hover:bg-blue-50/50 group/editor relative min-h-[24px] flex items-center"
+        className="cursor-text py-0.5 px-2 rounded hover:bg-blue-50/50 group/editor relative min-h-[20px] flex items-center"
         onClick={() => {
           setIsEditing(true);
           if (onEdit) onEdit();
@@ -343,7 +343,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                   )}
                   <tr className={`border-b transition-all group ${activeCell?.id === skabelon.id ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'}`}>
                     {/* NR FELT */}
-                    <td className="py-2 px-2 text-center">
+                    <td className="py-1 px-2 text-center">
                       {isCellActive('nr') ? (
                         <input
                           id={`edit-nr-${skabelon.id}`}
@@ -373,7 +373,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     </td>
 
                     {/* TITEL FELT */}
-                    <td className="py-2 px-2">
+                    <td className="py-1 px-2">
                       {isCellActive('titel_kort') ? (
                         <input
                           id={`edit-titel-${skabelon.id}`}
@@ -403,7 +403,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     </td>
 
                     {/* BESKRIVELSE FELT */}
-                    <td className="py-2 px-2 max-w-0">
+                    <td className="py-1 px-2 max-w-0">
                       <InlineTextEditor
                         value={skabelon.beskrivelse}
                         placeholder="Klik for beskrivelse..."
@@ -420,7 +420,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                             name="beskrivelse"
                             autoFocus
                             value={activeCell?.value ?? ''}
-                            className="w-full p-2 text-sm border rounded h-48 focus:ring-1 focus:ring-blue-400 outline-none"
+                            className="w-full p-2 text-sm border rounded h-32 focus:ring-1 focus:ring-blue-400 outline-none"
                             onChange={(e) => setActiveCell({ ...activeCell!, value: e.target.value })}
                             aria-label="Rediger beskrivelse"
                             onBlur={() => {
@@ -433,7 +433,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                     </td>
 
                     {/* PROCES FELT (ALTID SELECT) */}
-                    <td className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-1 px-2" onClick={(e) => e.stopPropagation()}>
                       {skabelon.formaal > 1 ? (
                         <select
                           id={`select-proces-${skabelon.id}`}

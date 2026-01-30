@@ -24,6 +24,7 @@ export interface StandardMappe {
   navn: string;
   beskrivelse: string | null;
   sortering: number;
+  formaal: 'DOK' | 'EML';
 }
 
 export interface SkabAktivitet {

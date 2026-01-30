@@ -7,7 +7,7 @@ interface ConfirmModalProps {
     onClose: () => void;
     onConfirm: () => void;
     title: string;
-    message: string;
+    message: React.ReactNode;
     confirmText?: string;
     cancelText?: string;
     isDestructive?: boolean;
@@ -52,10 +52,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                                 <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
                                     {title}
                                 </h3>
-                                <div className="mt-2">
-                                    <p className="text-sm text-gray-500">
-                                        {message}
-                                    </p>
+                                <div className="mt-2 text-sm text-gray-500 whitespace-pre-wrap">
+                                    {message}
                                 </div>
                             </div>
                         </div>

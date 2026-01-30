@@ -436,7 +436,7 @@ const DokumentRow = React.memo(function DokumentRow({
                     title="Undermappe"
                 >
                     <option value="">(Ingen)</option>
-                    {standardMapper.map(m => (
+                    {standardMapper.filter(m => m.formaal === 'DOK').map(m => (
                         <option key={m.id} value={m.id}>
                             {m.navn}
                         </option>

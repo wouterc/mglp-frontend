@@ -17,6 +17,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
     const [error, setError] = useState<string | null>(null);
     const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
     const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
+    const [standardMapper, setStandardMapper] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
         dokument_nr: '',
@@ -33,18 +34,22 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
         aktiv: true,
         udgaaet: false,
         informations_kilde_id: '',
+        default_undermappe_id: '',
         mail_titel: ''
     });
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [blokData, infoData] = await Promise.all([
+                const [blokData, infoData, mappeData] = await Promise.all([
                     api.get<Blokinfo[]>('/skabeloner/blokinfo/'),
-                    api.get<InformationsKilde[]>('/kerne/informationskilder/')
+                    api.get<InformationsKilde[]>('/kerne/informationskilder/'),
+                    api.get<any[]>('/kerne/standardmapper/')
                 ]);
                 setBlokinfo(blokData.filter(b => b.formaal === 3));
                 setInformationsKilder(infoData);
+                // Kun vis mapper til dokumenter (formaal='DOK')
+                setStandardMapper(mappeData.filter(m => m.formaal === 'DOK'));
             } catch (e) {
                 console.error("Fejl ved hentning af data", e);
             }
@@ -69,6 +74,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                 aktiv: dokument.aktiv ?? true,
                 udgaaet: dokument.udgaaet ?? false,
                 informations_kilde_id: dokument.informations_kilde?.id?.toString() || '',
+                default_undermappe_id: dokument.default_undermappe?.id?.toString() || '',
                 mail_titel: dokument.mail_titel || ''
             });
         } else if (initialFilters?.gruppe_nr) {
@@ -132,6 +138,7 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
             dokument_nr: formData.dokument_nr ? parseInt(formData.dokument_nr) : null,
             gruppe_id: formData.gruppe_id ? parseInt(formData.gruppe_id) : null,
             informations_kilde_id: formData.informations_kilde_id ? parseInt(formData.informations_kilde_id) : null,
+            default_undermappe_id: formData.default_undermappe_id ? parseInt(formData.default_undermappe_id) : null,
         };
 
         try {
@@ -280,7 +287,19 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                             {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
                         </select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Default submappe</label>
+                        <select
+                            name="default_undermappe_id"
+                            value={formData.default_undermappe_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none bg-white text-[12px]"
+                        >
+                            <option value="">Ingen</option>
+                            {standardMapper.map(m => <option key={m.id} value={m.id}>{m.navn}</option>)}
+                        </select>
+                    </div>
+                    <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Mail Titel</label>
                         <textarea
                             name="mail_titel"
