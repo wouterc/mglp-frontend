@@ -86,7 +86,7 @@ function AktivitetRow({
     onFocus,
     onBlur
 }: AktivitetRowProps) {
-    const isDone = aktivitet.status?.status_nummer === 80;
+    const isDone = aktivitet.status?.status_nummer === 80 || aktivitet.status?.status_kategori === 1;
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = React.useRef<HTMLDivElement>(null);
@@ -103,10 +103,17 @@ function AktivitetRow({
 
     const getDateColorClass = (dateStr: string | null) => {
         if (!dateStr || isDone) return '';
+
+        // Parsing YYYY-MM-DD manually for robustness against timezone shifts
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return '';
+
+        const targetDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        targetDate.setHours(0, 0, 0, 0);
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const targetDate = new Date(dateStr);
-        targetDate.setHours(0, 0, 0, 0);
+
         const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays < 0) return '!bg-red-500 !text-white';

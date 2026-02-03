@@ -56,6 +56,11 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     // State for Link Preference Modal
     const [showLinkPreferenceModal, setShowLinkPreferenceModal] = useState<{ aktivitet: Aktivitet } | null>(null);
 
+    // State for Link/Document Modal
+    const [linkModalAktivitet, setLinkModalAktivitet] = useState<Aktivitet | null>(null);
+    const [sagsDokumenter, setSagsDokumenter] = useState<SagsDokument[]>([]);
+    const [isFetchingDocs, setIsFetchingDocs] = useState(false);
+
     const openLinkApp = useCallback((aktivitet: Aktivitet, mode: 'window' | 'tab') => {
         if (!valgtSag) return;
         const ids = aktivitet.dokumenter?.join(',');
@@ -72,8 +77,27 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
     }, [valgtSag]);
 
-    const handleLinkAppClick = (aktivitet: Aktivitet) => {
-        if (!aktivitet.dokumenter || aktivitet.dokumenter.length === 0 || !valgtSag) return;
+    const handleLinkAppClick = async (aktivitet: Aktivitet) => {
+        if (!valgtSag) return;
+
+        // If NO documents are linked, open the Linker Modal instead of trying to open them
+        if (!aktivitet.dokumenter || aktivitet.dokumenter.length === 0) {
+            setLinkModalAktivitet(aktivitet);
+
+            // Fetch documents for the case if not already fetching/fetched
+            if (sagsDokumenter.length === 0 && !isFetchingDocs) {
+                setIsFetchingDocs(true);
+                try {
+                    const docs = await api.get<SagsDokument[]>(`/sager/dokumenter/?sag_id=${valgtSag.id}`);
+                    setSagsDokumenter(docs);
+                } catch (e) {
+                    console.error("Fejl ved hentning af dokumenter til linking:", e);
+                } finally {
+                    setIsFetchingDocs(false);
+                }
+            }
+            return;
+        }
 
         // 1. Check user preference from currentUser (global state)
         // Note: We need to access currentUser from state.currentUser (useAppState)
@@ -298,6 +322,25 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         } catch (e: any) {
             console.error("Fejl ved sletning:", e);
             showAlert('Systemet siger', "Kunne ikke slette aktivitet.");
+        }
+    };
+
+    const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
+        try {
+            const updatedAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitetId}/`, { dokumenter: documentIds });
+
+            // Update local state
+            const updated = allActivities.map(a => a.id === updatedAktivitet.id ? updatedAktivitet : a);
+            setAllActivities(updated);
+            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag!.id, aktiviteter: updated } });
+
+            // Update the modal's active aktivitet if it's the one we just saved
+            if (linkModalAktivitet?.id === aktivitetId) {
+                setLinkModalAktivitet(updatedAktivitet);
+            }
+        } catch (e) {
+            console.error("Fejl ved lagring af dokument-links:", e);
+            alert("Kunne ikke gemme dokument-links.");
         }
     };
 
@@ -856,6 +899,17 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                     onClose={() => setShowLinkPreferenceModal(null)}
                 />
             )}
+
+            {/* Manual Activity-Document Linker Modal */}
+            <ActivityDocumentLinkerModal
+                isOpen={!!linkModalAktivitet}
+                onClose={() => setLinkModalAktivitet(null)}
+                sagId={valgtSag?.id || 0}
+                initialAktivitetId={linkModalAktivitet?.id}
+                aktiviteter={allActivities}
+                dokumenter={sagsDokumenter}
+                onLinkChanges={handleLinkChanges}
+            />
 
 
 

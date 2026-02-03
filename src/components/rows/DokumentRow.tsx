@@ -6,6 +6,7 @@ import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import ConfirmModal from '../ui/ConfirmModal';
 import { SagsDokument, Sag, User, InformationsKilde, StandardMappe } from '../../types';
+import { API_BASE_URL } from '../../config';
 
 interface DokumentRowProps {
     doc: SagsDokument;
@@ -23,7 +24,9 @@ interface DokumentRowProps {
     isLast?: boolean;
     statusser: any[];
     onStatusToggle: (doc: SagsDokument) => void;
-    onLinkClick?: (doc: SagsDokument) => void; // @# New Prop
+    onLinkClick?: (doc: SagsDokument) => void;
+    onLinkFile: (docId: number, path: string) => Promise<void>;
+
     informationsKilder: InformationsKilde[];
     standardMapper: StandardMappe[];
     isActive?: boolean;
@@ -47,14 +50,16 @@ const DokumentRow = React.memo(function DokumentRow({
     isLast,
     statusser,
     onStatusToggle,
-    onLinkClick, // @# New Prop
+    onLinkClick,
+    onLinkFile,
+
     informationsKilder,
     standardMapper,
     isActive,
     onFocus,
     onBlur
 }: DokumentRowProps) {
-    const isDone = doc.status?.status_nummer === 80;
+    const isDone = doc.status?.status_nummer === 80 || doc.status?.status_kategori === 1 || !!(doc.fil || doc.link);
     const dropHandledRef = useRef(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -74,10 +79,17 @@ const DokumentRow = React.memo(function DokumentRow({
 
     const getDateColorClass = (dateStr: string | null) => {
         if (!dateStr || isDone) return '';
+
+        // Parsing YYYY-MM-DD manually for robustness against timezone shifts
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return '';
+
+        const targetDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        targetDate.setHours(0, 0, 0, 0);
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const targetDate = new Date(dateStr);
-        targetDate.setHours(0, 0, 0, 0);
+
         const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays < 0) return '!bg-red-500 !text-white';
@@ -127,19 +139,53 @@ const DokumentRow = React.memo(function DokumentRow({
         }
     }, [doc.id, doc.undermappe?.id, onUpload]);
 
-    // Funktion til upload til specifik mappe fra overlay
-    const handleFolderDrop = (e: React.DragEvent, mappenId?: number) => {
-        e.preventDefault();
-        // Vi stopper IKKE propagation her, for at lade react-dropzone nulstille isDragActive
-        // Men vi sætter et flag så onDrop ikke kører igen
-        dropHandledRef.current = true;
+    const [isInternalDragOver, setIsInternalDragOver] = useState(false);
 
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            setIsUploading(true);
-            onUpload(doc.id, files[0], mappenId).finally(() => setIsUploading(false));
+    // Funktion til upload til specifik mappe fra overlay
+
+    const handleNativeDragOver = (e: React.DragEvent) => {
+        // We allow both files (handled by dropzone if it wanted to) 
+        // and our internal types.
+        const types = e.dataTransfer.types;
+        if (types.includes('application/json') || types.includes('text/plain') || types.includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            setIsInternalDragOver(true);
         }
     };
+
+    const handleNativeDrop = (e: React.DragEvent) => {
+        setIsInternalDragOver(false);
+
+        let rawData = e.dataTransfer.getData('application/json');
+
+        // Fallback to text/plain if application/json is empty (cross-window issue)
+        if (!rawData) {
+            const textData = e.dataTransfer.getData('text/plain');
+            if (textData && textData.startsWith('MGLP_FILE:')) {
+                rawData = textData.substring('MGLP_FILE:'.length);
+            }
+        }
+
+        if (rawData) {
+            e.preventDefault();
+            try {
+                const data = JSON.parse(rawData);
+                if (data.type === 'mglp-file' && data.path) {
+                    if (data.sag_id !== sag.id) {
+                        alert(`Du kan kun trække filer indenfor den samme sag.\nFilen tilhører sag ${data.sag_id}, men dette er sag ${sag.id}.`);
+                        return;
+                    }
+                    setIsUploading(true);
+                    onLinkFile(doc.id, data.path).finally(() => setIsUploading(false));
+                }
+            } catch (err) {
+                console.error("Fejl ved parsing af drop data:", err);
+            }
+        }
+    };
+
+
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
         onDrop,
@@ -167,10 +213,42 @@ const DokumentRow = React.memo(function DokumentRow({
         onRename(doc);
     };
 
+    const rootProps = getRootProps();
+
     return (
         <tr
-            {...getRootProps()}
-            className={`group transition-colors relative ${isDragActive ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
+            {...rootProps}
+            onDragOver={(e) => {
+                // Always prevent default to allow interactions, filter logic inside handler
+                // We want to ensure we accept the drag if potential match
+                if (e.dataTransfer.types.length > 0) {
+                    e.preventDefault();
+                    // Only highlight if it matches our types
+                    const types = e.dataTransfer.types;
+                    if (types.includes('application/json') || types.includes('text/plain') || types.includes('Files')) {
+                        e.dataTransfer.dropEffect = 'copy';
+                        setIsInternalDragOver(true);
+                    }
+                }
+                rootProps.onDragOver?.(e);
+            }}
+            onDragLeave={(e) => {
+                // Prevent flickering: Only turn off if we actually leave the row, not just entering a child
+                if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) {
+                    return;
+                }
+                setIsInternalDragOver(false);
+                rootProps.onDragLeave?.(e);
+            }}
+            onDrop={(e) => {
+                handleNativeDrop(e);
+                rootProps.onDrop?.(e);
+            }}
+            className={`group transition-colors relative ${isDragActive || isInternalDragOver ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
+
+
+
+
             style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
             onClick={onFocus}
             onFocus={onFocus}
@@ -377,7 +455,7 @@ const DokumentRow = React.memo(function DokumentRow({
                         ) : doc.fil ? (
                             <div className="flex items-center justify-between w-full gap-1">
                                 <a
-                                    href={doc.fil}
+                                    href={`${API_BASE_URL}/sager/sagsdokumenter/${doc.id}/open_file/`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="flex items-center gap-2 text-blue-600 hover:underline truncate group/link"
@@ -417,16 +495,17 @@ const DokumentRow = React.memo(function DokumentRow({
                 </div>
 
                 {/* Drag Overlay - Simple and Green */}
-                {isDragActive && (
+                {(isDragActive || isInternalDragOver) && (
                     <div
                         className="absolute inset-0 bg-green-200/95 flex items-center justify-center border-2 border-green-600 rounded z-20 p-2 overflow-hidden pointer-events-none"
                     >
                         <div className="flex items-center gap-2 text-green-900 font-bold text-[11px] text-center px-2">
                             <UploadCloud size={14} className="flex-shrink-0" />
-                            <span>Slip filen for at uploade til "{doc.titel || 'dokumentet'}"</span>
+                            <span>Slip filen for at tildele fra Stifinder til "{doc.titel || 'dokumentet'}"</span>
                         </div>
                     </div>
                 )}
+
             </td>
             <td className="px-2 py-1.5 w-24 align-middle overflow-hidden">
                 <select

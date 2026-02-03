@@ -234,6 +234,17 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         }
     };
 
+    const handleLinkFile = async (docId: number, path: string) => {
+        try {
+            await api.post(`/sager/sagsdokumenter/${docId}/link_file/`, { path });
+            await fetchDokumenter(true);
+        } catch (e: any) {
+            console.error("Link fejl:", e);
+            alert("Kunne ikke linke filen: " + (e.response?.data?.message || e.message));
+        }
+    };
+
+
     // --- Comment Logic ---
     const openEditModal = (doc: SagsDokument) => {
         setEditingDoc(doc);
@@ -875,7 +886,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                                 onEditComment={openEditModal}
                                                 onRename={openRenameModal}
                                                 onInlineSave={handleInlineSave}
+                                                onLinkFile={handleLinkFile}
                                                 onSaveToTemplate={handleGemTilSkabelon}
+
                                                 onCopy={handleCopyDokument}
                                                 onRenameLine={openRenameTitleModal}
                                                 onDeleteLine={handleDeleteLine}

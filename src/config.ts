@@ -1,4 +1,11 @@
 // --- Fil: src/config.ts ---
-// Læser API URL'en fra environment variabler.
-// Dette giver fleksibilitet til at have forskellige URL'er for udvikling og produktion.
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+/**
+ * API_BASE_URL styres nu udelukkende via .env filer.
+ * Lokalt: .env (peger på localhost:8000)
+ * Produktion: .env.production (peger på /api)
+ */
+
+// @ts-ignore - Vite håndterer import.meta.env, men TS kan drille under build
+const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+export const API_BASE_URL: string = envUrl || '/api';

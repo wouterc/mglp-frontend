@@ -39,11 +39,13 @@ interface DraggableRowProps {
     onRename: (item: FileItem) => void;
     onDelete: (item: FileItem) => void;
     onMove: (item: FileItem) => void;
+    onNativeDrop?: (sourcePath: string, targetPath: string) => void;
     formatSize: (size: number) => string;
     formatDate: (mtime: number) => string;
 }
 
-const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRename, onDelete, onMove, formatSize, formatDate }) => {
+const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRename, onDelete, onMove, onNativeDrop, formatSize, formatDate }) => {
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: item.path,
         data: item,
@@ -69,14 +71,70 @@ const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRena
             }}
             style={style}
             onClick={() => onOpen(item)}
+            draggable={!item.is_dir}
+            onDragStart={(e) => {
+                if (item.is_dir) return; // Folders are not natively draggable in this context currently
+
+                // Native drag data for cross-window/external drops
+                const dragData = {
+                    type: 'mglp-file',
+                    path: item.path,
+                    name: item.name,
+                    sag_id: sagId
+                };
+                const json = JSON.stringify(dragData);
+                e.dataTransfer.setData('application/json', json);
+                // Set text/plain as a fallback with a prefix to identify it
+                e.dataTransfer.setData('text/plain', `MGLP_FILE:${json}`);
+                e.dataTransfer.effectAllowed = 'copyMove';
+            }}
+            onDragOver={(e) => {
+                // Allow dropping files onto folders (internal move)
+                if (item.is_dir) {
+                    // Check if it's our internal file type
+                    const types = e.dataTransfer.types;
+                    if (types.includes('application/json') || types.includes('text/plain')) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    }
+                }
+            }}
+            onDrop={(e) => {
+                if (item.is_dir && onNativeDrop) {
+                    e.preventDefault();
+                    // Extract path from drop data
+                    let rawData = e.dataTransfer.getData('application/json');
+                    if (!rawData) {
+                        const textData = e.dataTransfer.getData('text/plain');
+                        if (textData && textData.startsWith('MGLP_FILE:')) {
+                            rawData = textData.substring('MGLP_FILE:'.length);
+                        }
+                    }
+
+                    if (rawData) {
+                        try {
+                            const data = JSON.parse(rawData);
+                            if (data.type === 'mglp-file' && data.path && data.sag_id === sagId) {
+                                onNativeDrop(data.path, item.path);
+                            }
+                        } catch (err) {
+                            console.error("Drop error", err);
+                        }
+                    }
+                }
+            }}
+
+
             className={`
                 group transition-colors cursor-pointer border-b border-gray-50
                 ${isOver ? 'bg-blue-100/50 outline-2 outline-dashed outline-blue-400' : 'hover:bg-blue-50/30'}
                 ${isDragging ? 'shadow-lg bg-white ring-1 ring-blue-200' : ''}
             `}
             {...attributes}
-            {...listeners}
+            {...(item.is_dir ? listeners : {})}
         >
+
+
             <td className="px-6 py-3 text-center">
                 {item.is_dir ?
                     <Folder size={20} className="text-blue-500 fill-blue-50" /> :
@@ -522,7 +580,48 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         }
     };
 
+    // Native drop handler (reusing dnd-kit logic structure)
+    const handleNativeDropFromFolder = async (sourcePath: string, targetPath: string) => {
+        // Don't move to self
+        if (sourcePath === targetPath) return;
+
+        try {
+            // Check linked status first (optimistic check, backend also checks)
+            const item = items.find(i => i.path === sourcePath);
+            if (item && item.linked_info) {
+                setBlockedInfo({
+                    isOpen: true,
+                    type: 'move',
+                    item: item,
+                    linked_details: item.linked_info
+                });
+                return;
+            }
+
+            await api.post('/sager/filer/move_entry/', {
+                sag_id: sag.id,
+                source_path: sourcePath,
+                target_path: targetPath
+            });
+            showToast('Flyttet succesfuldt', 'success');
+            fetchItems();
+        } catch (err: any) {
+            if (err.response?.data?.error === 'linked') {
+                const item = items.find(i => i.path === sourcePath);
+                setBlockedInfo({
+                    isOpen: true,
+                    type: 'move',
+                    item: item || null,
+                    linked_details: err.response.data.details
+                });
+            } else {
+                showToast('Fejl ved flytning: ' + (err.response?.data?.error || err.message), 'error');
+            }
+        }
+    };
+
     const handleOpen = (item: FileItem) => {
+
         if (item.is_dir) {
             setCurrentPath(item.path);
         } else {
@@ -652,9 +751,11 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                                                 setMoveState({ isOpen: true, item });
                                             }
                                         }}
+                                        onNativeDrop={handleNativeDropFromFolder}
                                         formatSize={formatSize}
                                         formatDate={formatDate}
                                     />
+
                                 ))}
                             </tbody>
                         </table>
