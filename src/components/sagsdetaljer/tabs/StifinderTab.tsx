@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Folder, File, ChevronRight, Upload, Trash2, Edit2, Plus, Download, RefreshCw, MoreVertical, FolderPlus, Home, Move } from 'lucide-react';
+import { Folder, File, ChevronRight, Upload, Trash2, Edit2, Plus, Download, RefreshCw, MoreVertical, FolderPlus, Home, Move, ExternalLink } from 'lucide-react';
+
 import { api } from '../../../api';
 import { API_BASE_URL } from '../../../config';
 import { useDropzone } from 'react-dropzone';
@@ -678,7 +679,15 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
+                            onClick={() => window.open(`/dokumenter?sag_id=${sag.id}&tab=stifinder&f_path=${encodeURIComponent(currentPath)}`, '_blank', 'width=1200,height=800')}
+                            className="p-1.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm text-blue-600"
+                            title="Åbn i nyt vindue"
+                        >
+                            <ExternalLink size={16} />
+                        </button>
+                        <button
                             onClick={open}
+
                             className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm"
                         >
                             <Upload size={16} className="text-blue-600" />

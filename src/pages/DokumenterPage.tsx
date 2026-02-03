@@ -148,6 +148,14 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
             </button>
           </div>
 
+          <button
+            onClick={() => window.open(`/dokumenter?sag_id=${localSag.id}&tab=stifinder`, '_blank', 'width=1200,height=800')}
+            title="Åbn Stifinder i nyt vindue"
+            className="p-2.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+          >
+            <FolderSearch size={20} />
+          </button>
+
           {/* Large Case Selector */}
           <div className="w-full sm:w-96 lg:w-[450px]">
             <CaseSelector
