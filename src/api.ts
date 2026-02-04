@@ -58,6 +58,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
         throw error;
     }
 
+    // Support raw response if requested (e.g. for Blobs)
+    if ((options as any).rawResponse) {
+        return response as any;
+    }
+
     // Nogle endpoints returnerer ingen body (204 No Content)
     if (response.status === 204) {
         return {} as T;

@@ -43,9 +43,13 @@ interface DraggableRowProps {
     onNativeDrop?: (sourcePath: string, targetPath: string) => void;
     formatSize: (size: number) => string;
     formatDate: (mtime: number) => string;
+    isSelected: boolean;
+    onToggleSelect: (item: FileItem) => void;
+    onWarn: (msg: string) => void;
+    selectedPaths: Set<string>;
 }
 
-const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRename, onDelete, onMove, onNativeDrop, formatSize, formatDate }) => {
+const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRename, onDelete, onMove, onNativeDrop, formatSize, formatDate, isSelected, onToggleSelect, onWarn, selectedPaths }) => {
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: item.path,
@@ -88,6 +92,53 @@ const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRena
                 // Set text/plain as a fallback with a prefix to identify it
                 e.dataTransfer.setData('text/plain', `MGLP_FILE:${json}`);
                 e.dataTransfer.effectAllowed = 'copyMove';
+
+                // --- Drag-to-Desktop (DownloadURL) ---
+                // "pseudo-standard" supported by Chrome/Edge
+                const isChromium = (window as any).chrome || navigator.userAgent.indexOf("Chrome") > -1;
+
+                if (isChromium) {
+                    let baseUrl = API_BASE_URL;
+                    // Ensure we have a full absolute URL including protocol/host
+                    if (!baseUrl.startsWith('http')) {
+                        // Handle relative API_BASE_URL (e.g. '/api') or empty
+                        const origin = window.location.origin;
+                        if (baseUrl.startsWith('/')) {
+                            baseUrl = origin + baseUrl;
+                        } else {
+                            baseUrl = origin + '/' + baseUrl;
+                        }
+                    }
+                    // Remove trailing slash if double
+                    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+                    let downloadUrl = '';
+                    let fileName = '';
+
+                    // Check if we are dragging a selection
+                    const isMultiDrag = selectedPaths.has(item.path) && selectedPaths.size > 1;
+
+                    if (isMultiDrag) {
+                        // Create ZIP download URL
+                        const params = new URLSearchParams();
+                        params.append('sag_id', sagId.toString());
+                        selectedPaths.forEach(p => params.append('paths', p));
+
+                        downloadUrl = `${baseUrl}/sager/filer/download_multiple/?${params.toString()}`;
+                        fileName = `Sagsfiler_${sagId}.zip`;
+                    } else {
+                        // Single file download
+                        downloadUrl = `${baseUrl}/sager/filer/download/?sag_id=${sagId}&path=${encodeURIComponent(item.path)}`;
+                        fileName = item.name;
+                    }
+
+                    // Format: mime-type:filename:url
+                    e.dataTransfer.setData('DownloadURL', `application/octet-stream:${fileName}:${downloadUrl}`);
+                } else {
+                    // Non-chromium browsers (Firefox, Safari) do not support this standard way of dragging out files.
+                    // We warn the user if onWarn is provided
+                    if (onWarn) onWarn("Træk-til-skrivebord understøttes kun i Chrome og Edge.");
+                }
             }}
             onDragOver={(e) => {
                 // Allow dropping files onto folders (internal move)
@@ -134,7 +185,16 @@ const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRena
             {...attributes}
             {...(item.is_dir ? listeners : {})}
         >
-
+            <td className="px-4 py-3 w-10 text-center" onClick={(e) => e.stopPropagation()}>
+                {!item.is_dir && (
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleSelect(item)}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                )}
+            </td>
 
             <td className="px-6 py-3 text-center">
                 {item.is_dir ?
@@ -157,11 +217,10 @@ const DraggableRow: React.FC<DraggableRowProps> = ({ item, sagId, onOpen, onRena
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                const url = `${API_BASE_URL}/sager/filer/download/?sag_id=${sagId}&path=${encodeURIComponent(item.path)}`;
-                                window.open(url, '_blank');
+                                onOpen(item);
                             }}
                             className="p-1.5 bg-white border border-gray-100 rounded shadow-sm text-gray-500 hover:text-green-600 transition"
-                            title="Download"
+                            title="Download / Vis"
                         >
                             <Download size={14} />
                         </button>
@@ -250,6 +309,68 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         prefix: '',
         extension: ''
     });
+
+    // Selection State
+    const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+
+    // Clear selection when path changes
+    useEffect(() => {
+        setSelectedPaths(new Set());
+    }, [currentPath]);
+
+    const handleToggleSelect = (item: FileItem) => {
+        const newSet = new Set(selectedPaths);
+        if (newSet.has(item.path)) {
+            newSet.delete(item.path);
+        } else {
+            newSet.add(item.path);
+        }
+        setSelectedPaths(newSet);
+    };
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            const allFilePaths = items.filter(i => !i.is_dir).map(i => i.path);
+            setSelectedPaths(new Set(allFilePaths));
+        } else {
+            setSelectedPaths(new Set());
+        }
+    };
+
+    const handleDownloadSelected = async () => {
+        if (selectedPaths.size === 0) return;
+
+        showToast(`Forbereder download af ${selectedPaths.size} filer...`, 'info');
+        try {
+            const response = await api.post<Response>(`/sager/filer/download_multiple/`, {
+                sag_id: sag.id,
+                paths: Array.from(selectedPaths)
+            }, { rawResponse: true } as any);
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Fejl ved download");
+            }
+
+            const blob = await response.blob();
+            // Create Object URL
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Sagsfiler_${sag.sags_nr}.zip`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+
+            setSelectedPaths(new Set());
+            showToast("Download startet", 'success');
+        } catch (e: any) {
+            console.error("Download error", e);
+            showToast("Fejl ved download af filer: " + e.message, 'error');
+        }
+    };
 
     // Toast state
     const [toast, setToast] = useState<{ isVisible: boolean; message: string; type: ToastType }>({
@@ -621,13 +742,59 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         }
     };
 
-    const handleOpen = (item: FileItem) => {
-
+    const handleOpen = async (item: FileItem) => {
         if (item.is_dir) {
             setCurrentPath(item.path);
         } else {
-            const url = `${API_BASE_URL}/sager/filer/download/?sag_id=${sag.id}&path=${encodeURIComponent(item.path)}&view=1`;
-            window.open(url, '_blank');
+            try {
+                showToast('Henter fil...', 'info');
+                const url = `/sager/filer/download/?sag_id=${sag.id}&path=${encodeURIComponent(item.path)}&view=1`;
+
+                // Use the raw fetch wrapper but with our auth logic
+                const response = await api.get<Response>(url, { rawResponse: true } as any);
+
+                // Read as Blob
+                const blob = await response.blob();
+
+                // Check if it's actually a JSON error (our backend might return 200 OK with text error now, or JSON)
+                // But since we set responseType to blob, we have to check content type or try to parse
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    // It was an error in JSON format
+                    const text = await blob.text();
+                    const json = JSON.parse(text);
+                    throw new Error(json.error || json.message || "Ukendt fejl");
+                }
+
+                // If it is text/plain, it might be our debug error message
+                if (contentType && contentType.includes('text/plain')) {
+                    const text = await blob.text();
+                    if (text.startsWith('FIL IKKE FUNDET') || text.startsWith('Fejl') || text.startsWith('Systemfejl')) {
+                        // Open in new tab so user can see the debug message
+                        const debugBlob = new Blob([text], { type: 'text/plain' });
+                        const debugUrl = window.URL.createObjectURL(debugBlob);
+                        window.open(debugUrl, '_blank');
+                        showToast('Fejl ved hentning af fil - se fane', 'error');
+                        return; // Don't proceed to PDF/doc opening
+                    }
+                }
+
+                // Create Object URL
+                const objectUrl = window.URL.createObjectURL(blob);
+
+                // Open in new tab
+                const win = window.open(objectUrl, '_blank');
+                if (!win) {
+                    showToast('Pop-up blokeret. Tillad venligst pop-ups.', 'error');
+                }
+
+                // Cleanup after a delay (browser needs time to open it)
+                setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60000); // 1 minute
+
+            } catch (err: any) {
+                console.error("Download error", err);
+                showToast('Kunne ikke hente fil: ' + err.message, 'error');
+            }
         }
     };
 
@@ -707,6 +874,16 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                         >
                             <RefreshCw size={16} className={`text-gray-500 ${loading ? 'animate-spin' : ''}`} />
                         </button>
+
+                        {selectedPaths.size > 0 && (
+                            <button
+                                onClick={handleDownloadSelected}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 border border-blue-600 rounded-lg text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm animate-in fade-in"
+                            >
+                                <Download size={16} />
+                                Download ({selectedPaths.size})
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -732,6 +909,15 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                         <table className="w-full text-left border-collapse">
                             <thead className="sticky top-0 bg-white shadow-sm z-10">
                                 <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                    <th className="px-4 py-3 w-10 text-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={items.length > 0 && items.some(i => !i.is_dir) && selectedPaths.size === items.filter(i => !i.is_dir).length}
+                                            onChange={handleSelectAll}
+                                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                            disabled={items.filter(i => !i.is_dir).length === 0}
+                                        />
+                                    </th>
                                     <th className="px-6 py-3 w-12"></th>
                                     <th className="px-4 py-3">Navn</th>
                                     <th className="px-4 py-3 w-32">Størrelse</th>
@@ -748,6 +934,10 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                                         onOpen={handleOpen}
                                         onRename={openRenamePrompt}
                                         onDelete={openDeleteConfirm}
+                                        isSelected={selectedPaths.has(item.path)}
+                                        onToggleSelect={handleToggleSelect}
+                                        onWarn={(msg) => showToast(msg, 'info')}
+                                        selectedPaths={selectedPaths}
                                         onMove={(item) => {
                                             if (item.linked_info) {
                                                 setBlockedInfo({
