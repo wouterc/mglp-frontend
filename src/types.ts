@@ -334,7 +334,9 @@ export interface User {
   private_address?: string;
   preferred_link_open_mode?: 'window' | 'tab' | null;
   is_online?: boolean;
+  is_online?: boolean;
   last_seen?: string;
+  opgave_sortering?: number;
 }
 
 export interface SagsDokument {
@@ -445,3 +447,46 @@ export interface HjaelpPunkt {
   artikler: number[];
   artikler_details?: Viden[];
 }
+
+export enum OpgaveStatus {
+  BACKLOG = 'BACKLOG',
+  TODO = 'TODO',
+  IN_PROGRESS = 'IN_PROGRESS',
+  TEST = 'TEST',
+  DONE = 'DONE'
+}
+
+export enum OpgavePriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT'
+}
+
+export interface OpgaveKommentar {
+  id: number;
+  opgave: number;
+  tekst: string;
+  bruger: number;
+  bruger_details?: User;
+  oprettet: string;
+}
+
+export interface Opgave {
+  id: number;
+  titel: string;
+  beskrivelse: string;
+  status: OpgaveStatus;
+  prioritet: OpgavePriority;
+  ansvarlig: number | null;
+  ansvarlig_details?: User;
+  deadline: string | null;
+  oprettet_af: number;
+  oprettet_af_details?: User;
+  oprettet: string;
+  opdateret: string;
+  kommentarer: OpgaveKommentar[];
+  kommentarer_count: number;
+  index: number;
+}
+
