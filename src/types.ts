@@ -334,7 +334,6 @@ export interface User {
   private_address?: string;
   preferred_link_open_mode?: 'window' | 'tab' | null;
   is_online?: boolean;
-  is_online?: boolean;
   last_seen?: string;
   opgave_sortering?: number;
 }

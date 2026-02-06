@@ -10,7 +10,7 @@ import {
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
-import { api } from '../../api';
+import { SagService } from '../../services/SagService';
 import HelpButton from '../ui/HelpButton';
 
 export type TabType = 'overblik' | 'processer' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
@@ -79,10 +79,12 @@ function SagsdetaljerLayout({
             }
             setIsSearching(true);
             try {
-                const data = await api.get<any>(`/sager/search/?q=${debouncedSearch}`);
-                setSearchResults(data);
+                console.log("Searching for:", debouncedSearch);
+                const data = await SagService.searchSager(debouncedSearch);
+                console.log("Search results:", data);
+                setSearchResults(data || []);
                 setShowResults(true);
-                setActiveIndex(data.length > 0 ? 0 : -1);
+                setActiveIndex(data && data.length > 0 ? 0 : -1);
             } catch (error) {
                 console.error("Søgefejl:", error);
             } finally {

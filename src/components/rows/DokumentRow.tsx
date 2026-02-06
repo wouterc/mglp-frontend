@@ -219,30 +219,24 @@ const DokumentRow = React.memo(function DokumentRow({
         <tr
             {...rootProps}
             onDragOver={(e) => {
-                // Always prevent default to allow interactions, filter logic inside handler
-                // We want to ensure we accept the drag if potential match
                 if (e.dataTransfer.types.length > 0) {
-                    e.preventDefault();
-                    // Only highlight if it matches our types
                     const types = e.dataTransfer.types;
                     if (types.includes('application/json') || types.includes('text/plain') || types.includes('Files')) {
+                        e.preventDefault();
                         e.dataTransfer.dropEffect = 'copy';
-                        setIsInternalDragOver(true);
+                        if (!isInternalDragOver) setIsInternalDragOver(true);
                     }
                 }
-                rootProps.onDragOver?.(e);
+                if (rootProps.onDragOver) rootProps.onDragOver(e);
             }}
             onDragLeave={(e) => {
-                // Prevent flickering: Only turn off if we actually leave the row, not just entering a child
-                if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) {
-                    return;
-                }
                 setIsInternalDragOver(false);
-                rootProps.onDragLeave?.(e);
+                if (rootProps.onDragLeave) rootProps.onDragLeave(e);
             }}
             onDrop={(e) => {
+                setIsInternalDragOver(false);
                 handleNativeDrop(e);
-                rootProps.onDrop?.(e);
+                if (rootProps.onDrop) rootProps.onDrop(e);
             }}
             className={`group transition-colors relative ${isDragActive || isInternalDragOver ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
 

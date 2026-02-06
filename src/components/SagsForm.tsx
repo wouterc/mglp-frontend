@@ -13,6 +13,9 @@ import AdresseSøgning from './AdresseSøgning';
 // @# 2025-11-10 19:05 - Importeret globale typer
 import type { Status, BbrAnvendelse, DawaAdresse, Sag } from '../types';
 import Button from './ui/Button'; // Importer den nye knap
+import { SagService } from '../services/SagService';
+import { LookupService } from '../services/LookupService';
+import { useLookups } from '../contexts/LookupContext';
 
 // @# 2025-11-10 19:05 - Fjernet lokale, redundante type-definitioner for Status og BbrAnvendelse
 
@@ -62,6 +65,8 @@ interface SagsDataState {
 }
 
 function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
+  const { state: lookupState } = useLookups();
+  const { sagsStatusser: statusser } = lookupState;
   const [sagsData, setSagsData] = useState<SagsDataState>({
     alias: '',
     hovedansvarlige: '',
@@ -91,7 +96,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     raadgiver_sagsnr: '',
     raadgiver_kontakt_id: '',
   });
-  const [statusser, setStatusser] = useState<Status[]>([]);
+  // const [statusser, setStatusser] = useState<Status[]>([]); // Uses context now
   const [outlookAccounts, setOutlookAccounts] = useState<any[]>([]);
   const [bbrAnvendelser, setBbrAnvendelser] = useState<BbrAnvendelse[]>([]);
   const [isFetchingDetails, setIsFetchingDetails] = useState<boolean>(false);
@@ -140,6 +145,8 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   }, [sagTilRedigering, erRedigering]);
 
   useEffect(() => {
+    // Statusser kommer nu fra Context context
+    /*
     const fetchStatusser = async () => {
       try {
         const data = await api.get<any>('/kerne/status/?formaal=1');
@@ -149,11 +156,11 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       }
     };
     fetchStatusser();
+    */
 
     const fetchAccounts = async () => {
       try {
-        const data = await api.get<any>('/emails/accounts/');
-        const allAccounts = Array.isArray(data) ? data : data.results || [];
+        const allAccounts = await LookupService.getEmailAccounts();
         setOutlookAccounts(allAccounts.filter((a: any) => a.is_active));
       } catch (error) {
         console.error('Fejl ved hentning af konti:', error);
@@ -165,7 +172,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   useEffect(() => {
     const fetchBbrAnvendelser = async () => {
       try {
-        const data = await api.get<BbrAnvendelse[]>('/kerne/bbr-anvendelser/');
+        const data = await LookupService.getBbrAnvendelser();
         setBbrAnvendelser(data);
       } catch (error) {
         console.error('Error fetching BBR applications:', error);
@@ -277,9 +284,9 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
 
     try {
       if (erRedigering) {
-        await api.put(`/sager/${dataToSave.id}/`, dataToSave);
+        await SagService.updateSag(dataToSave.id, dataToSave);
       } else {
-        await api.post(`/sager/`, dataToSave);
+        await SagService.createSag(dataToSave);
       }
       onSave();
     } catch (error: any) {

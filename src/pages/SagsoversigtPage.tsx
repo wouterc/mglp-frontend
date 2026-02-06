@@ -4,11 +4,13 @@
 // @# 2025-12-25 21:00 - Refactored to use SagsRow component.
 import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect, useMemo, ChangeEvent, useCallback, ReactNode, useRef } from 'react';
-import { api } from '../api';
+import type { Sag, Status } from '../types';
+import { SagService } from '../services/SagService';
 import SagsForm from '../components/SagsForm';
 import { ArrowUp, ArrowDown, PlusCircle, FunnelX, Loader2, AlertCircle } from 'lucide-react';
-import type { Sag, Status } from '../types';
-import { useAppState } from '../StateContext';
+import { useSager } from '../contexts/SagContext';
+import { useLookups } from '../contexts/LookupContext';
+import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import { useTableNavigation } from '../hooks/useTableNavigation';
 import Button from '../components/ui/Button';
@@ -23,11 +25,11 @@ interface SagsoversigtPageProps {
 type SortKey = keyof Sag | `status.${keyof Status}`;
 
 function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
-  const navigate = useNavigate(); // Still used for internal navigation if needed, though props.navigateTo is often preferred
-  const { state, dispatch } = useAppState();
+  const navigate = useNavigate();
+  const { state: sagerState, dispatch: sagDispatch } = useSager();
+  const { state: lookupState } = useLookups();
   const {
     sager,
-    statusser,
     sagsoversigtError: error,
     sagsoversigtIsLoading: isLoading,
     sagsoversigtFilters: filter,
@@ -35,7 +37,9 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
     sagsoversigtVisLukkede: visLukkede,
     sagsoversigtVisAnnullerede: visAnnullerede,
     erSagerHentet
-  } = state;
+  } = sagerState;
+
+  const { statusser } = lookupState;
 
   const [visForm, setVisForm] = useState<boolean>(false);
   const [sagTilRedigering, setSagTilRedigering] = useState<Sag | null>(null);
@@ -44,6 +48,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const [creatingActivitiesForSagId, setCreatingActivitiesForSagId] = useState<number | null>(null);
   const [creatingDocumentsForSagId, setCreatingDocumentsForSagId] = useState<number | null>(null);
   const [modalInfo, setModalInfo] = useState<{ isOpen: boolean; title: string; message: ReactNode }>({ isOpen: false, title: '', message: null });
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
   const tableRef = useRef<HTMLTableElement>(null);
   useTableNavigation(tableRef);
@@ -51,49 +56,36 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const debouncedFilter = useDebounce(filter, 300);
 
   const hentData = useCallback(async () => {
-    if (erSagerHentet && statusser.length > 0) return;
-
-    dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: true, sagsoversigtError: null } });
-    try {
-      let sagerData = null;
-      let statusData = null;
-
-      if (!erSagerHentet && statusser.length === 0) {
-        [sagerData, statusData] = await Promise.all([
-          api.get<any>('/sager/'),
-          api.get<any>('/kerne/status/?formaal=1')
-        ]);
-      } else if (!erSagerHentet) {
-        sagerData = await api.get<any>('/sager/');
-      } else if (statusser.length === 0) {
-        statusData = await api.get<any>('/kerne/status/?formaal=1');
-      }
-
-      if (sagerData) {
-        const sagsliste: Sag[] = Array.isArray(sagerData.results) ? sagerData.results : Array.isArray(sagerData) ? sagerData : [];
-        dispatch({ type: 'SET_SAGER_STATE', payload: { sager: sagsliste, erSagerHentet: true } });
-      }
-
-      if (statusData) {
-        const statusliste: Status[] = Array.isArray(statusData.results) ? statusData.results : Array.isArray(statusData) ? statusData : [];
-        dispatch({ type: 'SET_STATUSSER', payload: statusliste });
-      }
-
-    } catch (e: any) {
-      dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtError: `Kunne ikke hente data.\nSikr at backend-serveren kører.` } });
-      console.error("Fejl ved hentning:", e);
-    } finally {
-      dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: false } });
+    // Hvis vi allerede har data, viser vi kun en lille "Updating" indikator
+    if (sager.length > 0) {
+      setIsUpdating(true);
+    } else {
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: true, sagsoversigtError: null } });
     }
-  }, [dispatch, erSagerHentet, statusser.length]);
 
-  useEffect(() => { hentData(); }, [hentData]);
+    try {
+      const sagsliste = await SagService.getSager();
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sager: sagsliste, erSagerHentet: true } });
+    } catch (e: any) {
+      if (sager.length === 0) {
+        sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtError: `Kunne ikke hente sager.\nSikr at backend-serveren kører.` } });
+      }
+      console.error("Fejl ved hentning af sager:", e);
+    } finally {
+      setIsUpdating(false);
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtIsLoading: false } });
+    }
+  }, [sagDispatch, sager.length]);
+
+  useEffect(() => {
+    hentData();
+  }, [hentData]);
 
   const handleStatusSave = async (sagId: number, nyStatusId: string) => {
     try {
-      const opdateretSag = await api.patch<Sag>(`/sager/${sagId}/`, { status_id: nyStatusId });
+      const opdateretSag = await SagService.updateSag(sagId, { status_id: nyStatusId });
       const opdateredeSager = sager.map(sag => (sag.id === sagId ? opdateretSag : sag));
-      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
     } catch (error) {
       console.error("Fejl ved opdatering af status:", error);
     }
@@ -102,10 +94,10 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const handleOpretAktiviteter = async (sagId: number) => {
     setCreatingActivitiesForSagId(sagId);
     try {
-      await api.post(`/sager/${sagId}/opret_aktiviteter/`, {});
-      const opdateretSag = await api.get<Sag>(`/sager/${sagId}/`);
+      await SagService.opretAktiviteter(sagId);
+      const opdateretSag = await SagService.getSag(sagId);
       const opdateredeSager = sager.map(s => s.id === sagId ? opdateretSag : s);
-      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
 
       setModalInfo({
         isOpen: true,
@@ -128,10 +120,10 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const handleOpretDokumenter = async (sagId: number) => {
     setCreatingDocumentsForSagId(sagId);
     try {
-      await api.post(`/sager/${sagId}/synkroniser_dokumenter/`, {});
-      const opdateretSag = await api.get<Sag>(`/sager/${sagId}/`);
+      await SagService.synkroniserDokumenter(sagId);
+      const opdateretSag = await SagService.getSag(sagId);
       const opdateredeSager = sager.map(s => s.id === sagId ? opdateretSag : s);
-      dispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
+      sagDispatch({ type: 'SET_SAGER_STATE', payload: { sager: opdateredeSager } });
 
       setModalInfo({
         isOpen: true,
@@ -193,24 +185,24 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   // Sync den filtrerede liste af ID'er til global state
   useEffect(() => {
     const ids = sorteredeOgFiltreredeSager.map(s => s.id);
-    dispatch({ type: 'SET_SAGS_ID_LISTE', payload: ids });
-  }, [sorteredeOgFiltreredeSager, dispatch]);
+    sagDispatch({ type: 'SET_SAGS_ID_LISTE', payload: ids });
+  }, [sorteredeOgFiltreredeSager, sagDispatch]);
 
   const requestSort = (key: SortKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
-    dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtSortConfig: { key, direction } } });
+    sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtSortConfig: { key, direction } } });
   };
 
   const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtFilters: { ...filter, [name]: value } } });
+    sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtFilters: { ...filter, [name]: value } } });
   };
 
   const handleNulstilFiltre = () => {
-    dispatch({
+    sagDispatch({
       type: 'SET_SAGER_STATE',
       payload: {
         sagsoversigtFilters: { sags_nr: '', alias: '', hovedansvarlige: '', adresse: '', status: '' },
@@ -226,7 +218,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const handleRaekkeKlik = (sagId: number) => { setUdfoldetSagId(udfoldetSagId === sagId ? null : sagId); };
 
   const handleSaveSag = () => {
-    dispatch({ type: 'SET_SAGER_STATE', payload: { erSagerHentet: false } });
+    sagDispatch({ type: 'SET_SAGER_STATE', payload: { erSagerHentet: false } });
     setVisForm(false);
     setSagTilRedigering(null);
   };
@@ -259,7 +251,15 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
       </Modal>
 
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2>
+          {isUpdating && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100 animate-pulse">
+              <Loader2 size={14} className="animate-spin" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">Opdaterer...</span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <HelpButton helpPointCode="SAGSOVERSIGT_HELP" />
           <button onClick={handleOpretNySag} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700" title="Opret Ny Sag">
@@ -281,8 +281,8 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
           <button onClick={handleNulstilFiltre} className="p-2 text-gray-600 rounded-full hover:bg-gray-200" title="Nulstil Alle Filtre"><FunnelX size={18} /></button>
         </div>
         {visFlereFiltre && (<div className="mt-4 pt-4 border-t border-gray-200"><div className="flex flex-wrap items-center gap-4 text-sm">
-          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visLukkede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisLukkede: !visLukkede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis lukkede</span></label>
-          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visAnnullerede} onChange={() => dispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisAnnullerede: !visAnnullerede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis annullerede</span></label></div></div>)}
+          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visLukkede} onChange={() => sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisLukkede: !visLukkede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis lukkede</span></label>
+          <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={visAnnullerede} onChange={() => sagDispatch({ type: 'SET_SAGER_STATE', payload: { sagsoversigtVisAnnullerede: !visAnnullerede } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>Vis annullerede</span></label></div></div>)}
       </div>
 
       <div className="overflow-x-auto rounded-lg shadow-md">
@@ -298,7 +298,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
             </tr>
           </thead>
           <tbody className="text-gray-700 text-xs">
-            {isLoading
+            {isLoading && sorteredeOgFiltreredeSager.length === 0
               ? (<tr><td colSpan={6} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>)
               : sorteredeOgFiltreredeSager.length === 0
                 ? (<tr><td colSpan={6} className="text-center py-4">Ingen sager fundet.</td></tr>)
@@ -316,7 +316,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
                     onOpretAktiviteter={handleOpretAktiviteter}
                     onOpretDokumenter={handleOpretDokumenter}
                     navigateTo={navigateTo}
-                    dispatch={dispatch}
+                    dispatch={sagDispatch}
                   />
                 )))}
           </tbody>

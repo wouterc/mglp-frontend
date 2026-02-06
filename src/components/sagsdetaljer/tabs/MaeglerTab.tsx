@@ -3,8 +3,9 @@
 // @# 2025-11-23 11:30 - Opdateret layout: Ikoner altid synlige, Hus-ikon kopierer, Rediger-knapper tilføjet.
 import React, { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { Building2, Phone, Mail, Home, User, Check, Copy, Loader2, Edit, Save } from 'lucide-react';
-import { api } from '../../../api';
 import { Sag, Virksomhed, Kontakt } from '../../../types';
+import { SagService } from '../../../services/SagService';
+import { api } from '../../../api'; // Stadig brugt til hentning af mæglere/kontakter
 import useDebounce from '../../../hooks/useDebounce';
 import VirksomhedForm from '../../VirksomhedForm';
 import KontaktForm from '../../KontaktForm';
@@ -82,7 +83,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, opdatering);
+            await SagService.updateSag(sag.id, opdatering);
             onUpdate();
         } catch (e) {
             console.error(e);
@@ -94,7 +95,7 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
     const saveSagsNr = async (value: string) => {
         setIsSavingSagsNr(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, { maegler_sagsnr: value });
+            await SagService.updateSag(sag.id, { maegler_sagsnr: value });
             onUpdate();
         } catch (e) {
             console.error(e);

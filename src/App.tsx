@@ -38,34 +38,16 @@ import KommunikationPage from './pages/KommunikationPage';
 import VidensbankPage from './pages/VidensbankPage';
 import OpgaverPage from './pages/OpgaverPage';
 import { useAppState, StateContext } from './StateContext';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { state, dispatch } = useAppState();
-  const { initialVirksomhedFilters, initialKontaktFilters } = useContext(StateContext);
-  const { valgtSag, currentUser } = state; // @# Hent currentUser
+  const { state, dispatch, initialVirksomhedFilters, initialKontaktFilters } = useAppState();
+  const { logout } = useAuth();
+  const { valgtSag, currentUser } = state;
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  // @# 2025-11-23 20:00 - Hent bruger ved start
-  useEffect(() => {
-    if (!currentUser) {
-      const fetchMe = async () => {
-        try {
-          const user = await api.get<any>('/kerne/me/');
-          dispatch({ type: 'SET_CURRENT_USER', payload: user });
-        } catch (e: any) {
-          if (e.status !== 403) {
-            console.error("Kunne ikke hente brugerinfo:", e);
-          }
-        } finally {
-          dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
-        }
-      };
-      fetchMe();
-    }
-  }, [currentUser, dispatch]);
 
   // Auto-naviger til Kommunikation i PWA/Standalone mode ELLER på mobil hvis vi er på roden
   useEffect(() => {
@@ -82,14 +64,7 @@ function App() {
   };
 
   const performLogout = async () => {
-    try {
-      await api.post('/kerne/logout/');
-    } catch (e) {
-      console.error("Logout fejl:", e);
-    }
-    dispatch({ type: 'SET_CURRENT_USER', payload: null });
-    // Reload to clear valid session cookie/state completely
-    window.location.href = '/login';
+    await logout(); // Kald den centrale logout
   };
 
   const navigateTo = (side: string, context: any) => {
@@ -131,8 +106,8 @@ function App() {
 
   const aktivSideForLayout = location.pathname.substring(1) || 'sagsoversigt';
 
-  // @# Auth Guard
-  if (state.isAuthChecking) {
+  // @# Auth & Init Guard - Vent på både auth og grunddata for at fjerne flimmer
+  if (state.isAuthChecking || state.lookupsIsLoading) {
     return <div className="flex items-center justify-center h-screen bg-gray-100 text-gray-500">Indlæser system...</div>;
   }
 

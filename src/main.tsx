@@ -5,14 +5,17 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { StateProvider } from './StateContext.tsx';
+import { AppProviders } from './contexts/AppProviders';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <StateProvider>
-        <App />
-      </StateProvider>
+      <AppProviders>
+        <StateProvider>
+          <App />
+        </StateProvider>
+      </AppProviders>
     </BrowserRouter>
   </React.StrictMode>,
 );

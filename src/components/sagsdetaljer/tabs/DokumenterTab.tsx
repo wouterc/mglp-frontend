@@ -219,7 +219,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Upload fejl:", e);
-            alert("Kunne ikke uploade filen.");
+            setFeedbackModal({
+                title: "Fejl ved upload",
+                message: "Kunne ikke uploade filen. Prøv venligst igen.",
+                type: 'error'
+            });
             throw e;
         }
     };
@@ -230,7 +234,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Slet fejl:", e);
-            alert("Kunne ikke slette filen.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke slette filen.",
+                type: 'error'
+            });
         }
     };
 
@@ -240,7 +248,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             await fetchDokumenter(true);
         } catch (e: any) {
             console.error("Link fejl:", e);
-            alert("Kunne ikke linke filen: " + (e.response?.data?.message || e.message));
+            setFeedbackModal({
+                title: "Fejl ved linkning",
+                message: "Kunne ikke linke filen: " + (e.response?.data?.message || e.message),
+                type: 'error'
+            });
         }
     };
 
@@ -275,7 +287,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             setEditingDoc(null);
         } catch (e) {
             console.error("Fejl ved gemning af kommentar", e);
-            alert("Kunne ikke gemme kommentar.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke gemme kommentar.",
+                type: 'error'
+            });
         } finally {
             setIsSavingComment(false);
         }
@@ -322,7 +338,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             setRenamingDoc(null);
         } catch (e) {
             console.error("Fejl ved omdøbning", e);
-            alert("Kunne ikke omdøbe fil.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke omdøbe fil.",
+                type: 'error'
+            });
         } finally {
             setIsRenaming(false);
         }
@@ -376,9 +396,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             await fetchDokumenter(true);
         } catch (e: any) {
             console.error("Fejl ved hurtig-tilføj:", e);
-            // Helper to try and show API error data if available
             const errorMsg = e.response?.data ? JSON.stringify(e.response.data) : (e.message || "Ukendt fejl");
-            alert("Fejl ved hurtig-tilføj: " + errorMsg);
+            setFeedbackModal({
+                title: "Fejl ved tilføjelse",
+                message: "Kunne ikke oprette dokumentrækken: " + errorMsg,
+                type: 'error'
+            });
         } finally {
             setIsSavingNy((prev: any) => ({ ...prev, [gruppeId]: false }));
         }
@@ -465,7 +488,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             fetchDokumenter(true);
         } catch (e) {
             console.error("Fejl ved kopiering af dokument:", e);
-            alert("Kunne ikke kopiere dokumentet.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke kopiere dokumentet.",
+                type: 'error'
+            });
         }
     };
 
@@ -491,7 +518,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             setDeleteConfirmDoc(null);
         } catch (e) {
             console.error("Fejl ved sletning af dokumentrække:", e);
-            alert("Kunne ikke slette dokumentrækken.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke slette dokumentrækken.",
+                type: 'error'
+            });
         }
     };
 
@@ -511,7 +542,11 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
             setRenamingTitleDoc(null);
         } catch (e) {
             console.error("Fejl ved omdøbning af titel:", e);
-            alert("Kunne ikke omdøbe dokumentet.");
+            setFeedbackModal({
+                title: "Fejl",
+                message: "Kunne ikke omdøbe dokumentet.",
+                type: 'error'
+            });
         } finally {
             setIsRenamingTitle(false);
         }

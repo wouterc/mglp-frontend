@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Check } from 'lucide-react';
-import { api } from '../../api';
+import { SagService } from '../../services/SagService';
 
 export interface SearchResult {
     id: number;
@@ -32,7 +32,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
             if (label) {
                 setSelectedCaseLabel(label);
             } else {
-                api.get<any>(`/sager/${value}/`).then(res => {
+                SagService.getSag(value).then(res => {
                     setSelectedCaseLabel(`${res.sags_nr}${res.alias ? ' - ' + res.alias : ''}`);
                 }).catch(() => {
                     setSelectedCaseLabel(`Sag #${value}`);
@@ -52,7 +52,7 @@ export default function CaseSelector({ value, onChange, placeholder = "Søg efte
             }
             setLoading(true);
             try {
-                const data = await api.get<SearchResult[]>(`/sager/search/?q=${searchTerm}`);
+                const data = await SagService.searchSager(searchTerm);
                 setResults(data);
                 setIsOpen(true);
                 setActiveIndex(data.length > 0 ? 0 : -1);

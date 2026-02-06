@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../../StateContext';
 import { Sag, Blokinfo } from '../../../types';
-import { api } from '../../../api';
+import { SagService } from '../../../services/SagService';
 import { Check, Loader2, Save } from 'lucide-react';
 
 interface ProcesserTabProps {
@@ -37,7 +37,7 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
         setIsSaving(true);
         setMessage(null);
         try {
-            await api.patch(`/sager/${sag.id}/`, {
+            await SagService.updateSag(sag.id, {
                 valgte_processer_ids: valgteIds
             });
             setMessage({ type: 'success', text: 'Processer gemt korrekt.' });
@@ -64,8 +64,8 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                     onClick={handleSave}
                     disabled={isSaving || !isChanged}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${isChanged
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         }`}
                 >
                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
@@ -88,8 +88,8 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                             key={proces.id}
                             onClick={() => toggleProces(proces.id)}
                             className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border-2 transition-all ${isSelected
-                                    ? 'border-blue-500 bg-blue-50 shadow-sm'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
                                 }`}
                         >
                             <div className="flex flex-col">
@@ -102,8 +102,8 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                             </div>
 
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${isSelected
-                                    ? 'bg-blue-600 border-blue-600 text-white'
-                                    : 'bg-white border-gray-300 text-transparent'
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-white border-gray-300 text-transparent'
                                 }`}>
                                 <Check size={14} strokeWidth={4} />
                             </div>

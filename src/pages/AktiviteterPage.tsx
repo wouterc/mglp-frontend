@@ -7,7 +7,10 @@ import React, { useState, useEffect, useCallback, Fragment, ReactElement, useRef
 import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail, MoreVertical, Copy, Edit3, Trash2, CheckCircle2 } from 'lucide-react';
-import { useAppState } from '../StateContext';
+import { useSager } from '../contexts/SagContext';
+import { useLookups } from '../contexts/LookupContext';
+import { useAktivitetDokument } from '../contexts/AktivitetDokumentContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { Status, Aktivitet, Sag, AktivitetGruppeSummary, AktiviteterFilterState, User, InformationsKilde } from '../types';
 import SagsAktivitetForm from '../components/SagsAktivitetForm';
 import Tooltip from '../components/Tooltip';
@@ -30,9 +33,37 @@ interface AktiviteterPageProps {
 
 // --- Hovedkomponent ---
 function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
-    const { state, dispatch } = useAppState();
+    const { state: adState, dispatch: adDispatch } = useAktivitetDokument();
+    const { state: lookupState } = useLookups();
+    const { state: sagState, dispatch: sagDispatch } = useSager();
+    const { dispatch: authDispatch } = useAuth();
     const location = useLocation();
-    const { valgtSag, hentedeAktiviteter, gruppeLoadingStatus, aktiviteterIsLoading, aktiviteterFilters, aktiviteterUdvidedeGrupper, cachedAktiviteter, users: colleagues, aktivitetStatusser, informationsKilder } = state;
+
+    // --- SMART SHIMS for legacy compatibility & extreme performance ---
+    const dispatch = adDispatch;
+    const state = useMemo(() => ({
+        ...adState,
+        ...lookupState,
+        valgtSag: sagState.valgtSag,
+        isAuthChecking: false
+    }), [adState, lookupState, sagState.valgtSag]) as any;
+
+    const {
+        hentedeAktiviteter,
+        gruppeLoadingStatus,
+        aktiviteterIsLoading,
+        aktiviteterFilters,
+        aktiviteterUdvidedeGrupper,
+        cachedAktiviteter
+    } = adState;
+
+    const {
+        users: colleagues,
+        aktivitetStatusser,
+        informationsKilder
+    } = lookupState;
+
+    const { valgtSag } = sagState;
 
     // UI State
     const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState<Aktivitet | null>(null);
@@ -123,8 +154,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         // 2. Save to backend in background
         api.patch<User>('/kerne/me/', { preferred_link_open_mode: mode })
             .then(updatedUser => {
-                // Update global state
-                dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
+                authDispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
             })
             .catch(e => {
                 console.error("Kunne ikke gemme præference", e);
@@ -136,7 +166,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     useTableNavigation(tableRef);
 
     // --- Local State for DATA ---
-    const [allActivities, setAllActivities] = useState<Aktivitet[]>([]);
     const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
 
@@ -156,58 +185,50 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         setFeedbackModal({ isOpen: true, title, message, type: 'info' });
     };
 
-    // --- Hent ALT data ved sags-skift ---
+    // --- Hent oversigter ved sags-skift ---
     useEffect(() => {
-        if (!valgtSag) {
-            setAllActivities([]);
-            return;
+        if (!valgtSag) return;
+        fetchAktiviteterData(valgtSag.id);
+    }, [valgtSag?.id, adDispatch]);
+
+    const fetchAktiviteterData = async (sagId: number) => {
+        const hasData = !!state.aktivitetsGrupper[sagId] && !!state.cachedAktiviteter[sagId];
+
+        if (!hasData) {
+            adDispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
         }
-
-        // 1. Sæt data fra cache med det samme hvis det findes
-        if (cachedAktiviteter[valgtSag.id]) {
-            setAllActivities(cachedAktiviteter[valgtSag.id]);
-        } else {
-            setAllActivities([]); // Ryd hvis ingen cache
-        }
-
-        // 2. Hent i baggrunden hvis vi har cache, ellers vis loader
-        fetchAktiviteterPåSag(valgtSag.id);
-    }, [valgtSag?.id, dispatch]); // @# Kun reager på sags-ID ændring
-
-    const fetchAktiviteterPåSag = async (sagId: number) => {
-        const hasCachedData = !!cachedAktiviteter[sagId];
-
-        // Kun vis "Hoved-loading" hvis vi slet ikke har data
-        if (!hasCachedData) {
-            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true, aktiviteterError: null } });
-        }
-
-        // isFetchingAll styrer den lille spinner i headeren
         setIsFetchingAll(true);
 
         try {
-            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${sagId}`);
-            setAllActivities(data);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: sagId, aktiviteter: data } });
+            // 1. Hent oversigter (summaries) - for rækkefølge og gruppe-info
+            const summaries = await api.get<AktivitetGruppeSummary[]>(`/aktiviteter/?sag=${sagId}`);
+            adDispatch({ type: 'SET_SAG_GRUPPE_SUMMARIES', payload: { sagId, summaries } });
 
+            // 2. Hent ALLE aktiviteter på én gang (Optimeret backend-kald)
+            const allResp = await api.get<any>(`/aktiviteter/all/?sag=${sagId}`);
+            const allAktiviteter = allResp.results || allResp;
+
+            // Gem i cache
+            adDispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId, aktiviteter: allAktiviteter } });
+
+            // 3. Tjek for nye skabeloner
             const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
             setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
         } catch (e: any) {
-            if (!hasCachedData) {
-                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
+            if (!hasData) {
+                adDispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterError: e.message } });
             }
-            console.error("Fejl ved hentning af aktiviteter:", e);
         } finally {
             setIsFetchingAll(false);
-            dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
+            adDispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
         }
     };
 
     const handleSelectSag = async (sagId: number) => {
         try {
             const fuldSag = await api.get<Sag>(`/sager/${sagId}/`);
-            dispatch({ type: 'NULSTIL_HENTEDE_AKTIVITETER' });
-            dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
+            adDispatch({ type: 'NULSTIL_HENTEDE_AKTIVITETER' });
+            sagDispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
         } catch (e: any) { console.error(e.message); }
     };
 
@@ -217,8 +238,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (!navn || !valgtSag) return;
 
         // Calculate next number (100+ strategy)
-        const existingInGroup = allActivities.filter(a => a.gruppe?.id === gruppeId && a.proces?.id === procesId);
-        const maxNr = existingInGroup.length > 0 ? Math.max(...existingInGroup.map(a => a.aktivitet_nr || 0)) : 0;
+        const allCached = valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : [];
+        const groupActivities = allCached.filter((a: Aktivitet) => a.gruppe?.id === gruppeId);
+        const maxNr = groupActivities.length > 0 ? Math.max(...groupActivities.map((a: Aktivitet) => a.aktivitet_nr || 0)) : 0;
         const nextNr = maxNr < 100 ? 101 : maxNr + 1;
 
         setIsSavingNy(prev => ({ ...prev, [gruppeId]: true }));
@@ -232,10 +254,10 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 aktiv: true
             });
             setQuickAddValues(prev => ({ ...prev, [gruppeId]: '' }));
-            // Genhent data
-            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
-            setAllActivities(data);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
+
+            // Opdater data
+            fetchAktiviteterData(valgtSag.id);
+
         } catch (e: any) {
             showAlert('Systemet siger', "Fejl ved hurtig-tilføj: " + (e.message || "Ukendt fejl"));
         } finally {
@@ -243,27 +265,29 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
     };
 
-    const handleGemTilSkabelon = useCallback((aktivitet: Aktivitet) => {
+    const handleGemTilSkabelon = (aktivitet: Aktivitet) => {
         setConfirmTemplateActivity(aktivitet);
-    }, []);
+    };
 
     const handleCopyAktivitet = async (sourceAktivitet: Aktivitet) => {
         if (!valgtSag) return;
 
+        const gruppeId = sourceAktivitet.gruppe?.id;
+        if (!gruppeId) return;
+
+        const allCached = valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : [];
+        const groupActivities = allCached.filter((a: Aktivitet) => a.gruppe?.id === gruppeId);
+
         // 1. Navne logik: Find base navn og tilføj nummer
         const currentNavn = sourceAktivitet.aktivitet || "Ny aktivitet";
         const baseNavn = currentNavn.replace(/ - \d+$/, '');
-        const groupAktiviteter = allActivities.filter(a =>
-            (a.proces?.id || a.gruppe?.proces_id) === (sourceAktivitet.proces?.id || sourceAktivitet.gruppe?.proces_id) &&
-            a.gruppe?.id === sourceAktivitet.gruppe?.id
-        );
 
-        const relatedNames = groupAktiviteter
-            .map(a => a.aktivitet)
-            .filter((t): t is string => !!t && (t === baseNavn || t.startsWith(baseNavn + " - ")));
+        const relatedNames = groupActivities
+            .map((a: Aktivitet) => a.aktivitet)
+            .filter((t: string | undefined): t is string => !!t && (t === baseNavn || t.startsWith(baseNavn + " - ")));
 
         let maxSuffix = 1;
-        relatedNames.forEach(t => {
+        relatedNames.forEach((t: string) => {
             const m = t.match(/ - (\d+)$/);
             if (m) {
                 const s = parseInt(m[1]);
@@ -275,14 +299,14 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const newNavn = `${baseNavn} - ${nextSuffix}`;
 
         // 2. Nummer logik: 100+ strategien
-        const maxNr = Math.max(0, ...groupAktiviteter.map(a => a.aktivitet_nr || 0));
+        const maxNr = Math.max(0, ...groupActivities.map((a: Aktivitet) => a.aktivitet_nr || 0));
         const nextNr = maxNr < 100 ? 101 : maxNr + 1;
 
         // 3. Gem via API
         try {
-            const response = await api.post<Aktivitet>('/aktiviteter/', {
+            await api.post<Aktivitet>('/aktiviteter/', {
                 sag_id: valgtSag.id,
-                gruppe_id: sourceAktivitet.gruppe?.id,
+                gruppe_id: gruppeId,
                 proces_id: sourceAktivitet.proces?.id || sourceAktivitet.gruppe?.proces_id,
                 aktivitet_nr: nextNr,
                 aktivitet: newNavn,
@@ -293,10 +317,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             setCopyNotify({ message: `Linjen er kopieret til ${newNavn} - nr. ${nextNr}` });
             setTimeout(() => setCopyNotify(null), 3000);
 
-            // Opdater cache & state
-            const updated = [...allActivities, response];
-            setAllActivities(updated);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+            fetchAktiviteterData(valgtSag.id);
 
         } catch (e: any) {
             console.error("Fejl ved kopiering:", e);
@@ -311,11 +332,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const performDeleteAktivitet = async () => {
         if (!deleteConfirmAktivitet || !valgtSag) return;
         const id = deleteConfirmAktivitet.id;
+        const gruppeId = deleteConfirmAktivitet.gruppe?.id;
         try {
             await api.delete(`/aktiviteter/${id}/`);
-            const updated = allActivities.filter(a => a.id !== id);
-            setAllActivities(updated);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+            if (gruppeId) {
+                fetchAktiviteterData(valgtSag.id);
+            }
             setCopyNotify({ message: "Aktiviteten er slettet." });
             setTimeout(() => setCopyNotify(null), 3000);
             setDeleteConfirmAktivitet(null);
@@ -326,13 +348,14 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     };
 
     const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
+        if (!valgtSag) return;
         try {
             const updatedAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitetId}/`, { dokumenter: documentIds });
 
-            // Update local state
-            const updated = allActivities.map(a => a.id === updatedAktivitet.id ? updatedAktivitet : a);
-            setAllActivities(updated);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag!.id, aktiviteter: updated } });
+            const gId = updatedAktivitet.gruppe?.id;
+            if (gId) {
+                fetchAktiviteterData(valgtSag.id);
+            }
 
             // Update the modal's active aktivitet if it's the one we just saved
             if (linkModalAktivitet?.id === aktivitetId) {
@@ -349,9 +372,10 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         setIsRenamingAktivitet(true);
         try {
             const updatedDoc = await api.patch<Aktivitet>(`/aktiviteter/${renamingAktivitet.id}/`, { aktivitet: editAktivitetNavn });
-            const updated = allActivities.map(a => a.id === updatedDoc.id ? updatedDoc : a);
-            setAllActivities(updated);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: updated } });
+            const gId = updatedDoc.gruppe?.id;
+            if (gId) {
+                fetchAktiviteterData(valgtSag.id);
+            }
             setRenamingAktivitet(null);
         } catch (e) {
             console.error("Fejl ved omdøbning:", e);
@@ -367,20 +391,16 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     };
 
     const performGemTilSkabelon = async () => {
-        if (!confirmTemplateActivity) return;
+        if (!confirmTemplateActivity || !valgtSag) return;
 
         try {
             const response = await api.post<{ ny_aktivitet_nr: number }>(`/aktiviteter/${confirmTemplateActivity.id}/gem_til_skabelon/`);
+            const gruppeId = confirmTemplateActivity.gruppe?.id;
 
-            // Opdater lokal state med nyt nummer og fjern 'ny' status
-            const updated = allActivities.map(a =>
-                a.id === confirmTemplateActivity.id
-                    ? { ...a, er_ny: false, aktivitet_nr: response.ny_aktivitet_nr }
-                    : a
-            );
+            if (gruppeId) {
+                fetchAktiviteterData(valgtSag.id);
+            }
 
-            setAllActivities(updated);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag!.id, aktiviteter: updated } });
             setNyeAktiviteterFindes(true);
 
             setFeedbackModal({
@@ -403,128 +423,84 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
     // --- LOKAL FILTRERING OG GRUPPERING ---
     const { filteredGroups, groupedActivities, samletTaeling } = useMemo(() => {
-        if (!allActivities.length) return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
+        const summaries = valgtSag ? state.aktivitetsGrupper[valgtSag.id] || [] : [];
+        if (!summaries.length) return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
 
         const filters = aktiviteterFilters;
         const lowerAkt = filters.aktivitet.toLowerCase();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const dayOfWeek = today.getDay();
-        let maxOrangeDiff = 1;
-        if (dayOfWeek === 5) maxOrangeDiff = 3;
-        else if (dayOfWeek === 6) maxOrangeDiff = 2;
 
         const groupsMap: Record<string, any> = {};
+        const actMap: Record<string, Aktivitet[]> = {};
         let samletTotal = 0;
         let samletFaerdige = 0;
 
-        // One-pass filtering and grouping
-        const valgteProcesIds = valgtSag?.valgte_processer?.map(p => p.id) || [];
+        const allCached = valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : [];
+        for (const summary of summaries) {
+            const procesId = summary.proces.id;
 
-        for (const a of allActivities) {
-            if (!a.gruppe) continue;
+            const key = `${procesId}-${summary.gruppe.id}`;
+            const groupActivities = allCached.filter((a: Aktivitet) => a.gruppe?.id === summary.gruppe.id && a.proces?.id === procesId);
 
-            // Determine process ID.
-            // Prefer a.proces.id if present, otherwise look at a.gruppe.proces_id
-            const aProcesId = a.proces?.id || a.gruppe?.proces_id;
+            const g = {
+                proces: summary.proces,
+                gruppe: summary.gruppe,
+                filteredAktiviteter: [] as Aktivitet[],
+                total_aktiv_count: summary.total_aktiv_count,
+                total_faerdig_count: summary.total_faerdig_count,
+                filtered_aktiv_count: 0,
+                filtered_faerdig_count: 0
+            };
 
-            if (!aProcesId || !valgteProcesIds.includes(aProcesId)) continue;
+            samletTotal += summary.total_aktiv_count;
+            samletFaerdige += summary.total_faerdig_count;
 
-            const key = `${aProcesId}-${a.gruppe.id}`;
-            if (!groupsMap[key]) {
-                groupsMap[key] = {
-                    proces: a.proces || { id: a.gruppe.proces_id, titel_kort: "Ukendt proces" }, // Fallback for UI
-                    gruppe: a.gruppe,
-                    filteredAktiviteter: [],
-                    total_aktiv_count: 0,
-                    total_faerdig_count: 0,
-                    filtered_aktiv_count: 0,
-                    filtered_faerdig_count: 0
-                };
-            }
-
-            const g = groupsMap[key];
-
-            // Counts for the summary (regardless of filters, but depends on 'aktiv' flag)
-            if (a.aktiv) {
-                g.total_aktiv_count++;
-                samletTotal++;
-                if (a.status?.status_kategori === 1) {
-                    g.total_faerdig_count++;
-                    samletFaerdige++;
+            for (const a of groupActivities) {
+                // Apply Filters
+                if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
+                if (filters.status) {
+                    if (filters.status === 'ikke-faerdigmeldt') {
+                        if (a.status?.status_kategori === 1) continue;
+                    } else {
+                        if (a.status?.id.toString() !== filters.status.toString()) continue;
+                    }
                 }
-            }
 
-            // Apply Filters
-            if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
-            if (filters.status) {
-                if (filters.status === 'ikke-faerdigmeldt') {
+                if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) continue;
+
+                if (filters.overskredet) {
                     if (a.status?.status_kategori === 1) continue;
-                } else {
-                    if (a.status?.id.toString() !== filters.status.toString()) continue;
+                    const d = a.dato_intern ? new Date(a.dato_intern) : null;
+                    if (!d || d >= today) continue;
+                }
+
+                if (filters.vigtige && !a.kommentar_vigtig) continue;
+
+                g.filteredAktiviteter.push(a);
+                g.filtered_aktiv_count++;
+                if (a.status?.status_kategori === 1) {
+                    g.filtered_faerdig_count++;
                 }
             }
-
-            if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) continue;
-
-            if (filters.dato_intern_efter && (!a.dato_intern || new Date(a.dato_intern) < new Date(filters.dato_intern_efter))) continue;
-            if (filters.dato_intern_foer && (!a.dato_intern || new Date(a.dato_intern) > new Date(filters.dato_intern_foer))) continue;
-
-            if (filters.overskredet) {
-                if (a.status?.status_kategori === 1) continue;
-
-                const isNearOrPast = (dateStr: string | null) => {
-                    if (!dateStr) return false;
-                    const d = new Date(dateStr);
-                    d.setHours(0, 0, 0, 0);
-                    const diff = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                    return diff <= maxOrangeDiff;
-                };
-
-                if (!isNearOrPast(a.dato_intern) && !isNearOrPast(a.dato_ekstern)) continue;
-            }
-
-            if (filters.vigtige && !a.kommentar_vigtig) continue;
-
-            if (filters.informations_kilde && a.informations_kilde?.id.toString() !== filters.informations_kilde.toString()) continue;
-
-            // If we reached here, it's filtered IN
-            // If we reached here, it's filtered IN
-            // @# ID Filtering
-            const searchParams = new URLSearchParams(location.search);
-            const idsParam = searchParams.get('ids');
-            if (idsParam) {
-                const ids = idsParam.split(',').map(Number);
-                if (!ids.includes(a.id)) continue;
-            }
-
-            g.filteredAktiviteter.push(a);
-            g.filtered_aktiv_count++;
-            if (a.status?.status_kategori === 1) {
-                g.filtered_faerdig_count++;
-            }
+            g.filteredAktiviteter.sort((a, b) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
+            actMap[key] = g.filteredAktiviteter;
+            groupsMap[key] = g;
         }
 
-        const processedGroups = Object.values(groupsMap).filter((g: any) =>
-            g.filteredAktiviteter.length > 0
-        ).sort((a: any, b: any) => {
-            if (a.proces.nr !== b.proces.nr) return a.proces.nr - b.proces.nr;
-            return a.gruppe.nr - b.gruppe.nr;
-        });
-
-        const actMap: Record<string, Aktivitet[]> = {};
-        processedGroups.forEach((g: any) => {
-            g.filteredAktiviteter.sort((a: Aktivitet, b: Aktivitet) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
-            actMap[`${g.proces.id}-${g.gruppe.id}`] = g.filteredAktiviteter;
-        });
+        const sortedGroups = Object.values(groupsMap)
+            .filter((g: any) => !lowerAkt || g.filtered_aktiv_count > 0)
+            .sort((a: any, b: any) => {
+                if (a.proces.nr !== b.proces.nr) return a.proces.nr - b.proces.nr;
+                return a.gruppe.nr - b.gruppe.nr;
+            });
 
         return {
-            filteredGroups: processedGroups,
+            filteredGroups: sortedGroups,
             groupedActivities: actMap,
             samletTaeling: { total: samletTotal, faerdige: samletFaerdige }
         };
-
-    }, [allActivities, aktiviteterFilters, valgtSag, location.search]);
+    }, [valgtSag, state.aktivitetsGrupper, state.cachedAktiviteter, aktiviteterFilters, location.search]);
 
 
     const handleToggleAlleGrupper = (vis: boolean) => {
@@ -534,38 +510,49 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             acc[gruppeKey] = vis;
             return acc;
         }, {} as { [key: string]: boolean });
-        dispatch({
+
+        adDispatch({
             type: 'SET_AKTIVITETER_STATE',
             payload: { aktiviteterUdvidedeGrupper: { ...aktiviteterUdvidedeGrupper, [valgtSag.id]: alleGruppeKeys } },
         });
     };
 
     const handleToggleGruppe = async (gruppe: any) => {
+        if (!valgtSag) return;
         const gruppeId = gruppe.gruppe.id;
         const gruppeKey = `${gruppe.proces.id}-${gruppeId}`;
-        const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
+        const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag.id]?.[gruppeKey];
+
         const nyUdvidetState = {
-            ...(aktiviteterUdvidedeGrupper[valgtSag!.id] || {}),
+            ...(aktiviteterUdvidedeGrupper[valgtSag.id] || {}),
             [gruppeKey]: !erUdvidet,
         };
-        dispatch({
+
+        adDispatch({
             type: 'SET_AKTIVITETER_STATE',
-            payload: { aktiviteterUdvidedeGrupper: { ...aktiviteterUdvidedeGrupper, [valgtSag!.id]: nyUdvidetState } },
+            payload: { aktiviteterUdvidedeGrupper: { ...aktiviteterUdvidedeGrupper, [valgtSag.id]: nyUdvidetState } },
         });
+
+        // Data is already loaded in one-shot
+        if (!erUdvidet) {
+            // No need to fetch anything here
+        }
     };
 
     const handleInlineSave = useCallback(async (aktivitet: Aktivitet, field: string, value: string | boolean | null) => {
+        if (!valgtSag) return;
         const feltNavn = field === 'status' ? 'status_id' : field;
         const payload = { [feltNavn]: value };
         try {
             const opdateretAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitet.id}/`, payload);
-            setAllActivities(prev => prev.map(a =>
-                a.id === opdateretAktivitet.id ? opdateretAktivitet : a
-            ));
+            const gruppeId = opdateretAktivitet.gruppe?.id;
+            if (gruppeId) {
+                fetchAktiviteterData(valgtSag.id);
+            }
         } catch (e) {
             console.error("Fejl ved inline save:", e);
         }
-    }, [setAllActivities]);
+    }, [valgtSag]);
 
     const handleStatusToggle = useCallback(async (aktivitet: Aktivitet) => {
         const isDone = aktivitet.status?.status_nummer === 80;
@@ -591,21 +578,27 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (!valgtSag) return;
         setIsFetchingAll(true);
         try {
-            const res = await api.post<any>(`/sager/${valgtSag.id}/synkroniser_aktiviteter/`);
-            const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
-            setAllActivities(data);
-            dispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId: valgtSag.id, aktiviteter: data } });
+            await api.post<any>(`/sager/${valgtSag.id}/synkroniser_aktiviteter/`);
+
+            // Genhent data
+            await fetchAktiviteterData(valgtSag.id);
+
             setNyeAktiviteterFindes(false);
 
-            if (res.detaljer) {
-                showAlert('Systemet siger', res.detaljer);
-            } else if (res.tilfoejede && res.tilfoejede.length > 0) {
-                showAlert('Systemet siger', `Synkronisering fuldført! ${res.tilfoejede.length} nye aktiviteter tilføjet:\n\n- ${res.tilfoejede.join('\n- ')}`);
-            } else {
-                showAlert('Systemet siger', "Sagen er allerede fuldt synkroniseret.");
-            }
+            setFeedbackModal({
+                isOpen: true,
+                title: 'Systemet siger',
+                message: 'Aktiviteter er synkroniseret og opdateret.',
+                type: 'success'
+            });
         } catch (e: any) {
-            showAlert('Systemet siger', `Fejl ved synkronisering: ${e.message}`);
+            console.error("Fejl ved synkronisering:", e);
+            setFeedbackModal({
+                isOpen: true,
+                title: 'Systemet siger',
+                message: `Fejl ved synkronisering: ${e.message}`,
+                type: 'error'
+            });
         } finally {
             setIsFetchingAll(false);
         }
@@ -614,16 +607,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const handleFormSave = () => {
         setAktivitetTilRedigering(null);
         if (valgtSag) {
-            const reload = async () => {
-                dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: true } });
-                try {
-                    const data = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${valgtSag.id}`);
-                    setAllActivities(data);
-                } finally {
-                    dispatch({ type: 'SET_AKTIVITETER_STATE', payload: { aktiviteterIsLoading: false } });
-                }
-            };
-            reload();
+            fetchAktiviteterData(valgtSag.id);
         }
     };
 
@@ -716,9 +700,9 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                             </tr>
                         </thead>
                         <tbody>
-                            {aktiviteterIsLoading && allActivities.length === 0 ? (
+                            {aktiviteterIsLoading && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
                                 <tr><td colSpan={10} className="text-center p-4">Henter aktiviteter...</td></tr>
-                            ) : state.aktiviteterError && allActivities.length === 0 ? (
+                            ) : state.aktiviteterError && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
                                 <tr><td colSpan={10} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
                             ) : !valgtSag ? (
                                 <tr><td colSpan={10} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
@@ -906,7 +890,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                 onClose={() => setLinkModalAktivitet(null)}
                 sagId={valgtSag?.id || 0}
                 initialAktivitetId={linkModalAktivitet?.id}
-                aktiviteter={allActivities}
+                aktiviteter={valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : []}
                 dokumenter={sagsDokumenter}
                 onLinkChanges={handleLinkChanges}
             />

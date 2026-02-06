@@ -1,6 +1,7 @@
 // --- Fil: src/pages/DokumenterPage.tsx ---
 import React, { ReactElement, useEffect, useState, useRef } from 'react';
-import { useAppState } from '../StateContext';
+import { useSager } from '../contexts/SagContext';
+import { useAktivitetDokument } from '../contexts/AktivitetDokumentContext';
 import { api } from '../api';
 import { Sag } from '../types';
 import DokumenterTab from '../components/sagsdetaljer/tabs/DokumenterTab';
@@ -14,12 +15,23 @@ interface DokumenterPageProps {
 }
 
 function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
-  const { state, dispatch } = useAppState();
-  const { valgtSag } = state;
+  const { state: sagState, dispatch: sagDispatch } = useSager();
+  const { state: adState, dispatch: adDispatch } = useAktivitetDokument();
+
+  // --- SMART SHIMS for legacy compatibility & extreme performance ---
+  const dispatch = adDispatch;
+  const state = {
+    ...sagState,
+    ...adState,
+    erFilterMenuAaben: false // No longer used here
+  } as any;
+
+  const { valgtSag } = sagState;
   const navigate = useNavigate();
   const location = useLocation();
 
   // @# Resolve effective sagId (prop > URL)
+  // ... remaining logic updated to use sagDispatch for SET_VALGT_SAG ...
   const queryParams = new URLSearchParams(location.search);
   const urlSagId = queryParams.get('sag_id');
   const effectiveSagId = sagId || (urlSagId ? parseInt(urlSagId, 10) : null);
@@ -47,14 +59,7 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const hasToggledRef = useRef(false);
 
   // Luk filter-menuen som standard når siden åbnes
-  useEffect(() => {
-    if (hasToggledRef.current) return;
-
-    if (state.erFilterMenuAaben) {
-      dispatch({ type: 'TOGGLE_FILTER_MENU' });
-      hasToggledRef.current = true;
-    }
-  }, []); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // (Fjernet legacy toggle-logik for at forbedre performance)
 
 
   useEffect(() => {
@@ -69,7 +74,7 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
     setLoading(true);
     api.get<Sag>(`/sager/${effectiveSagId}/`).then(data => {
       setLocalSag(data);
-      dispatch({ type: 'SET_VALGT_SAG', payload: data });
+      sagDispatch({ type: 'SET_VALGT_SAG', payload: data });
       setLoading(false);
     }).catch(err => {
       console.error("Fejl ved hentning af sag i DokumenterPage:", err);
@@ -80,8 +85,8 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const handleSelectSag = async (id: number) => {
     setLoading(true);
     try {
-      const fuldSag = await api.get<Sag>(`/sager/${id}/`);
-      dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
+      const targetSag = await api.get<Sag>(`/sager/${id}/`);
+      sagDispatch({ type: 'SET_VALGT_SAG', payload: targetSag });
 
       // Update URL so navigation/refresh works
       const params = new URLSearchParams(location.search);

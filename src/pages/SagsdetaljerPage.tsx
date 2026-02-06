@@ -4,10 +4,11 @@
 // @# 2025-11-23 14:00 - Tilføjet status-logik (hentning + opdatering) til OverblikTab.
 import React, { useState, useEffect, useCallback, ReactElement } from 'react';
 import { useLocation } from 'react-router-dom';
-import { api } from '../api';
 import { Sag } from '../types';
+import { SagService } from '../services/SagService';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { useAppState } from '../StateContext';
+import { useSager } from '../contexts/SagContext';
+import { useLookups } from '../contexts/LookupContext';
 
 // Layout og Tabs
 import SagsdetaljerLayout, { TabType } from '../components/sagsdetaljer/SagsdetaljerLayout';
@@ -30,11 +31,12 @@ interface SagsdetaljerPageProps {
 
 
 function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactElement {
-    const { state, dispatch } = useAppState();
-    const { sagsStatusser: statusser } = state;
+    const { state: sagState, dispatch: sagDispatch } = useSager();
+    const { state: lookupState } = useLookups();
+    const { sagsStatusser: statusser } = lookupState;
     const location = useLocation();
 
-    const [sag, setSag] = useState<Sag | null>(state.valgtSag && state.valgtSag.id === sagId ? state.valgtSag : null);
+    const [sag, setSag] = useState<Sag | null>(sagState.valgtSag && sagState.valgtSag.id === sagId ? sagState.valgtSag : null);
     const [isLoading, setIsLoading] = useState(!sag && !!sagId);
     const [error, setError] = useState<string | null>(null);
 
@@ -44,9 +46,13 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
     // 1. Hent kun sagens stamdata (Letvægts fetch)
     const fetchSag = useCallback(async (id: number, silent = false) => {
-        // Hvis vi allerede har sagen i global state og id matcher, 
-        // så behøver vi ikke vise den store spinner mens vi re-validerer.
-        const hasLoadedMatch = state.valgtSag && state.valgtSag.id === id;
+        const hasLoadedMatch = sagState.valgtSag && sagState.valgtSag.id === id;
+
+        // Hvis vi har sagen og ikke beder om en tvungen opdatering, så stop her.
+        if (hasLoadedMatch && !silent) {
+            if (!sag) setSag(sagState.valgtSag);
+            return;
+        }
 
         if (!silent && !hasLoadedMatch) {
             setIsLoading(true);
@@ -54,9 +60,9 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
         setError(null);
         try {
-            const data = await api.get<Sag>(`/sager/${id}/`);
+            const data = await SagService.getSag(id);
             setSag(data);
-            dispatch({ type: 'SET_VALGT_SAG', payload: data });
+            sagDispatch({ type: 'SET_VALGT_SAG', payload: data });
         } catch (e: any) {
             if (!hasLoadedMatch) {
                 setError(e.message);
@@ -66,7 +72,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
         } finally {
             setIsLoading(false);
         }
-    }, [dispatch, state.valgtSag]);
+    }, [sagDispatch, sagState.valgtSag, sag]);
 
     // 1b. Sørg for at statusser er indlæst (Lookups håndteres nu i StateContext)
     // Men vi behøver stadig sags-statusser (formaal=1) som måske ikke er dem i global state?
@@ -92,14 +98,36 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
         }
     }, [sagId, location.state]); // Kør når vi skifter sag eller hopper ind med en specifik fane
 
-    // 2. Håndter navigation (Næste/Forrige) fra Layoutet
+    // 2. Håndter navigation (Næste/Forrige/Søgning) fra Layoutet
     const handleNavigateToSag = async (targetId: number) => {
+        // Opdater route via parent
+        navigateTo('sagsdetaljer', null); // "Reset" view (valgfrit) eller direkte kald:
+        // Men SagsdetaljerPage modtager sagId via props (fra App.tsx router state eller URL params).
+        // navigateTo('sagsdetaljer', { id: targetId }); <-- Dette afhænger af hvordan App.tsx håndterer routing.
+
+        // Da vi er i en SPA uden "rigtig" routing parameter i URL'en (baseret på App.tsx logik),
+        // skal vi bede parent om at skifte sagId.
+        // HVIS 'navigateTo' funktionen i App.tsx tager et sags-objekt og udleder ID'et:
+        // Vi behøver ikke hente sagen først, hvis parent gør det.
+        // MEN hvis parent forventer et objekt, så lad os hente den (som vi gør).
+
+        // Problemet kan være at setIsLoading(true) låser visningen, men navigateTo ikke mounter komponenten på ny,
+        // hvis det bare er en prop-opdatering.
+
+        if (targetId === sagId) return; // Allerede på sagen
+
+        setIsLoading(true);
         try {
-            setIsLoading(true);
-            const nySag = await api.get<Sag>(`/sager/${targetId}/`);
+            // Hent den nye sag
+            const nySag = await SagService.getSag(targetId);
+            // Naviger via parent, send hele objektet med
             navigateTo('sagsdetaljer', nySag);
+            // Hvis komponenten ikke unmounter, skal vi manuelt opdatere state:
+            setSag(nySag);
+            setActiveTab('overblik'); // Reset tab eller bevar? Ofte vil man starte forfra på ny sag.
         } catch (e) {
             console.error("Fejl ved sags-navigation:", e);
+        } finally {
             setIsLoading(false);
         }
     };
@@ -135,7 +163,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
         try {
             // 2. Send til serveren i baggrunden
-            const opdateretSag = await api.patch<Sag>(`/sager/${sag.id}/`, { status_id: statusIdInt });
+            const opdateretSag = await SagService.updateSag(sag.id, { status_id: statusIdInt });
             setSag(opdateretSag);
 
         } catch (error) {

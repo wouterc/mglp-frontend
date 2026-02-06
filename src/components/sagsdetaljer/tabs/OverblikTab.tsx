@@ -5,7 +5,7 @@ import {
     User, LifeBuoy, Waves, MapPin, Building, Edit, Copy, Check, Loader2, Save
 } from 'lucide-react';
 import { TabType } from '../SagsdetaljerLayout';
-import { api } from '../../../api';
+import { SagService } from '../../../services/SagService';
 // useDebounce ikke længere i brug
 
 interface OverblikTabProps {
@@ -17,7 +17,7 @@ interface OverblikTabProps {
     onStatusChange: (nyStatusId: string) => void;
     onUpdate: () => void;
 }
-// ... StatusCard uændret ...
+
 interface StatusCardProps {
     label: string;
     icon: any;
@@ -63,10 +63,6 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
     // Tjek om der er ændringer
     const erAendret = localComment !== (sag.kommentar || '');
 
-    // Opdater kun lokal kommentar hvis vi IKKE er i gang med at redigere (eller hvis gemt succesfuldt)
-    // Men her vil vi gerne have at hvis man navigerer væk og tilbage, så resetter den.
-    // Vi bruger en simpel effekt som kun resetter hvis sagen ændrer ID eller hvis vi lige har gemt.
-    // Opdater lokal kommentar hvis sagen ændres udefra (f.eks. via modal eller reload)
     useEffect(() => {
         setLocalComment(sag.kommentar || '');
     }, [sag.kommentar]);
@@ -74,7 +70,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
     const handleSaveComment = async () => {
         setIsSavingComment(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, { kommentar: localComment });
+            await SagService.updateSag(sag.id, { kommentar: localComment });
             onUpdate(); // Opdater parent
         } catch (error) {
             console.error("Fejl ved gemning af kommentar:", error);
@@ -83,7 +79,6 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
         }
     };
 
-    // Handler for select
     const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
         onStatusChange(e.target.value);
     };
