@@ -20,6 +20,7 @@ import RenameFileModal from '../../ui/RenameFileModal';
 interface DokumenterTabProps {
     sag: Sag;
     onUpdate?: () => void;
+    onToolbarUpdate?: (content: React.ReactNode) => void;
 }
 
 interface DokumentFilterState {
@@ -34,7 +35,7 @@ interface DokumentFilterState {
 
 
 
-export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
+export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: DokumenterTabProps) {
     const { state, dispatch } = useAppState();
     const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner, standardMapper } = state;
     const navigate = useNavigate();
@@ -753,17 +754,17 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         return { processedGroups: result, globalStats };
     }, [cachedDocs, filters, masterGroups, sag, location.search]);
 
-    const handleExpandAll = () => {
+    const handleExpandAll = useCallback(() => {
         const allKeys: Record<string, boolean> = {};
         processedGroups.forEach(g => allKeys[g.name] = true);
         setExpandedGroups(allKeys);
-    };
+    }, [processedGroups]);
 
-    const handleCollapseAll = () => {
+    const handleCollapseAll = useCallback(() => {
         const allCollapsed: Record<string, boolean> = {};
         processedGroups.forEach(g => allCollapsed[g.name] = false);
         setExpandedGroups(allCollapsed);
-    };
+    }, [processedGroups]);
 
     if (loading && cachedDocs?.length === 0) {
         return (
@@ -775,54 +776,60 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const hasIdFilter = !!new URLSearchParams(location.search).get('ids');
 
+    // Lift toolbar content up to parent via callback
+    useEffect(() => {
+        if (!onToolbarUpdate) return;
+
+        const content = (
+            <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full mr-2">
+                    Fremgang: {globalStats.completed} / {globalStats.total}
+                </span>
+                <Tooltip content="Fold alle grupper ud">
+                    <button onClick={handleExpandAll} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors border border-transparent hover:border-gray-200">
+                        <ChevronsDown size={14} />
+                        Fold ud
+                    </button>
+                </Tooltip>
+                <Tooltip content="Fold alle grupper sammen">
+                    <button onClick={handleCollapseAll} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors border border-transparent hover:border-gray-200">
+                        <ChevronsUp size={14} />
+                        Fold ind
+                    </button>
+                </Tooltip>
+                <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                {copyNotify && (
+                    <div className="ml-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
+                        <CheckCircle2 size={14} />
+                        {copyNotify.message}
+                    </div>
+                )}
+                {sag && (nyeDokumenterFindes || syncing) && (
+                    <Tooltip content="Nye dokumenter fundet - Klik for at synkronisere">
+                        <button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className={`
+                                p-1.5 rounded-full transition-all border
+                                ${syncing ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
+                            `}
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                    </Tooltip>
+                )}
+            </div>
+        );
+
+        onToolbarUpdate(content);
+    }, [globalStats, copyNotify, nyeDokumenterFindes, syncing, onToolbarUpdate, handleExpandAll, handleCollapseAll]);
+
     return (
-        <div className="flex h-full gap-4">
+        <div className="flex h-full gap-2">
             {/* Main Content Area */}
-            <div className="flex-1 min-w-0 flex flex-col gap-4">
-                <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-4">
-                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
-                                Dokumenter for Sag {sag.sags_nr}
-                                <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                    {globalStats.completed} / {globalStats.total}
-                                </span>
-                            </h2>
-                            <div className="flex items-center gap-1">
-                                <Tooltip content="Fold alle grupper ud">
-                                    <button onClick={handleExpandAll} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
-                                        <ChevronsDown size={18} />
-                                    </button>
-                                </Tooltip>
-                                <Tooltip content="Fold alle grupper sammen">
-                                    <button onClick={handleCollapseAll} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
-                                        <ChevronsUp size={18} />
-                                    </button>
-                                </Tooltip>
-                                <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                                <HelpButton helpPointCode="DOKUMENTER_HELP" />
-                                {copyNotify && (
-                                    <div className="ml-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
-                                        <CheckCircle2 size={14} />
-                                        {copyNotify.message}
-                                    </div>
-                                )}
-                                {sag && (nyeDokumenterFindes || syncing) && (
-                                    <Tooltip content="Nye dokumenter fundet - Klik for at synkronisere">
-                                        <button
-                                            onClick={handleSync}
-                                            disabled={syncing}
-                                            className={`
-                                                p-1.5 rounded-full transition-all border
-                                                ${syncing ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
-                                            `}
-                                        >
-                                            <RefreshCw size={16} />
-                                        </button>
-                                    </Tooltip>
-                                )}
-                            </div>
-                        </div>
 
                         {hasIdFilter && (
                             <button

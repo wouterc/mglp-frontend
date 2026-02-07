@@ -11,8 +11,9 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { api } from '../api';
 import AdresseSøgning from './AdresseSøgning';
 // @# 2025-11-10 19:05 - Importeret globale typer
-import type { Status, BbrAnvendelse, DawaAdresse, Sag } from '../types';
+import type { Status, BbrAnvendelse, DawaAdresse, Sag, User } from '../types';
 import Button from './ui/Button'; // Importer den nye knap
+import SearchableSelect from './ui/SearchableSelect';
 import { SagService } from '../services/SagService';
 import { LookupService } from '../services/LookupService';
 import { useLookups } from '../contexts/LookupContext';
@@ -23,7 +24,7 @@ import { useLookups } from '../contexts/LookupContext';
 type SagTilRedigering = Sag | null;
 
 interface SagsFormProps {
-  onSave: () => void;
+  onSave: (sag?: Sag) => void;
   onCancel: () => void;
   sagTilRedigering: SagTilRedigering;
 }
@@ -99,8 +100,22 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   // const [statusser, setStatusser] = useState<Status[]>([]); // Uses context now
   const [outlookAccounts, setOutlookAccounts] = useState<any[]>([]);
   const [bbrAnvendelser, setBbrAnvendelser] = useState<BbrAnvendelse[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isFetchingDetails, setIsFetchingDetails] = useState<boolean>(false);
   const erRedigering = sagTilRedigering != null;
+
+  const BOLIG_TYPER = [
+    { value: 'Villa', label: 'Villa' },
+    { value: 'Rækkehus', label: 'Rækkehus' },
+    { value: 'Ejerlejlighed', label: 'Ejerlejlighed' },
+    { value: 'Andelsbolig', label: 'Andelsbolig' },
+    { value: 'Landejendom', label: 'Landejendom' },
+    { value: 'Sommerhus', label: 'Sommerhus' },
+    { value: 'Byggegrund', label: 'Byggegrund' },
+    { value: 'Villalejlighed', label: 'Villalejlighed' },
+    { value: 'Ideel anpart', label: 'Ideel anpart' },
+    { value: 'Erhverv', label: 'Erhverv' },
+  ];
 
   // @# 2025-11-10 19:30 - Rettet type-mismatch. Mapper nu eksplicit null -> ''
   useEffect(() => {
@@ -166,7 +181,18 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         console.error('Fejl ved hentning af konti:', error);
       }
     };
+
+    const fetchUsers = async () => {
+      try {
+        const allUsers = await LookupService.getUsers();
+        setUsers(allUsers.filter(u => u.is_active));
+      } catch (error) {
+        console.error('Fejl ved hentning af brugere:', error);
+      }
+    };
+
     fetchAccounts();
+    fetchUsers();
   }, []);
 
   useEffect(() => {
@@ -193,6 +219,13 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   };
 
   const handleAdresseValgt = async (adresse: DawaAdresse) => {
+    const calculatedAlias = [
+      adresse.vejnavn,
+      adresse.husnr,
+      adresse.etage,
+      adresse.dør
+    ].filter(Boolean).join(' ').trim();
+
     setSagsData(prevData => ({
       ...prevData,
       adresse_id_dawa: adresse.id,
@@ -203,6 +236,8 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       adresse_doer: adresse.dør || '',
       adresse_post_nr: adresse.postnr,
       adresse_by: adresse.postnrnavn,
+      // Auto-udfyld alias hvis det er tomt
+      alias: prevData.alias && prevData.alias.trim() !== '' ? prevData.alias : calculatedAlias,
       // Nulstil detaljer, mens vi henter nye
       bolig_bfe: '',
       bolig_matrikel: '',
@@ -256,6 +291,16 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     }
   };
 
+  const constructAliasFromAddress = () => {
+    const parts = [
+      sagsData.adresse_vej,
+      sagsData.adresse_husnr,
+      sagsData.adresse_etage,
+      sagsData.adresse_doer
+    ].filter(Boolean); // Filter out empty strings/nulls
+    return parts.join(' ').trim();
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // @# 2025-11-10 20:10 - Rettet type fra Partial<SagsDataState> til 'any'
@@ -280,22 +325,34 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       delete dataToSave.sags_nr;
     }
 
+    // Auto-fill alias if empty on save
+    if (!dataToSave.alias || dataToSave.alias.trim() === '') {
+      dataToSave.alias = constructAliasFromAddress();
+    }
+
 
 
     try {
+      let gemtSag;
       if (erRedigering) {
-        await SagService.updateSag(dataToSave.id, dataToSave);
+        gemtSag = await SagService.updateSag(dataToSave.id, dataToSave);
       } else {
-        await SagService.createSag(dataToSave);
+        gemtSag = await SagService.createSag(dataToSave);
       }
-      onSave();
+      onSave(gemtSag);
     } catch (error: any) {
       console.error('Error saving case:', error);
       alert(`Fejl ved gemning: ${error.message}`);
     }
   };
 
-  const erFormularGyldig = sagsData.alias && sagsData.hovedansvarlige;
+  // Alias is not required anymore (auto-filled), but Hovedansvarlig is.
+  const erFormularGyldig = !!sagsData.hovedansvarlige;
+
+  const userOptions = users.map(u => ({
+    value: `${u.first_name} ${u.last_name}`.trim() || u.username,
+    label: `${u.first_name} ${u.last_name}`.trim() || u.username
+  }));
 
   return (
     <div className="p-2 sm:p-4 max-w-5xl mx-auto">
@@ -313,111 +370,16 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
-        {/* Generelt Sektion */}
-        <div className="p-3 border rounded-md bg-gray-50/30">
-          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Generelt</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-            {erRedigering && (
-              <div>
-                <label htmlFor="sags_nr" className="block text-xs font-medium text-gray-500">SagsNr</label>
-                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-100 text-sm" />
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="alias" className="block text-xs font-medium text-gray-500">Alias (Påkrævet)</label>
-              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="status_id" className="block text-xs font-medium text-gray-500">Status</label>
-              <select
-                id="status_id"
-                name="status_id"
-                value={sagsData.status_id || ''}
-                onChange={handleChange}
-                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="">Vælg status...</option>
-                {statusser.map(status => (
-                  <option key={status.id} value={status.id}>
-                    {status.status_nummer} - {status.beskrivelse}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="hovedansvarlige" className="block text-xs font-medium text-gray-500">Hovedansvarlig (Påkrævet)</label>
-              <input type="text" id="hovedansvarlige" name="hovedansvarlige" value={sagsData.hovedansvarlige || ''} onChange={handleChange} required className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="standard_outlook_account_id" className="block text-xs font-medium text-gray-500">Standard mail-konto (Afsender)</label>
-              <select
-                id="standard_outlook_account_id"
-                name="standard_outlook_account_id"
-                value={sagsData.standard_outlook_account_id || ''}
-                onChange={handleChange}
-                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="">Vælg konto...</option>
-                {outlookAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.account_name} ({acc.email_address})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="bolig_bfe" className="block text-xs font-medium text-gray-500">BFE Nummer</label>
-              <input type="text" id="bolig_bfe" name="bolig_bfe" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="bolig_type" className="block text-xs font-medium text-gray-500">Bolig Type</label>
-              <input type="text" id="bolig_type" name="bolig_type" value={sagsData.bolig_type || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
-              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
-              <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div className="md:col-span-2">
-              <label htmlFor="bolig_link" className="block text-xs font-medium text-gray-500">Bolig system</label>
-              <input type="text" id="bolig_link" name="bolig_link" value={sagsData.bolig_link || ''} onChange={handleChange} placeholder="https://..." className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
-              <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
-              <select
-                id="bolig_anvendelse_id"
-                name="bolig_anvendelse_id"
-                value={sagsData.bolig_anvendelse_id || ''}
-                onChange={handleChange}
-                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="">Vælg anvendelse...</option>
-                {bbrAnvendelser.map(anv => (
-                  <option key={anv.id} value={anv.id}>
-                    {anv.kode} - {anv.beskrivelse}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Adresse Sektion */}
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+            e.preventDefault();
+          }
+        }}
+      >
+        {/* Adresse Sektion - Nu øverst */}
         <div className="p-3 border rounded-md">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">Adresse</h3>
           <div className="mb-3">
@@ -454,6 +416,122 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             <div className="col-span-12 sm:col-span-2">
               <label htmlFor="kommunekode_vis" className="block text-xs font-medium text-gray-500">Kommune</label>
               <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm text-center" />
+            </div>
+          </div>
+        </div>
+
+        {/* Generelt Sektion */}
+        <div className="p-3 border rounded-md bg-gray-50/30">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Generelt</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+            {erRedigering && (
+              <div>
+                <label htmlFor="sags_nr" className="block text-xs font-medium text-gray-500">SagsNr</label>
+                <input type="text" id="sags_nr" name="sags_nr" value={sagsData.sags_nr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-100 text-sm" />
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="alias" className="block text-xs font-medium text-gray-500">Alias (Valgfri - autoudfyldes ved gem)</label>
+              <input type="text" id="alias" name="alias" value={sagsData.alias || ''} onChange={handleChange} placeholder="F.eks. Vejnavn 123" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="status_id" className="block text-xs font-medium text-gray-500">Status</label>
+              <select
+                id="status_id"
+                name="status_id"
+                value={sagsData.status_id || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">Vælg status...</option>
+                {statusser.map(status => (
+                  <option key={status.id} value={status.id}>
+                    {status.status_nummer} - {status.beskrivelse}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="hovedansvarlige" className="block text-xs font-medium text-gray-500 mb-0.5 after:content-['*'] after:ml-0.5 after:text-red-500">Hovedansvarlig</label>
+              <SearchableSelect
+                id="hovedansvarlige"
+                value={sagsData.hovedansvarlige || ''}
+                onChange={(val) => setSagsData(prev => ({ ...prev, hovedansvarlige: val }))}
+                options={userOptions}
+                placeholder="Vælg ansvarlig..."
+                error={!sagsData.hovedansvarlige}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="standard_outlook_account_id" className="block text-xs font-medium text-gray-500">Standard mail-konto (Afsender)</label>
+              <select
+                id="standard_outlook_account_id"
+                name="standard_outlook_account_id"
+                value={sagsData.standard_outlook_account_id || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">Vælg konto...</option>
+                {outlookAccounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.account_name} ({acc.email_address})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="bolig_bfe" className="block text-xs font-medium text-gray-500">BFE Nummer</label>
+              <input type="text" id="bolig_bfe" name="bolig_bfe" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_type" className="block text-xs font-medium text-gray-500 mb-0.5">Bolig Type</label>
+              <SearchableSelect
+                id="bolig_type"
+                value={sagsData.bolig_type || ''}
+                onChange={(val) => setSagsData(prev => ({ ...prev, bolig_type: val }))}
+                options={BOLIG_TYPER}
+                placeholder="Vælg boligtype..."
+              />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
+              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
+              <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="bolig_link" className="block text-xs font-medium text-gray-500">Bolig system</label>
+              <input type="text" id="bolig_link" name="bolig_link" value={sagsData.bolig_link || ''} onChange={handleChange} placeholder="https://..." className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
+              <select
+                id="bolig_anvendelse_id"
+                name="bolig_anvendelse_id"
+                value={sagsData.bolig_anvendelse_id || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">Vælg anvendelse...</option>
+                {bbrAnvendelser.map(anv => (
+                  <option key={anv.id} value={anv.id}>
+                    {anv.kode} - {anv.beskrivelse}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

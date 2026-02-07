@@ -134,7 +134,7 @@ function App() {
           setAktivSide={(side: string) => navigateTo(side, null)}
           filterSidebar={filterSidebarComponent}
         >
-          <Routes>
+          <Routes key={location.pathname}>
             <Route path="/" element={<SagsoversigtPage navigateTo={navigateTo} />} />
             <Route path="/sagsoversigt" element={<SagsoversigtPage navigateTo={navigateTo} />} />
             <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />

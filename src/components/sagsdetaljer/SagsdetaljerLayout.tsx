@@ -2,16 +2,18 @@
 // @# 2025-11-22 17:30 - Oprettet layout til sagsdetaljer med venstre-menu og top-navigation.
 // @# 2025-11-23 10:00 - Fjernet rediger-knap (flyttet til tab). Tilføjet global søgning i top-bar.
 import React, { ReactNode, useMemo, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
-    ArrowLeft, Search, Loader2, MailPlus, ListChecks
+    ArrowLeft, Search, Loader2, MailPlus, ListChecks,
+    List, Info, ListTodo, Files, Mail, Inbox
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
 import useDebounce from '../../hooks/useDebounce';
 import { SagService } from '../../services/SagService';
-import HelpButton from '../ui/HelpButton';
+import SagsHeader from './SagsHeader';
 
 export type TabType = 'overblik' | 'processer' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
@@ -47,6 +49,7 @@ function SagsdetaljerLayout({
 }: SagsdetaljerLayoutProps) {
 
     const { state } = useAppState();
+    const navigate = useNavigate();
     const { sagsIdListe } = state;
 
     // --- SØGNING LOGIK ---
@@ -133,100 +136,81 @@ function SagsdetaljerLayout({
     return (
         <div className="flex h-full flex-col bg-gray-100">
 
-            {/* --- TOP BAR --- */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm sticky top-0 z-10 gap-4">
+            {/* --- TOP BAR (Reusable Header) --- */}
+            <SagsHeader
+                sag={sag}
+                activePage="detaljer"
+                rightContent={
+                    <div className="flex items-center gap-4 w-full justify-end">
+                        {/* Søgning */}
+                        <div className="flex-1 max-w-sm relative" ref={searchRef}>
+                            <div className="relative">
+                                <input
+                                    id="sagsdetaljer-search-input"
+                                    name="sagsdetaljer-search-input"
+                                    type="text"
+                                    placeholder="Søg sag (nr, alias)..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-md text-sm transition-all"
+                                    aria-label="Søg sag"
+                                />
+                                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                                    {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                                </div>
+                            </div>
 
-                {/* Venstre side: Tilbage + Titel */}
-                <div className="flex items-center space-x-4 flex-1">
-                    <button
-                        onClick={onBack}
-                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
-                        title="Tilbage til oversigt"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-
-                    <div className="flex flex-col min-w-0">
-                        <h1 className="text-xl font-bold text-gray-800 truncate flex items-center gap-2">
-                            Sag {sag.sags_nr}: {sag.alias}
-                            <HelpButton helpPointCode="SAGSDETALJER_HELP" />
-                        </h1>
-                        <div className="text-sm text-gray-500 flex items-center space-x-2 truncate">
-                            <span className="truncate">{sag.adresse_vej} {sag.adresse_husnr}</span>
-                            <span className="text-gray-300">|</span>
-                            <span className={`font-medium ${sag.status?.status_kategori === 9 ? 'text-red-600' : 'text-green-600'}`}>
-                                {sag.status?.beskrivelse || 'Ukendt status'}
-                            </span>
+                            {/* Søgeresultater Dropdown */}
+                            {showResults && searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                                    {searchResults.map((res, index) => (
+                                        <button
+                                            key={res.id}
+                                            onClick={() => handleSelectSearchResult(res.id)}
+                                            onMouseEnter={() => setActiveIndex(index)}
+                                            className={`w-full text-left px-4 py-2 text-sm border-b border-gray-50 last:border-0 transition-colors ${index === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}
+                                        >
+                                            <span className={`font-semibold ${index === activeIndex ? 'text-white' : ''}`}>{res.sags_nr}</span>
+                                            <span className={`mx-2 ${index === activeIndex ? 'text-blue-200' : 'text-gray-300'}`}>|</span>
+                                            <span className={index === activeIndex ? 'text-blue-50' : 'text-gray-700'}>{res.alias}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                </div>
 
-                <div className="flex-1 max-w-md relative" ref={searchRef}>
-                    <div className="relative">
-                        <input
-                            id="sagsdetaljer-search-input"
-                            name="sagsdetaljer-search-input"
-                            type="text"
-                            placeholder="Søg sag (nr, alias)..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
-                            onKeyDown={handleKeyDown}
-                            className="w-full pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-md text-sm transition-all"
-                            aria-label="Søg sag"
-                        />
-                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
-                            {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                        </div>
-                    </div>
+                        {/* Navigation Buttons */}
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                            {navState.total > 0 && (
+                                <span className="text-xs text-gray-400 mr-2">
+                                    {navState.index} af {navState.total}
+                                </span>
+                            )}
 
-                    {/* Søgeresultater Dropdown */}
-                    {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                            {searchResults.map((res, index) => (
+                            <div className="flex bg-gray-100 rounded-md p-1">
                                 <button
-                                    key={res.id}
-                                    onClick={() => handleSelectSearchResult(res.id)}
-                                    onMouseEnter={() => setActiveIndex(index)}
-                                    className={`w-full text-left px-4 py-2 text-sm border-b border-gray-50 last:border-0 transition-colors ${index === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}
+                                    onClick={() => navState.prev && onNavigateToSag(navState.prev)}
+                                    disabled={!navState.prev}
+                                    className="p-2 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+                                    title="Forrige sag"
                                 >
-                                    <span className={`font-semibold ${index === activeIndex ? 'text-white' : ''}`}>{res.sags_nr}</span>
-                                    <span className={`mx-2 ${index === activeIndex ? 'text-blue-200' : 'text-gray-300'}`}>|</span>
-                                    <span className={index === activeIndex ? 'text-blue-50' : 'text-gray-700'}>{res.alias}</span>
+                                    <ChevronLeft size={20} />
                                 </button>
-                            ))}
+                                <button
+                                    onClick={() => navState.next && onNavigateToSag(navState.next)}
+                                    disabled={!navState.next}
+                                    className="p-2 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+                                    title="Næste sag"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
-
-                {/* Højre side: Navigation */}
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                    {navState.total > 0 && (
-                        <span className="text-xs text-gray-400 mr-2">
-                            {navState.index} af {navState.total}
-                        </span>
-                    )}
-
-                    <div className="flex bg-gray-100 rounded-md p-1">
-                        <button
-                            onClick={() => navState.prev && onNavigateToSag(navState.prev)}
-                            disabled={!navState.prev}
-                            className="p-2 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
-                            title="Forrige sag"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <button
-                            onClick={() => navState.next && onNavigateToSag(navState.next)}
-                            disabled={!navState.next}
-                            className="p-2 rounded-md text-gray-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
-                            title="Næste sag"
-                        >
-                            <ChevronRight size={20} />
-                        </button>
                     </div>
-                </div>
-            </div>
+                }
+            />
 
             {/* --- MAIN CONTENT AREA (Split View) --- */}
             <div className="flex flex-1 overflow-hidden">

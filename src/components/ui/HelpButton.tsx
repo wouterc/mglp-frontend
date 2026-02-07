@@ -72,7 +72,7 @@ const HelpButton: React.FC<HelpButtonProps> = ({ helpPointCode, label, className
             </button>
 
             {isMenuOpen && articles.length > 1 && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border-2 border-amber-400 overflow-hidden z-[100] animate-in fade-in zoom-in duration-200">
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border-2 border-amber-400 overflow-hidden z-[1000] animate-in fade-in zoom-in duration-200">
                     <div className="px-4 py-3 bg-amber-400 text-amber-950">
                         <span className="text-[10px] font-black uppercase tracking-widest">Vælg vejledning</span>
                     </div>
@@ -103,7 +103,7 @@ const HelpButton: React.FC<HelpButtonProps> = ({ helpPointCode, label, className
             {/* Overlay to close menu when clicking outside */}
             {isMenuOpen && (
                 <div
-                    className="fixed inset-0 z-[90]"
+                    className="fixed inset-0 z-[900]"
                     onClick={() => setIsMenuOpen(false)}
                 />
             )}

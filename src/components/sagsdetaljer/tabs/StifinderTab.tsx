@@ -711,53 +711,14 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         if (item.is_dir) {
             setCurrentPath(item.path);
         } else {
-            try {
-                showToast('Henter fil...', 'info');
+            // Use the standard API_BASE_URL (which is /api in production)
+            // AND ensure we use a trailing slash before the query parameters to avoid 301 redirects
+            const url = `${API_BASE_URL}/sager/filer/download/?sag_id=${sag.id}&path=${encodeURIComponent(item.path)}&view=1`;
 
-                // Use service
-                const response = await FilService.downloadFil(sag.id, item.path, true);
-
-                // Read as Blob
-                const blob = await response.blob();
-
-                // Check if it's actually a JSON error (our backend might return 200 OK with text error now, or JSON)
-                // But since we set responseType to blob, we have to check content type or try to parse
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    // It was an error in JSON format
-                    const text = await blob.text();
-                    const json = JSON.parse(text);
-                    throw new Error(json.error || json.message || "Ukendt fejl");
-                }
-
-                // If it is text/plain, it might be our debug error message
-                if (contentType && contentType.includes('text/plain')) {
-                    const text = await blob.text();
-                    if (text.startsWith('FIL IKKE FUNDET') || text.startsWith('Fejl') || text.startsWith('Systemfejl')) {
-                        // Open in new tab so user can see the debug message
-                        const debugBlob = new Blob([text], { type: 'text/plain' });
-                        const debugUrl = window.URL.createObjectURL(debugBlob);
-                        window.open(debugUrl, '_blank');
-                        showToast('Fejl ved hentning af fil - se fane', 'error');
-                        return; // Don't proceed to PDF/doc opening
-                    }
-                }
-
-                // Create Object URL
-                const objectUrl = window.URL.createObjectURL(blob);
-
-                // Open in new tab
-                const win = window.open(objectUrl, '_blank');
-                if (!win) {
-                    showToast('Pop-up blokeret. Tillad venligst pop-ups.', 'error');
-                }
-
-                // Cleanup after a delay (browser needs time to open it)
-                setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60000); // 1 minute
-
-            } catch (err: any) {
-                console.error("Download error", err);
-                showToast('Kunne ikke hente fil: ' + err.message, 'error');
+            // We open directly. Browser will handle the session/cookies since it's same origin/domain.
+            const win = window.open(url, '_blank');
+            if (!win) {
+                showToast('Pop-up blokeret. Tillad venligst pop-ups.', 'error');
             }
         }
     };
@@ -777,10 +738,10 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                     className={`
                         hover:text-blue-600 px-2 py-1 rounded-md transition flex items-center
                         ${isOver ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400 font-bold scale-105' : ''}
-                        ${isLast ? 'font-semibold text-gray-900' : 'text-gray-500'}
+                        ${isLast ? 'font-bold text-blue-900' : 'text-blue-600 font-medium'}
                     `}
                 >
-                    {isHome ? <Home size={16} className="inline mr-1.5" /> : null}
+                    {isHome ? <Home size={16} className="inline mr-1.5 text-blue-600" /> : null}
                     {name}
                 </button>
             </div>
@@ -788,14 +749,14 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden flex flex-col h-[700px]">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-300 overflow-hidden flex flex-col flex-1 min-h-[500px]">
             <DndContext
                 onDragEnd={handleDragEnd}
                 sensors={sensors}
                 collisionDetection={pointerWithin}
             >
                 {/* Toolbar */}
-                <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <div className="p-4 bg-gray-200 flex items-center justify-between">
                     <div className="flex items-center text-sm">
                         {breadcrumbs.map((bc, i) => (
                             <BreadcrumbDropZone
@@ -871,8 +832,8 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                         </div>
                     ) : (
                         <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 bg-white shadow-sm z-10">
-                                <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                            <thead className="sticky top-0 bg-gray-200 shadow-sm z-10">
+                                <tr className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                                     <th className="px-4 py-3 w-10 text-center">
                                         <input
                                             type="checkbox"
@@ -889,7 +850,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                                     <th className="px-6 py-3 w-24"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
+                            <tbody className="divide-y divide-gray-200">
                                 {items.map((item) => (
                                     <DraggableRow
                                         key={item.path}
@@ -936,7 +897,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
             </DndContext>
 
             {/* Footer / Info */}
-            <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex justify-between">
+            <div className="px-6 py-3 bg-gray-200 text-[10px] text-gray-600 flex justify-between font-medium">
                 <div>{items.length} emner</div>
                 <div>Stifinder v1.0</div>
             </div>

@@ -217,10 +217,15 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   const handleAnnuller = () => { setVisForm(false); setSagTilRedigering(null); };
   const handleRaekkeKlik = (sagId: number) => { setUdfoldetSagId(udfoldetSagId === sagId ? null : sagId); };
 
-  const handleSaveSag = () => {
+  const handleSaveSag = (gemtSag?: Sag) => {
+    const wasCreating = !sagTilRedigering;
     sagDispatch({ type: 'SET_SAGER_STATE', payload: { erSagerHentet: false } });
     setVisForm(false);
     setSagTilRedigering(null);
+
+    if (wasCreating && gemtSag) {
+      navigateTo('sagsdetaljer', gemtSag);
+    }
   };
 
   const getSortIcon = (key: SortKey) => {

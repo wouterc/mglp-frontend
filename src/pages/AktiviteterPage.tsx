@@ -28,6 +28,7 @@ import { Link as LinkIcon } from 'lucide-react'; // @# New Import
 import LinkOpenPreferenceModal from '../components/modals/LinkOpenPreferenceModal';
 import HelpButton from '../components/ui/HelpButton';
 import Modal from '../components/Modal';
+import SagsHeader from '../components/sagsdetaljer/SagsHeader';
 
 
 interface AktiviteterPageProps {
@@ -41,6 +42,12 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const { state: sagState, dispatch: sagDispatch } = useSager();
     const { dispatch: authDispatch } = useAuth();
     const location = useLocation();
+
+    // @# DEBUG: Navigation issue
+    useEffect(() => {
+        console.log("AktiviteterPage mounted. SagId:", sagId, "Path:", location.pathname);
+        return () => console.log("AktiviteterPage unmounting");
+    }, [sagId, location.pathname]);
 
     // --- SMART SHIMS for legacy compatibility & extreme performance ---
     const dispatch = adDispatch;
@@ -425,83 +432,90 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
     // --- LOKAL FILTRERING OG GRUPPERING ---
     const { filteredGroups, groupedActivities, samletTaeling } = useMemo(() => {
-        const summaries = valgtSag ? state.aktivitetsGrupper[valgtSag.id] || [] : [];
-        if (!summaries.length) return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
+        try {
+            // @# DEBUG: Log calculation to check for infinite loops
+            console.log("Calculating filtered activites. SagId:", valgtSag?.id);
+            const summaries = valgtSag ? state.aktivitetsGrupper[valgtSag.id] || [] : [];
+            if (!summaries.length) return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
 
-        const filters = aktiviteterFilters;
-        const lowerAkt = filters.aktivitet.toLowerCase();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+            const filters = aktiviteterFilters;
+            const lowerAkt = filters.aktivitet.toLowerCase();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-        const groupsMap: Record<string, any> = {};
-        const actMap: Record<string, Aktivitet[]> = {};
-        let samletTotal = 0;
-        let samletFaerdige = 0;
+            const groupsMap: Record<string, any> = {};
+            const actMap: Record<string, Aktivitet[]> = {};
+            let samletTotal = 0;
+            let samletFaerdige = 0;
 
-        const allCached = valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : [];
-        for (const summary of summaries) {
-            const procesId = summary.proces.id;
+            const allCached = valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : [];
+            for (const summary of summaries) {
+                const procesId = summary.proces.id;
 
-            const key = `${procesId}-${summary.gruppe.id}`;
-            const groupActivities = allCached.filter((a: Aktivitet) => a.gruppe?.id === summary.gruppe.id && a.proces?.id === procesId);
+                const key = `${procesId}-${summary.gruppe.id}`;
+                const groupActivities = allCached.filter((a: Aktivitet) => a.gruppe?.id === summary.gruppe.id && a.proces?.id === procesId);
 
-            const g = {
-                proces: summary.proces,
-                gruppe: summary.gruppe,
-                filteredAktiviteter: [] as Aktivitet[],
-                total_aktiv_count: summary.total_aktiv_count,
-                total_faerdig_count: summary.total_faerdig_count,
-                filtered_aktiv_count: 0,
-                filtered_faerdig_count: 0
-            };
+                const g = {
+                    proces: summary.proces,
+                    gruppe: summary.gruppe,
+                    filteredAktiviteter: [] as Aktivitet[],
+                    total_aktiv_count: summary.total_aktiv_count,
+                    total_faerdig_count: summary.total_faerdig_count,
+                    filtered_aktiv_count: 0,
+                    filtered_faerdig_count: 0
+                };
 
-            samletTotal += summary.total_aktiv_count;
-            samletFaerdige += summary.total_faerdig_count;
+                samletTotal += summary.total_aktiv_count;
+                samletFaerdige += summary.total_faerdig_count;
 
-            for (const a of groupActivities) {
-                // Apply Filters
-                if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
-                if (filters.status) {
-                    if (filters.status === 'ikke-faerdigmeldt') {
+                for (const a of groupActivities) {
+                    // Apply Filters
+                    if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
+                    if (filters.status) {
+                        if (filters.status === 'ikke-faerdigmeldt') {
+                            if (a.status?.status_kategori === 1) continue;
+                        } else {
+                            if (a.status?.id.toString() !== filters.status.toString()) continue;
+                        }
+                    }
+
+                    if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) continue;
+
+                    if (filters.overskredet) {
                         if (a.status?.status_kategori === 1) continue;
-                    } else {
-                        if (a.status?.id.toString() !== filters.status.toString()) continue;
+                        const d = a.dato_intern ? new Date(a.dato_intern) : null;
+                        if (!d || d >= today) continue;
+                    }
+
+                    if (filters.vigtige && !a.kommentar_vigtig) continue;
+
+                    g.filteredAktiviteter.push(a);
+                    g.filtered_aktiv_count++;
+                    if (a.status?.status_kategori === 1) {
+                        g.filtered_faerdig_count++;
                     }
                 }
-
-                if (filters.aktiv_filter === 'kun_aktive' && !a.aktiv) continue;
-
-                if (filters.overskredet) {
-                    if (a.status?.status_kategori === 1) continue;
-                    const d = a.dato_intern ? new Date(a.dato_intern) : null;
-                    if (!d || d >= today) continue;
-                }
-
-                if (filters.vigtige && !a.kommentar_vigtig) continue;
-
-                g.filteredAktiviteter.push(a);
-                g.filtered_aktiv_count++;
-                if (a.status?.status_kategori === 1) {
-                    g.filtered_faerdig_count++;
-                }
+                g.filteredAktiviteter.sort((a, b) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
+                actMap[key] = g.filteredAktiviteter;
+                groupsMap[key] = g;
             }
-            g.filteredAktiviteter.sort((a, b) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
-            actMap[key] = g.filteredAktiviteter;
-            groupsMap[key] = g;
+
+            const sortedGroups = Object.values(groupsMap)
+                .filter((g: any) => !lowerAkt || g.filtered_aktiv_count > 0)
+                .sort((a: any, b: any) => {
+                    if (a.proces.nr !== b.proces.nr) return a.proces.nr - b.proces.nr;
+                    return a.gruppe.nr - b.gruppe.nr;
+                });
+
+            return {
+                filteredGroups: sortedGroups,
+                groupedActivities: actMap,
+                samletTaeling: { total: samletTotal, faerdige: samletFaerdige }
+            };
+        } catch (error) {
+            console.error("CRITICAL ERROR in Activities calculation:", error);
+            return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
         }
-
-        const sortedGroups = Object.values(groupsMap)
-            .filter((g: any) => !lowerAkt || g.filtered_aktiv_count > 0)
-            .sort((a: any, b: any) => {
-                if (a.proces.nr !== b.proces.nr) return a.proces.nr - b.proces.nr;
-                return a.gruppe.nr - b.gruppe.nr;
-            });
-
-        return {
-            filteredGroups: sortedGroups,
-            groupedActivities: actMap,
-            samletTaeling: { total: samletTotal, faerdige: samletFaerdige }
-        };
     }, [valgtSag, state.aktivitetsGrupper, state.cachedAktiviteter, aktiviteterFilters, location.search]);
 
 
@@ -614,291 +628,307 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     };
 
     return (
-        <div className="flex gap-4">
-            <div className="flex-1 min-w-0 flex flex-col gap-4 p-4">
-                {aktivitetTilRedigering && (
-                    <SagsAktivitetForm
-                        aktivitet={aktivitetTilRedigering}
-                        sagId={valgtSag?.id || null}
-                        mode={redigeringsMode}
-                        onSave={handleFormSave}
-                        onCancel={() => setAktivitetTilRedigering(null)}
-                    />
-                )}
-
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex justify-between items-start gap-4">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-4">
-                            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                                Aktiviteter for Sag {valgtSag ? `${valgtSag.sags_nr} - ${valgtSag.alias}` : 'Vælg en sag'}
-                                {valgtSag && (
-                                    <span className="text-lg font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                        {samletTaeling.faerdige} / {samletTaeling.total}
-                                    </span>
-                                )}
-                            </h2>
-                            <div className="flex items-center gap-1">
-                                <Tooltip content="Fold alle grupper ud">
-                                    <button onClick={() => handleToggleAlleGrupper(true)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
-                                        <ChevronsDown size={20} />
-                                    </button>
-                                </Tooltip>
-                                <Tooltip content="Fold alle grupper sammen">
-                                    <button onClick={() => handleToggleAlleGrupper(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
-                                        <ChevronsUp size={20} />
-                                    </button>
-                                </Tooltip>
-                                <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                                <HelpButton helpPointCode="AKTIVITETER_HELP" />
-                                {copyNotify && (
-                                    <div className="ml-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
-                                        <CheckCircle2 size={14} />
-                                        {copyNotify.message}
-                                    </div>
-                                )}
-                                {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
-                                    <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
-                                        <button
-                                            onClick={handleSynkroniser}
-                                            disabled={isFetchingAll}
-                                            className={`
-                                                p-1.5 rounded-full transition-all border
-                                                ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
-                                            `}
-                                        >
-                                            <RefreshCw size={16} />
-                                        </button>
-                                    </Tooltip>
-                                )}
-
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div className="min-w-72">
-                        <CaseSelector
-                            value={valgtSag?.id || null}
-                            onChange={handleSelectSag}
-                            label={valgtSag ? `${valgtSag.sags_nr}${valgtSag.alias ? ' - ' + valgtSag.alias : ''}` : undefined}
-                        />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-md overflow-hidden flex-1">
-                    <table className="w-full text-[12px] text-left table-fixed" ref={tableRef}>
-                        <thead className="bg-gray-800 text-white font-medium uppercase text-[11px]">
-                            <tr>
-                                <th className="py-2 px-2 w-[4%] text-center">Aktiv</th>
-                                <th className="py-2 px-2 w-[28%] text-left">GRUPPE / AKTIVITET</th>
-                                <th className="py-2 px-2 w-[8%] text-center">Dato Int.</th>
-                                <th className="py-2 px-2 w-[8%] text-center">Dato Ekstern</th>
-                                <th className="py-2 px-2 w-[6%] text-center">Info</th>
-                                <th className="py-2 px-2 w-[14%] text-left">Status</th>
-                                <th className="py-2 px-2 w-[18%] text-left">Resultat</th>
-                                <th className="py-2 px-0.5 w-[3%] text-center"><Mail className="inline h-4 w-4" /></th>
-                                <th className="py-2 px-2 w-[7%] text-left">Kilde</th>
-                                <th className="py-2 px-2 w-8 text-right"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {aktiviteterIsLoading && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
-                                <tr><td colSpan={10} className="text-center p-4">Henter aktiviteter...</td></tr>
-                            ) : state.aktiviteterError && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
-                                <tr><td colSpan={10} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
-                            ) : !valgtSag ? (
-                                <tr><td colSpan={10} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
-                            ) : filteredGroups.length === 0 ? (
-                                <tr><td colSpan={10} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
-                            ) : filteredGroups.map((gruppeSummary: any) => {
-                                const gruppeKey = `${gruppeSummary.proces.id}-${gruppeSummary.gruppe.id}`;
-                                const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
-                                const aktiviteter = groupedActivities[gruppeKey] || [];
-                                const harAktivtFilter = gruppeSummary.filtered_aktiv_count !== gruppeSummary.total_aktiv_count;
-
-                                return (
-                                    <Fragment key={gruppeKey}>
-                                        <tr className="bg-gray-200 hover:bg-gray-300 cursor-pointer" onClick={() => handleToggleGruppe(gruppeSummary)}>
-                                            <td className="py-2 px-4 text-center">
-                                                {erUdvidet ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                            </td>
-                                            <td className="py-2 px-4 font-bold text-gray-700 break-words" colSpan={9}>
-                                                {gruppeSummary.proces.nr}.{gruppeSummary.gruppe.nr} - {gruppeSummary.proces.titel_kort} / {gruppeSummary.gruppe.titel_kort}
-                                                <span className="font-normal ml-4 text-gray-600">
-                                                    ({gruppeSummary.total_faerdig_count}/{gruppeSummary.total_aktiv_count})
-                                                </span>
-                                                {harAktivtFilter && (
-                                                    <span className="ml-2 text-blue-600 font-semibold bg-blue-100 px-2 rounded-full text-xs">
-                                                        Viser: {gruppeSummary.filtered_faerdig_count}/{gruppeSummary.filtered_aktiv_count}
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                        {erUdvidet && aktiviteter.map((aktivitet: Aktivitet, idx: number) => (
-                                            <AktivitetRow
-                                                key={aktivitet.id}
-                                                aktivitet={aktivitet}
-                                                statusser={aktivitetStatusser}
-                                                colleagues={colleagues}
-                                                onInlineSave={handleInlineSave}
-                                                onStatusToggle={handleStatusToggle}
-                                                onEditComment={handleEditComment}
-                                                onEditResultat={handleEditResultat}
-                                                onGemTilSkabelon={handleGemTilSkabelon}
-                                                onCopy={handleCopyAktivitet}
-                                                onRenameLine={openRenameAktivitetModal}
-                                                onDeleteLine={handleDeleteAktivitet}
-                                                isLast={idx >= aktiviteter.length - 2}
-                                                onLinkClick={handleLinkAppClick}
-                                                informationsKilder={informationsKilder}
-                                                isActive={activeRow === aktivitet.id}
-                                                onFocus={() => setActiveRow(aktivitet.id)}
-                                                onBlur={() => setActiveRow(null)}
-                                            />
-                                        ))}
-
-                                        {erUdvidet && (
-                                            <tr className="bg-blue-50/20 border-b border-blue-100">
-                                                <td className="py-1 px-2 text-center">
-                                                    <PlusCircle size={14} className="mx-auto text-blue-400" />
-                                                </td>
-                                                {/* Input: Spans Gruppe, Dato Int, Dato Ekstern (3 cols) */}
-                                                <td className="py-1 px-2" colSpan={3}>
-                                                    <form onSubmit={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)} className="flex w-full items-center gap-2">
-                                                        <input
-                                                            id={`quick-add-activity-${gruppeKey}`}
-                                                            name={`quick-add-activity-${gruppeKey}`}
-                                                            type="text"
-                                                            placeholder="Nyt aktivitet navn... (Enter for at gemme)"
-                                                            value={quickAddValues[gruppeSummary.gruppe.id] || ''}
-                                                            onChange={(e) => setQuickAddValues({ ...quickAddValues, [gruppeSummary.gruppe.id]: e.target.value })}
-                                                            className="w-full px-2 py-1 text-[11px] border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 bg-transparent placeholder-gray-400"
-                                                            aria-label="Nyt aktivitet navn"
-                                                        />
-                                                    </form>
-                                                </td>
-                                                {/* Info: Empty */}
-                                                <td className="py-1 px-2"></td>
-                                                {/* Status: Button */}
-                                                <td className="py-1 px-2 text-left">
-                                                    <button
-                                                        onClick={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)}
-                                                        disabled={isSavingNy[gruppeSummary.gruppe.id] || !quickAddValues[gruppeSummary.gruppe.id]?.trim()}
-                                                        className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors inline-flex items-center gap-1"
-                                                    >
-                                                        {isSavingNy[gruppeSummary.gruppe.id] ? <RefreshCw size={12} className="animate-spin" /> : <PlusCircle size={12} />}
-                                                        TILFØJ
-                                                    </button>
-                                                </td>
-                                                <td className="py-1 px-2"></td>
-                                                <td className="py-1 px-2"></td>
-                                                <td className="py-1 px-2"></td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <AktiviteterFilter />
-
-            {/* Confirm Template Modal */}
-            <ConfirmModal
-                isOpen={!!confirmTemplateActivity}
-                onClose={() => setConfirmTemplateActivity(null)}
-                onConfirm={performGemTilSkabelon}
-                title="Gem til skabelon"
-                message={`Vil du gemme "${confirmTemplateActivity?.aktivitet}" som en permanent skabelon?`}
-                confirmText="Gem"
-            />
-
-            {/* Feedback / Alert Modal */}
-            <ConfirmModal
-                isOpen={!!feedbackModal?.isOpen}
-                onClose={() => setFeedbackModal(null)}
-                onConfirm={() => setFeedbackModal(null)}
-                title={feedbackModal?.title || ''}
-                message={feedbackModal?.message || ''}
-                confirmText="OK"
-                cancelText={undefined} // Hide cancel button
-                isDestructive={feedbackModal?.type === 'error'}
-            />
-
-            {/* Rename Title Modal */}
-            <Modal
-                isOpen={!!renamingAktivitet}
-                onClose={() => setRenamingAktivitet(null)}
-                title="Omdøb aktivitet"
-                footer={
-                    <div className="flex justify-end gap-2">
-                        <button
-                            onClick={() => setRenamingAktivitet(null)}
-                            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                            Annuller
-                        </button>
-                        <button
-                            onClick={handleSaveAktivitetRename}
-                            disabled={isRenamingAktivitet}
-                            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {isRenamingAktivitet ? 'Gemmer...' : 'Gem'}
-                        </button>
-                    </div>
-                }
-            >
-                <div className="p-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nyt navn på aktivitet
-                    </label>
-                    <input
-                        autoFocus
-                        type="text"
-                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        value={editAktivitetNavn}
-                        onChange={(e) => setEditAktivitetNavn(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveAktivitetRename();
-                        }}
-                    />
-                </div>
-            </Modal>
-
-            <ConfirmModal
-                isOpen={!!deleteConfirmAktivitet}
-                onClose={() => setDeleteConfirmAktivitet(null)}
-                onConfirm={performDeleteAktivitet}
-                title="Slet aktivitet?"
-                message={`Er du sikker på, at du vil slette "${deleteConfirmAktivitet?.aktivitet}"?`}
-                confirmText="Slet"
-                isDestructive={true}
-            />
-
-            {/* Link Preference Modal */}
-            {showLinkPreferenceModal && (
-                <LinkOpenPreferenceModal
-                    isOpen={!!showLinkPreferenceModal}
-                    onSave={handleSaveLinkPreference}
-                    onClose={() => setShowLinkPreferenceModal(null)}
+        <div className="flex flex-col h-full bg-gray-100">
+            {aktivitetTilRedigering && (
+                <SagsAktivitetForm
+                    aktivitet={aktivitetTilRedigering}
+                    sagId={valgtSag?.id || null}
+                    mode={redigeringsMode}
+                    onSave={handleFormSave}
+                    onCancel={() => setAktivitetTilRedigering(null)}
                 />
             )}
 
-            {/* Manual Activity-Document Linker Modal */}
-            <ActivityDocumentLinkerModal
-                isOpen={!!linkModalAktivitet}
-                onClose={() => setLinkModalAktivitet(null)}
-                sagId={valgtSag?.id || 0}
-                initialAktivitetId={linkModalAktivitet?.id}
-                aktiviteter={valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : []}
-                dokumenter={sagsDokumenter}
-                onLinkChanges={handleLinkChanges}
-            />
+            {valgtSag && (
+                <SagsHeader
+                    sag={valgtSag}
+                    activePage="aktiviteter"
+                    helpPointCode="AKTIVITETER_HELP"
+                    rightContent={
+                        <div className="flex items-center gap-4">
+                            <div className="min-w-64">
+                                <CaseSelector
+                                    value={valgtSag?.id || null}
+                                    onChange={handleSelectSag}
+                                    label={valgtSag ? `${valgtSag.sags_nr}${valgtSag.alias ? ' - ' + valgtSag.alias : ''}` : undefined}
+                                    className="shadow-none border-gray-200"
+                                    placeholder="Skift til en anden sag..."
+                                />
+                            </div>
+                        </div>
+                    }
+                    bottomContent={
+                        <div className="flex items-center gap-1 animate-in fade-in ml-80">
+                            {valgtSag && (
+                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full mr-2">
+                                    Fremgang: {samletTaeling.faerdige} / {samletTaeling.total}
+                                </span>
+                            )}
+                            <Tooltip content="Fold alle grupper ud">
+                                <button onClick={() => handleToggleAlleGrupper(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors border border-transparent hover:border-200">
+                                    <ChevronsDown size={14} />
+                                    Fold ud
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Fold alle grupper sammen">
+                                <button onClick={() => handleToggleAlleGrupper(false)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors border border-transparent hover:border-200">
+                                    <ChevronsUp size={14} />
+                                    Fold ind
+                                </button>
+                            </Tooltip>
 
+                            {copyNotify && (
+                                <div className="ml-2 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg transition-opacity duration-500 animate-in fade-in flex items-center gap-2">
+                                    <CheckCircle2 size={14} />
+                                    {copyNotify.message}
+                                </div>
+                            )}
+                            {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
+                                <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
+                                    <button
+                                        onClick={handleSynkroniser}
+                                        disabled={isFetchingAll}
+                                        className={`
+                                            ml-2 p-1.5 rounded-full transition-all border
+                                            ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
+                                        `}
+                                    >
+                                        <RefreshCw size={16} />
+                                    </button>
+                                </Tooltip>
+                            )}
+                        </div>
+                    }
+                />
+            )}
 
+            {/* Inndhold og Filter Sektion */}
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 overflow-y-auto pl-[76px] pr-6 pb-6 pt-0">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
 
+                        {/* Fallback Header (Only if no sag selected - which is rare but possible) */}
+                        {!valgtSag && (
+                            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex justify-between items-start gap-4 mb-4">
+                                <div className="flex flex-col gap-2">
+                                    <h2 className="text-2xl font-bold text-gray-800">Vælg en sag</h2>
+                                </div>
+                                <div className="min-w-72">
+                                    <CaseSelector value={null} onChange={handleSelectSag} />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-white rounded-lg shadow-md overflow-hidden flex-1">
+                            <table className="w-full text-[12px] text-left table-fixed" ref={tableRef}>
+                                <thead className="bg-gray-800 text-white font-medium uppercase text-[11px]">
+                                    <tr>
+                                        <th className="py-2 px-2 w-[4%] text-center">Aktiv</th>
+                                        <th className="py-2 px-2 w-[28%] text-left">GRUPPE / AKTIVITET</th>
+                                        <th className="py-2 px-2 w-[8%] text-center">Dato Int.</th>
+                                        <th className="py-2 px-2 w-[8%] text-center">Dato Ekstern</th>
+                                        <th className="py-2 px-2 w-[6%] text-center">Info</th>
+                                        <th className="py-2 px-2 w-[14%] text-left">Status</th>
+                                        <th className="py-2 px-2 w-[18%] text-left">Resultat</th>
+                                        <th className="py-2 px-0.5 w-[3%] text-center"><Mail className="inline h-4 w-4" /></th>
+                                        <th className="py-2 px-2 w-[7%] text-left">Kilde</th>
+                                        <th className="py-2 px-2 w-8 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {aktiviteterIsLoading && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
+                                        <tr><td colSpan={10} className="text-center p-4">Henter aktiviteter...</td></tr>
+                                    ) : state.aktiviteterError && (!valgtSag || !state.aktivitetsGrupper[valgtSag.id]?.length) ? (
+                                        <tr><td colSpan={10} className="text-center p-4 text-red-600 font-bold">Fejl ved hentning: {state.aktiviteterError}</td></tr>
+                                    ) : !valgtSag ? (
+                                        <tr><td colSpan={10} className="text-center p-4">Vælg venligst en sag for at se aktiviteter.</td></tr>
+                                    ) : filteredGroups.length === 0 ? (
+                                        <tr><td colSpan={10} className="text-center p-4">Ingen aktiviteter matcher de valgte filtre.</td></tr>
+                                    ) : filteredGroups.map((gruppeSummary: any) => {
+                                        const gruppeKey = `${gruppeSummary.proces.id}-${gruppeSummary.gruppe.id}`;
+                                        const erUdvidet = !!aktiviteterUdvidedeGrupper[valgtSag!.id]?.[gruppeKey];
+                                        const aktiviteter = groupedActivities[gruppeKey] || [];
+                                        const harAktivtFilter = gruppeSummary.filtered_aktiv_count !== gruppeSummary.total_aktiv_count;
+
+                                        return (
+                                            <Fragment key={gruppeKey}>
+                                                <tr className="bg-gray-200 hover:bg-gray-300 cursor-pointer" onClick={() => handleToggleGruppe(gruppeSummary)}>
+                                                    <td className="py-2 px-4 text-center">
+                                                        {erUdvidet ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                    </td>
+                                                    <td className="py-2 px-4 font-bold text-gray-700 break-words" colSpan={9}>
+                                                        {gruppeSummary.proces.nr}.{gruppeSummary.gruppe.nr} - {gruppeSummary.proces.titel_kort} / {gruppeSummary.gruppe.titel_kort}
+                                                        <span className="font-normal ml-4 text-gray-600">
+                                                            ({gruppeSummary.total_faerdig_count}/{gruppeSummary.total_aktiv_count})
+                                                        </span>
+                                                        {harAktivtFilter && (
+                                                            <span className="ml-2 text-blue-600 font-semibold bg-blue-100 px-2 rounded-full text-xs">
+                                                                Viser: {gruppeSummary.filtered_faerdig_count}/{gruppeSummary.filtered_aktiv_count}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                                {erUdvidet && aktiviteter.map((aktivitet: Aktivitet, idx: number) => (
+                                                    <AktivitetRow
+                                                        key={aktivitet.id}
+                                                        aktivitet={aktivitet}
+                                                        statusser={aktivitetStatusser}
+                                                        colleagues={colleagues}
+                                                        onInlineSave={handleInlineSave}
+                                                        onStatusToggle={handleStatusToggle}
+                                                        onEditComment={handleEditComment}
+                                                        onEditResultat={handleEditResultat}
+                                                        onGemTilSkabelon={handleGemTilSkabelon}
+                                                        onCopy={handleCopyAktivitet}
+                                                        onRenameLine={openRenameAktivitetModal}
+                                                        onDeleteLine={handleDeleteAktivitet}
+                                                        isLast={idx >= aktiviteter.length - 2}
+                                                        onLinkClick={handleLinkAppClick}
+                                                        informationsKilder={informationsKilder}
+                                                        isActive={activeRow === aktivitet.id}
+                                                        onFocus={() => setActiveRow(aktivitet.id)}
+                                                        onBlur={() => setActiveRow(null)}
+                                                    />
+                                                ))}
+
+                                                {erUdvidet && (
+                                                    <tr className="bg-blue-50/20 border-b border-blue-100">
+                                                        <td className="py-1 px-2 text-center">
+                                                            <PlusCircle size={14} className="mx-auto text-blue-400" />
+                                                        </td>
+                                                        {/* Input: Spans Gruppe, Dato Int, Dato Ekstern (3 cols) */}
+                                                        <td className="py-1 px-2" colSpan={3}>
+                                                            <form onSubmit={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)} className="flex w-full items-center gap-2">
+                                                                <input
+                                                                    id={`quick-add-activity-${gruppeKey}`}
+                                                                    name={`quick-add-activity-${gruppeKey}`}
+                                                                    type="text"
+                                                                    placeholder="Nyt aktivitet navn... (Enter for at gemme)"
+                                                                    value={quickAddValues[gruppeSummary.gruppe.id] || ''}
+                                                                    onChange={(e) => setQuickAddValues({ ...quickAddValues, [gruppeSummary.gruppe.id]: e.target.value })}
+                                                                    className="w-full px-2 py-1 text-[11px] border-0 border-b border-blue-200 focus:border-blue-500 focus:ring-0 bg-transparent placeholder-gray-400"
+                                                                    aria-label="Nyt aktivitet navn"
+                                                                />
+                                                            </form>
+                                                        </td>
+                                                        {/* Info: Empty */}
+                                                        <td className="py-1 px-2"></td>
+                                                        {/* Status: Button */}
+                                                        <td className="py-1 px-2 text-left">
+                                                            <button
+                                                                onClick={(e) => handleQuickAdd(gruppeSummary.gruppe.id, gruppeSummary.proces.id, e)}
+                                                                disabled={isSavingNy[gruppeSummary.gruppe.id] || !quickAddValues[gruppeSummary.gruppe.id]?.trim()}
+                                                                className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 transition-colors inline-flex items-center gap-1"
+                                                            >
+                                                                {isSavingNy[gruppeSummary.gruppe.id] ? <RefreshCw size={12} className="animate-spin" /> : <PlusCircle size={12} />}
+                                                                TILFØJ
+                                                            </button>
+                                                        </td>
+                                                        <td className="py-1 px-2"></td>
+                                                        <td className="py-1 px-2"></td>
+                                                        <td className="py-1 px-2"></td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Modals inside scroll area to stay relative to context */}
+                    <ConfirmModal
+                        isOpen={!!confirmTemplateActivity}
+                        onClose={() => setConfirmTemplateActivity(null)}
+                        onConfirm={performGemTilSkabelon}
+                        title="Gem til skabelon"
+                        message={`Vil du gemme "${confirmTemplateActivity?.aktivitet}" som en permanent skabelon?`}
+                        confirmText="Gem"
+                    />
+
+                    <ConfirmModal
+                        isOpen={!!feedbackModal?.isOpen}
+                        onClose={() => setFeedbackModal(null)}
+                        onConfirm={() => setFeedbackModal(null)}
+                        title={feedbackModal?.title || ''}
+                        message={feedbackModal?.message || ''}
+                        confirmText="OK"
+                        cancelText={undefined}
+                        isDestructive={feedbackModal?.type === 'error'}
+                    />
+
+                    <Modal
+                        isOpen={!!renamingAktivitet}
+                        onClose={() => setRenamingAktivitet(null)}
+                        title="Omdøb aktivitet"
+                        footer={
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setRenamingAktivitet(null)}
+                                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                >
+                                    Annuller
+                                </button>
+                                <button
+                                    onClick={handleSaveAktivitetRename}
+                                    disabled={isRenamingAktivitet}
+                                    className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {isRenamingAktivitet ? 'Gemmer...' : 'Gem'}
+                                </button>
+                            </div>
+                        }
+                    >
+                        <div className="p-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Nyt navn på aktivitet
+                            </label>
+                            <input
+                                autoFocus
+                                type="text"
+                                className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                value={editAktivitetNavn}
+                                onChange={(e) => setEditAktivitetNavn(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveAktivitetRename();
+                                }}
+                            />
+                        </div>
+                    </Modal>
+
+                    <ConfirmModal
+                        isOpen={!!deleteConfirmAktivitet}
+                        onClose={() => setDeleteConfirmAktivitet(null)}
+                        onConfirm={performDeleteAktivitet}
+                        title="Slet aktivitet?"
+                        message={`Er du sikker på, at du vil slette "${deleteConfirmAktivitet?.aktivitet}"?`}
+                        confirmText="Slet"
+                        isDestructive={true}
+                    />
+
+                    {showLinkPreferenceModal && (
+                        <LinkOpenPreferenceModal
+                            isOpen={!!showLinkPreferenceModal}
+                            onSave={handleSaveLinkPreference}
+                            onClose={() => setShowLinkPreferenceModal(null)}
+                        />
+                    )}
+
+                    <ActivityDocumentLinkerModal
+                        isOpen={!!linkModalAktivitet}
+                        onClose={() => setLinkModalAktivitet(null)}
+                        sagId={valgtSag?.id || 0}
+                        initialAktivitetId={linkModalAktivitet?.id}
+                        aktiviteter={valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : []}
+                        dokumenter={sagsDokumenter}
+                        onLinkChanges={handleLinkChanges}
+                    />
+                </div>
+
+                {/* Filter Sidebar - outside the table's scroll container */}
+                <AktiviteterFilter />
+            </div>
         </div>
     );
 }

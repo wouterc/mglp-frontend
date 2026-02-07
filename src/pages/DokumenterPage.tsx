@@ -9,6 +9,7 @@ import StifinderTab from '../components/sagsdetaljer/tabs/StifinderTab';
 import { Loader2, ListChecks, FolderSearch } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import CaseSelector from '../components/ui/CaseSelector';
+import SagsHeader from '../components/sagsdetaljer/SagsHeader';
 
 interface DokumenterPageProps {
   sagId: number | null;
@@ -30,6 +31,12 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // @# DEBUG: Navigation issue
+  useEffect(() => {
+    console.log("DokumenterPage mounted. SagId:", sagId, "Path:", location.pathname);
+    return () => console.log("DokumenterPage unmounting");
+  }, [sagId, location.pathname]);
+
   // @# Resolve effective sagId (prop > URL)
   // ... remaining logic updated to use sagDispatch for SET_VALGT_SAG ...
   const queryParams = new URLSearchParams(location.search);
@@ -50,11 +57,17 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
 
   // Sync tab from URL if it changes (e.g. browser back button)
   useEffect(() => {
-    const tab = new URLSearchParams(location.search).get('tab') as 'tjekliste' | 'stifinder';
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab') as 'tjekliste' | 'stifinder';
     if (tab && tab !== activeTab) {
       setActiveTab(tab);
+    } else if (!tab && activeTab !== 'tjekliste') {
+      // Default to tjekliste if no tab param
+      setActiveTab('tjekliste');
     }
-  }, [location.search, activeTab]);
+  }, [location.search]); // Remove activeTab from dependency to avoid loop
+
+
 
   const hasToggledRef = useRef(false);
 
@@ -122,62 +135,84 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
     );
   }
 
+  const [toolbarContent, setToolbarContent] = useState<React.ReactNode>(null);
+
+  useEffect(() => {
+    // Reset toolbar content when tab changes
+    setToolbarContent(null);
+  }, [activeTab]);
+
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 scroll-smooth">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="flex-1 flex flex-col min-w-0 bg-gray-100">
+      {localSag && (
+        <SagsHeader
+          sag={localSag}
+          activePage="dokumenter"
+          helpPointCode="DOKUMENTER_HELP"
+          rightContent={
+            <div className="flex items-center gap-4">
+              <div className="min-w-64">
+                <CaseSelector
+                  value={localSag.id}
+                  onChange={handleSelectSag}
+                  label={`${localSag.sags_nr}${localSag.alias ? ' - ' + localSag.alias : ''}`}
+                  className="shadow-none border-gray-200"
+                  placeholder="Skift til en anden sag..."
+                />
+              </div>
 
-        {/* Top Header Row with Tabs and Case Selector */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <button
+                onClick={() => window.open(`/dokumenter?sag_id=${localSag.id}&tab=stifinder`, '_blank', 'width=1200,height=800')}
+                title="Åbn Stifinder i nyt vindue"
+                className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+              >
+                <FolderSearch size={16} />
+              </button>
+            </div>
+          }
+          bottomContent={
+            <div className="flex items-center w-full gap-32">
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shadow-sm">
+                <button
+                  onClick={() => handleTabChange('tjekliste')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'tjekliste'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  <ListChecks size={20} />
+                  Tjekliste
+                </button>
+                <button
+                  onClick={() => handleTabChange('stifinder')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all mr-12 ${activeTab === 'stifinder'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  <FolderSearch size={20} />
+                  Stifinder
+                </button>
+              </div>
 
-          {/* Tab Switcher */}
-          <div className="flex items-center gap-2 bg-gray-200/50 p-1 rounded-xl w-fit shadow-inner">
-            <button
-              onClick={() => handleTabChange('tjekliste')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'tjekliste'
-                ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5 scale-[1.02]'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
-                }`}
-            >
-              <ListChecks size={20} />
-              Tjekliste
-            </button>
-            <button
-              onClick={() => handleTabChange('stifinder')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'stifinder'
-                ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5 scale-[1.02]'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
-                }`}
-            >
-              <FolderSearch size={20} />
-              Stifinder
-            </button>
-          </div>
+              {/* Dynamic Toolbar Content (Counters, Collapse, etc.) */}
+              <div className="flex items-center gap-2 animate-in fade-in">
+                {toolbarContent}
+              </div>
+            </div>
+          }
+        />
+      )}
 
-          <button
-            onClick={() => window.open(`/dokumenter?sag_id=${localSag.id}&tab=stifinder`, '_blank', 'width=1200,height=800')}
-            title="Åbn Stifinder i nyt vindue"
-            className="p-2.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
-          >
-            <FolderSearch size={20} />
-          </button>
+      <div className="flex-1 h-full overflow-y-auto pl-[76px] pr-6 pb-6 pt-0 scroll-smooth">
+        <div className="h-full space-y-6">
 
-          {/* Large Case Selector */}
-          <div className="w-full sm:w-96 lg:w-[450px]">
-            <CaseSelector
-              value={localSag.id}
-              onChange={handleSelectSag}
-              label={`${localSag.sags_nr}${localSag.alias ? ' - ' + localSag.alias : ''}`}
-              className="shadow-sm"
-              placeholder="Skift til en anden sag..."
-            />
-          </div>
+          {activeTab === 'tjekliste' ? (
+            <DokumenterTab sag={localSag} onToolbarUpdate={setToolbarContent} />
+          ) : (
+            <StifinderTab sag={localSag} />
+          )}
         </div>
-
-        {activeTab === 'tjekliste' ? (
-          <DokumenterTab sag={localSag} />
-        ) : (
-          <StifinderTab sag={localSag} />
-        )}
       </div>
     </div>
   );
