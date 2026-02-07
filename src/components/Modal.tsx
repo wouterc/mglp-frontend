@@ -22,6 +22,22 @@ function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWid
     if (!isOpen) setIsMaximized(false);
   }, [isOpen]);
 
+  // Handle Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleEscape);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const classes = isMaximized

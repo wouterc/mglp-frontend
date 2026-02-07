@@ -3,13 +3,16 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Opgave, OpgavePriority, User } from '../../types';
 import { Calendar, MessageSquare, User as UserIcon, ChevronDown, ArrowRight, ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { opgaveService } from '../../services/opgaveService';
 
 interface TaskCardProps {
     opgave: Opgave;
     onClick: (opgave: Opgave) => void;
     users?: User[];
     onAssigneeChange?: (opgaveId: number, userId: number | null) => void;
+    isOverlay?: boolean;
 }
 
 const priorityColors = {
@@ -19,8 +22,21 @@ const priorityColors = {
     [OpgavePriority.URGENT]: 'bg-red-50 text-red-600',
 };
 
-const TaskCard: React.FC<TaskCardProps> = ({ opgave, onClick, users, onAssigneeChange }) => {
-    const [isHoveringAssignee, setIsHoveringAssignee] = useState(false);
+// UI-only component to avoid hook conflicts
+const TaskCardUI: React.FC<TaskCardProps & {
+    innerRef?: (element: HTMLElement | null) => void;
+    style?: React.CSSProperties;
+    attributes?: any;
+    listeners?: any;
+    isOver?: boolean;
+    isOverArchive?: boolean;
+}> = ({ opgave, onClick, users, onAssigneeChange, innerRef, style, attributes, listeners, isOverlay, isOver, isOverArchive }) => {
+    const buttonRef = useRef<HTMLDivElement>(null);
+    const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+
+    const [history, setHistory] = useState<any[] | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     const handleAssigneeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         if (onAssigneeChange) {
@@ -28,83 +44,171 @@ const TaskCard: React.FC<TaskCardProps> = ({ opgave, onClick, users, onAssigneeC
             onAssigneeChange(opgave.id, val ? Number(val) : null);
         }
     };
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: opgave.id, data: { opgave } });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
+    const toggleHistory = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (showHistory) {
+            setShowHistory(false);
+            return;
+        }
+
+        if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setPopupPos({
+                top: rect.bottom + window.scrollY + 8,
+                left: rect.left + window.scrollX + (rect.width / 2)
+            });
+        }
+
+        setIsLoadingHistory(true);
+        try {
+            const data = await opgaveService.getStatusHistory(opgave.id);
+            setHistory(data);
+            setShowHistory(true);
+        } catch (err) {
+            console.error('Kunne ikke hente historik', err);
+        } finally {
+            setIsLoadingHistory(false);
+        }
     };
 
-    if (isDragging) {
-        return (
-            <div
-                ref={setNodeRef}
-                style={style}
-                className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl h-32 w-full opacity-50"
-            />
-        );
-    }
+    useEffect(() => {
+        if (!showHistory) return;
+        const handleDown = () => setShowHistory(false);
+        window.addEventListener('mousedown', handleDown);
+        return () => window.removeEventListener('mousedown', handleDown);
+    }, [showHistory]);
+
+    const getCardStyles = () => {
+        // PRIORITY 1: Archive feedback (requested by user)
+        if (isOverArchive) return 'bg-red-50 border-red-500 border-dashed shadow-xl scale-[1.02] z-[200] ring-4 ring-red-100 ring-opacity-50';
+
+        // PRIORITY 2: Normal Drag over column/task
+        if (isOver) return 'bg-blue-100 border-blue-500 shadow-md ring-2 ring-blue-400 ring-opacity-50 z-10';
+
+        if (opgave.deadline) {
+            const deadlineDate = new Date(opgave.deadline);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            if (deadlineDate < today) return 'bg-red-200 border-red-400 shadow-[0_2px_4px_rgba(220,38,38,0.15)]';
+            if (deadlineDate <= tomorrow) return 'bg-orange-200 border-orange-400';
+        }
+
+        if (opgave.status_direction === -1) return 'bg-purple-200 border-purple-400 shadow-[0_2px_4px_rgba(139,92,246,0.1)]';
+        if (opgave.status_direction === 1) return 'bg-emerald-200 border-emerald-400';
+
+        return 'bg-white border-gray-300';
+    };
+
+    const STATUS_LABELS: Record<string, string> = {
+        'BACKLOG': 'Indbakke',
+        'TODO': 'Klar til start',
+        'IN_PROGRESS': 'Igang',
+        'TEST': 'Test',
+        'DONE': 'Færdig'
+    };
 
     return (
         <div
-            ref={setNodeRef}
+            ref={innerRef}
             style={style}
             {...attributes}
             {...listeners}
             onClick={() => onClick(opgave)}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-300 hover:shadow-md transition-all cursor-pointer group mb-3 relative overflow-hidden"
+            className={`${getCardStyles()} px-4 py-2 rounded-xl shadow-sm border-2 transition-all cursor-pointer group mb-3 relative overflow-hidden`}
         >
-            {/* Status Flow Indicator */}
-            {(() => {
-                if (opgave.status_direction === 1) {
-                    return (
-                        <div className="absolute top-0 right-0 p-2">
-                            <div className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 shadow-sm" title="Flyttet frem">
-                                <ArrowRight size={12} />
-                                <span className="uppercase tracking-wider">Frem</span>
-                            </div>
-                        </div>
-                    );
-                } else if (opgave.status_direction === -1) {
-                    return (
-                        <div className="absolute top-0 right-0 p-2">
-                            <div className="flex items-center gap-1 bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200 shadow-sm" title="Sendt retur">
-                                <ArrowLeft size={12} />
-                                <span className="uppercase tracking-wider">Retur</span>
-                            </div>
-                        </div>
-                    );
-                }
-                return null;
-            })()}
-
-            <div className="flex justify-between items-start mb-2 mt-2">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${priorityColors[opgave.prioritet]}`}>
-                    {opgave.prioritet}
-                </span>
-                {opgave.deadline && (
-                    <div className={`flex items-center text-[10px] gap-1 ${new Date(opgave.deadline) < new Date() ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                        <Calendar size={12} />
-                        {new Date(opgave.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+            {showHistory && createPortal(
+                <div
+                    className="fixed w-[380px] bg-white rounded-lg shadow-2xl border border-gray-200 z-[9999] p-3 text-[11px] animate-in fade-in zoom-in duration-150"
+                    style={{
+                        top: `${popupPos.top}px`,
+                        left: `${popupPos.left}px`,
+                        transform: 'translateX(-50%)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center mb-2 pb-1 border-b border-gray-100">
+                        <span className="font-bold text-gray-700">Historik</span>
+                        <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-gray-600">
+                            <ChevronDown size={14} />
+                        </button>
                     </div>
-                )}
+                    {history && history.length > 0 ? (
+                        <div className="space-y-0.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                            {history.map((log) => (
+                                <div key={log.id} className="flex items-center gap-2 py-1 border-b border-gray-50 last:border-0 hover:bg-gray-50 px-1 rounded transition-colors group/row">
+                                    <div className="w-8 shrink-0 font-bold text-blue-600 truncate" title={log.bruger_navn}>
+                                        {log.bruger_username}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                        <div className="w-20 shrink-0 text-gray-400 truncate text-right">{STATUS_LABELS[log.gammel_status] || log.gammel_status}</div>
+                                        <span className="text-gray-300 shrink-0">→</span>
+                                        <div className="w-20 shrink-0 font-bold text-gray-800 truncate">{STATUS_LABELS[log.ny_status] || log.ny_status}</div>
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 tabular-nums shrink-0 ml-auto">
+                                        {new Date(log.tidspunkt).toLocaleDateString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-gray-400 text-center py-4 italic">Ingen historik fundet</div>
+                    )}
+                </div>,
+                document.body
+            )}
+
+            <div className="grid grid-cols-3 items-center mb-1">
+                <div className="flex justify-start">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${priorityColors[opgave.prioritet]}`}>
+                        {opgave.prioritet}
+                    </span>
+                </div>
+
+                <div className="flex justify-center relative" ref={buttonRef}>
+                    {opgave.status_direction === 1 && (
+                        <div
+                            onClick={toggleHistory}
+                            className={`flex items-center gap-1 bg-emerald-300 text-emerald-900 px-1.5 py-0.5 rounded text-[9px] font-bold border border-emerald-500 shadow-sm transition-transform active:scale-95 ${isLoadingHistory ? 'animate-pulse' : 'hover:brightness-95'}`}
+                            title="Klik for historik"
+                        >
+                            <ArrowRight size={10} />
+                            <span className="uppercase tracking-wider">Frem</span>
+                        </div>
+                    )}
+                    {opgave.status_direction === -1 && (
+                        <div
+                            onClick={toggleHistory}
+                            className={`flex items-center gap-1 bg-purple-300 text-purple-900 px-1.5 py-0.5 rounded text-[9px] font-bold border border-purple-500 shadow-sm transition-transform active:scale-95 ${isLoadingHistory ? 'animate-pulse' : 'hover:brightness-95'}`}
+                            title="Klik for historik"
+                        >
+                            <ArrowLeft size={10} />
+                            <span className="uppercase tracking-wider">Retur</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end min-w-0">
+                    {opgave.deadline && (
+                        <div className={`flex items-center text-[10px] gap-1 whitespace-nowrap ${new Date(opgave.deadline) < new Date() ? 'text-red-600 font-black' : 'text-gray-500 font-bold'}`}>
+                            <Calendar size={12} />
+                            {new Date(opgave.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <h4 className="font-semibold text-gray-800 text-sm mb-3 line-clamp-2 leading-relaxed">
+            <h4 className="font-semibold text-gray-800 text-sm mb-2 line-clamp-2 leading-relaxed min-h-[2.75rem] flex items-start">
                 {opgave.titel}
             </h4>
 
-            <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-1">
+            <div className="grid grid-cols-3 items-center pt-1.5 mt-0">
+                {/* Left: Assignee */}
                 <div className="flex items-center gap-2 relative group/assignee" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
-                        {/* Hidden Select Overlay for quick switching */}
                         {users && onAssigneeChange && (
                             <select
                                 className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
@@ -121,13 +225,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ opgave, onClick, users, onAssigneeC
                                     ))}
                             </select>
                         )}
-
                         {opgave.ansvarlig_details ? (
                             <div className="flex items-center gap-1">
                                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 border border-blue-200" title={opgave.ansvarlig_details.first_name}>
                                     {opgave.ansvarlig_details.first_name[0]}{opgave.ansvarlig_details.last_name[0]}
                                 </div>
-                                {/* Show dropdown arrow on hover if editable */}
                                 {users && <ChevronDown size={10} className="text-gray-400 opacity-0 group-hover/assignee:opacity-100 transition-opacity" />}
                             </div>
                         ) : (
@@ -141,14 +243,74 @@ const TaskCard: React.FC<TaskCardProps> = ({ opgave, onClick, users, onAssigneeC
                     </div>
                 </div>
 
-                {opgave.kommentarer_count > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <MessageSquare size={12} />
-                        {opgave.kommentarer_count}
-                    </div>
-                )}
+                {/* Center: Created Date */}
+                <div className="flex justify-center">
+                    <span className="text-[9px] text-gray-400 font-medium whitespace-nowrap">
+                        {new Date(opgave.oprettet).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                    </span>
+                </div>
+
+                {/* Right: Comments */}
+                <div className="flex justify-end">
+                    {opgave.kommentarer_count > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <MessageSquare size={12} />
+                            {opgave.kommentarer_count}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
+    );
+};
+
+const TaskCard: React.FC<TaskCardProps & { isOverArchive?: boolean }> = (props) => {
+    // Only use sortable logic if NOT in overlay
+    if (props.isOverlay) {
+        return <TaskCardUI {...props} />;
+    }
+
+    return <TaskCardSortable {...props} />;
+};
+
+const TaskCardSortable: React.FC<TaskCardProps> = (props) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+        isOver
+    } = useSortable({
+        id: props.opgave.id,
+        data: { opgave: props.opgave }
+    });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    if (isDragging) {
+        return (
+            <div
+                ref={setNodeRef}
+                style={style}
+                className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl h-32 w-full opacity-50 mb-3"
+            />
+        );
+    }
+
+    return (
+        <TaskCardUI
+            {...props}
+            innerRef={setNodeRef}
+            style={style}
+            attributes={attributes}
+            listeners={listeners}
+            isOver={isOver}
+        />
     );
 };
 

@@ -9,29 +9,165 @@ import {
     DragEndEvent,
     DragStartEvent,
     DragOverEvent,
-    closestCorners
+    closestCorners,
+    UniqueIdentifier,
+    rectIntersection,
+    pointerWithin,
+    CollisionDetection,
+    useDroppable
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { opgaveService } from '../services/opgaveService';
 import { useAppState } from '../StateContext';
 import { Opgave, OpgaveStatus, User, OpgavePriority } from '../types';
 import TaskColumn from '../components/opgaver/TaskColumn';
 import TaskCard from '../components/opgaver/TaskCard';
 import TaskDetailModal from '../components/opgaver/TaskDetailModal';
-import { Plus, Filter } from 'lucide-react';
+import { Plus, Filter, Search, X } from 'lucide-react';
+import ArchiveDropZone from '../components/opgaver/ArchiveDropZone';
+import ArchiveModal from '../components/opgaver/ArchiveModal';
+
+const OpgaverBoardContent: React.FC<{
+    tasks: Opgave[];
+    isLoading: boolean;
+    activeDragTask: Opgave | null;
+    overId: UniqueIdentifier | null;
+    users: User[];
+    filterAnsvarlig: string;
+    setFilterAnsvarlig: (v: string) => void;
+    searchQuery: string;
+    setSearchQuery: (v: string) => void;
+    setIsArchiveOpen: (v: boolean) => void;
+    setIsModalOpen: (v: boolean) => void;
+    setEditingTask: (t: Opgave | undefined) => void;
+    fetchTasks: () => void;
+    handleAssigneeChange: (id: number, uid: number | null) => void;
+    getFilteredTasks: (status: OpgaveStatus) => Opgave[];
+}> = (props) => {
+    const { setNodeRef: setArchiveRef, isOver: archiveIsOver } = useDroppable({
+        id: 'archive-dropzone',
+    });
+
+    return (
+        <div className="h-full flex flex-col bg-gray-100 font-sans">
+            {/* Toolbar / Archive Zone */}
+            <div
+                ref={setArchiveRef}
+                className="bg-white px-4 py-3 shadow-sm z-10 flex flex-wrap gap-4 items-center justify-between transition-colors duration-200"
+                style={archiveIsOver ? { backgroundColor: '#fef2f2' } : {}}
+            >
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800">Opgaver</h1>
+                    <p className="text-xs text-gray-500">Udvikling og fejlrettelser</p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* Search Bar */}
+                    <div className="relative w-64 group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Søg i opgaver..."
+                            className="w-full pl-10 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            value={props.searchQuery}
+                            onChange={(e) => props.setSearchQuery(e.target.value)}
+                        />
+                        {props.searchQuery && (
+                            <button
+                                onClick={() => props.setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                        <Filter size={14} className="text-gray-400" />
+                        <select
+                            className="bg-transparent text-sm focus:outline-none text-gray-600"
+                            value={props.filterAnsvarlig}
+                            onChange={(e) => props.setFilterAnsvarlig(e.target.value)}
+                        >
+                            <option value="">Alle ansvarlige</option>
+                            {props.users.map(u => (
+                                <option key={u.id} value={u.id}>{u.first_name || u.username}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <ArchiveDropZone
+                        onClick={() => props.setIsArchiveOpen(true)}
+                        isOver={archiveIsOver}
+                    />
+
+                    <button
+                        onClick={() => { props.setEditingTask(undefined); props.setIsModalOpen(true); }}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-blue-700 transition"
+                    >
+                        <Plus size={18} />
+                        Ny Opgave
+                    </button>
+                </div>
+            </div>
+
+            {/* Board Area */}
+            <div className="flex-1 overflow-x-auto overflow-y-hidden p-2">
+                <div className="flex h-full gap-2 min-w-max">
+                    {Object.values(OpgaveStatus).map(status => (
+                        <TaskColumn
+                            key={status}
+                            id={status}
+                            title={status === OpgaveStatus.BACKLOG ? 'Indbakke' :
+                                status === OpgaveStatus.TODO ? 'Klar til start' :
+                                    status === OpgaveStatus.IN_PROGRESS ? 'Igang' :
+                                        status === OpgaveStatus.TEST ? 'Test' : 'Færdig'}
+                            tasks={props.getFilteredTasks(status)}
+                            onTaskClick={async (t: Opgave) => {
+                                props.setEditingTask(t);
+                                props.setIsModalOpen(true);
+                                try {
+                                    const fullTask = await opgaveService.get(t.id);
+                                    props.setEditingTask(fullTask);
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                            }}
+                            users={props.users}
+                            onAssigneeChange={props.handleAssigneeChange}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <DragOverlay dropAnimation={null}>
+                {props.activeDragTask ? (
+                    <div style={{ pointerEvents: 'none' }}>
+                        <TaskCard
+                            opgave={props.activeDragTask}
+                            onClick={() => { }}
+                            isOverlay
+                            isOverArchive={archiveIsOver || props.overId === 'archive-dropzone'}
+                        />
+                    </div>
+                ) : null}
+            </DragOverlay>
+        </div>
+    );
+};
 
 const OpgaverPage: React.FC = () => {
-    const { state } = useAppState(); // Get global state
-    const { users } = state; // Use users from context
+    const { state } = useAppState();
+    const { users } = state;
     const [tasks, setTasks] = useState<Opgave[]>([]);
-    // const [users, setUsers] = useState<User[]>([]); // Removed local user state
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Opgave | undefined>(undefined);
     const [activeDragTask, setActiveDragTask] = useState<Opgave | null>(null);
-
-    // Filter states
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
     const [filterAnsvarlig, setFilterAnsvarlig] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -47,10 +183,8 @@ const OpgaverPage: React.FC = () => {
 
     useEffect(() => {
         fetchTasks();
-        // fetchUsers(); // Removed
     }, []);
 
-    // Deep linking: Open modal if ID is in URL
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
@@ -59,12 +193,10 @@ const OpgaverPage: React.FC = () => {
             if (task) {
                 setEditingTask(task);
                 setIsModalOpen(true);
-                // Clear URL param? Maybe not, so reload keeps it open.
             }
         }
     }, [tasks, isLoading]);
 
-    // Reactivity fix: Update editingTask when tasks list changes (e.g. after comment add/delete)
     useEffect(() => {
         if (editingTask) {
             const updated = tasks.find(t => t.id === editingTask.id);
@@ -74,7 +206,20 @@ const OpgaverPage: React.FC = () => {
         }
     }, [tasks]);
 
-    // Memoized grouping and sorting
+    const customCollisionDetection: CollisionDetection = (args) => {
+        const archiveContainer = args.droppableContainers.find(c => c.id === 'archive-dropzone');
+        if (archiveContainer) {
+            const archiveIntersection = pointerWithin({
+                ...args,
+                droppableContainers: [archiveContainer]
+            });
+            if (archiveIntersection.length > 0) {
+                return archiveIntersection;
+            }
+        }
+        return closestCorners(args);
+    };
+
     const memoizedTasksByStatus = React.useMemo(() => {
         const groups: Record<OpgaveStatus, Opgave[]> = {
             [OpgaveStatus.BACKLOG]: [],
@@ -83,61 +228,52 @@ const OpgaverPage: React.FC = () => {
             [OpgaveStatus.TEST]: [],
             [OpgaveStatus.DONE]: [],
         };
-
         tasks.forEach(task => {
-            if (groups[task.status]) {
-                groups[task.status].push(task);
-            }
+            if (groups[task.status]) groups[task.status].push(task);
         });
-
-        // Priority weights
         const priorityWeight: Record<OpgavePriority, number> = {
-            [OpgavePriority.URGENT]: 4,
-            [OpgavePriority.HIGH]: 3,
-            [OpgavePriority.MEDIUM]: 2,
-            [OpgavePriority.LOW]: 1,
+            [OpgavePriority.URGENT]: 4, [OpgavePriority.HIGH]: 3, [OpgavePriority.MEDIUM]: 2, [OpgavePriority.LOW]: 1,
         };
-
-        // Sort each group
         Object.values(OpgaveStatus).forEach(status => {
             groups[status].sort((a, b) => {
                 const weightA = priorityWeight[a.prioritet] || 0;
                 const weightB = priorityWeight[b.prioritet] || 0;
-
-                if (weightA !== weightB) {
-                    return weightB - weightA;
-                }
+                if (weightA !== weightB) return weightB - weightA;
                 return (a.index || 0) - (b.index || 0);
             });
         });
-
         return groups;
     }, [tasks]);
 
     const getFilteredTasks = (status: OpgaveStatus) => {
         let list = memoizedTasksByStatus[status];
+
+        // Filter by Assignee
         if (filterAnsvarlig) {
             list = list.filter(t => t.ansvarlig?.toString() === filterAnsvarlig);
         }
+
+        // Filter by Search Query (Title and Description)
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            list = list.filter(t =>
+                t.titel.toLowerCase().includes(query) ||
+                (t.beskrivelse && t.beskrivelse.toLowerCase().includes(query))
+            );
+        }
+
         return list;
     };
 
     const handleAssigneeChange = async (opgaveId: number, userId: number | null) => {
-        // Optimistic update
         setTasks(prev => prev.map(t =>
             t.id === opgaveId ? { ...t, ansvarlig: userId, ansvarlig_details: users.find(u => u.id === userId) } : t
         ));
-
         try {
             await opgaveService.update(opgaveId, { ansvarlig: userId });
-        } catch (error) {
-            console.error("Failed to update assignee", error);
-            fetchTasks(); // Revert on error
-        }
+        } catch (error) { fetchTasks(); }
     };
 
-
-    // DnD Sensors
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -147,143 +283,99 @@ const OpgaverPage: React.FC = () => {
         const { active } = event;
         const task = tasks.find(t => t.id === active.id);
         if (task) setActiveDragTask(task);
+        setOverId(null);
     };
 
     const handleDragOver = (event: DragOverEvent) => {
-        // Optional: Handling drag over if we want real-time rearranging across columns visually before drop
-        // For simplicity, we mostly rely on dragEnd for cross-column logic in this initial version, 
-        // but sorting within column needs live updates.
-        // Implementing full sortable across containers is complex, simplified for now:
-        // We just let the overlay be the feedback.
+        setOverId(event.over?.id || null);
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
-        setActiveDragTask(null);
         const { active, over } = event;
+        setActiveDragTask(null);
+        setOverId(null);
 
         if (!over) return;
 
-        const activeId = active.id;
-        const overId = over.id; // Could be a task ID or a column ID
+        // Robust ID lookup (handles string vs number)
+        const activeTask = tasks.find(t => String(t.id) === String(active.id));
 
-        // Find the active task object
-        const activeTask = tasks.find(t => t.id === activeId);
-        if (!activeTask) return;
+        if (!activeTask) {
+            console.warn('DragEnd: No active task found for ID', active.id);
+            return;
+        }
 
-        // Determine target status
-        let targetStatus: OpgaveStatus | undefined;
-        let newIndex = 0; // Simplified index logic for now
+        if (over.id === 'archive-dropzone') {
+            const taskId = activeTask.id;
+            console.log('[Archive] Drop detected for ID:', taskId);
 
-        // Check if over is a Column
-        if (Object.values(OpgaveStatus).includes(overId as OpgaveStatus)) {
-            targetStatus = overId as OpgaveStatus;
-            // append to end
-        } else {
-            // Over is another Task
-            const overTask = tasks.find(t => t.id === overId);
-            if (overTask) {
-                targetStatus = overTask.status;
-                // Insert logic would go here if we want precise reordering
+            // Optimistic update using robust string-safe filter
+            setTasks(prev => prev.filter(t => String(t.id) !== String(active.id)));
+
+            try {
+                await opgaveService.archive(taskId);
+                console.log('[Archive] Server success');
+            } catch (error) {
+                console.error('[Archive] FAILED - reloading tasks:', error);
+                fetchTasks(); // Restore from server
             }
+            return;
+        }
+
+        let targetStatus: OpgaveStatus | undefined;
+        if (Object.values(OpgaveStatus).includes(over.id as OpgaveStatus)) {
+            targetStatus = over.id as OpgaveStatus;
+        } else {
+            const overTask = tasks.find(t => String(t.id) === String(over.id));
+            if (overTask) targetStatus = overTask.status;
         }
 
         if (targetStatus && targetStatus !== activeTask.status) {
-            // Optimistic Update (status only)
-            setTasks(prev => prev.map(t =>
-                t.id === activeTask.id ? { ...t, status: targetStatus! } : t
-            ));
-
-            // API Call
+            setTasks(prev => prev.map(t => String(t.id) === String(activeTask.id) ? { ...t, status: targetStatus! } : t));
             try {
                 const updatedTask = await opgaveService.updateStatus(activeTask.id, targetStatus);
-                // Update with full data from backend (including new history)
-                setTasks(prev => prev.map(t =>
-                    t.id === activeTask.id ? updatedTask : t
-                ));
-            } catch (error) {
-                console.error("Failed to update status", error);
-                // Revert or show error
-                fetchTasks(); // Reload to be safe
-            }
+                setTasks(prev => prev.map(t => String(t.id) === String(activeTask.id) ? updatedTask : t));
+            } catch (error) { fetchTasks(); }
         }
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-100 font-sans">
-            {/* Toolbar */}
-            <div className="bg-white px-4 py-3 shadow-sm z-10 flex flex-wrap gap-4 items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Opgaver</h1>
-                    <p className="text-xs text-gray-500">Udvikling og fejlrettelser</p>
-                </div>
+        <DndContext
+            sensors={sensors}
+            collisionDetection={customCollisionDetection}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+        >
+            <OpgaverBoardContent
+                tasks={tasks}
+                isLoading={isLoading}
+                activeDragTask={activeDragTask}
+                overId={overId}
+                users={users}
+                filterAnsvarlig={filterAnsvarlig}
+                setFilterAnsvarlig={setFilterAnsvarlig}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                setIsArchiveOpen={setIsArchiveOpen}
+                setIsModalOpen={setIsModalOpen}
+                setEditingTask={setEditingTask}
+                fetchTasks={fetchTasks}
+                handleAssigneeChange={handleAssigneeChange}
+                getFilteredTasks={getFilteredTasks}
+            />
 
-                <div className="flex items-center gap-4">
-                    {/* Filters */}
-                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                        <Filter size={14} className="text-gray-400" />
-                        <select
-                            className="bg-transparent text-sm focus:outline-none text-gray-600"
-                            value={filterAnsvarlig}
-                            onChange={(e) => setFilterAnsvarlig(e.target.value)}
-                        >
-                            <option value="">Alle ansvarlige</option>
-                            {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.first_name || u.username}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <button
-                        onClick={() => { setEditingTask(undefined); setIsModalOpen(true); }}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-blue-700 transition"
-                    >
-                        <Plus size={18} />
-                        Ny Opgave
-                    </button>
-                </div>
-            </div>
-
-            {/* Board Area */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden p-2">
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCorners}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={handleDragOver}
-                >
-                    <div className="flex h-full gap-2 min-w-max">
-                        {Object.values(OpgaveStatus).map(status => (
-                            <TaskColumn
-                                key={status}
-                                id={status}
-                                title={status === OpgaveStatus.BACKLOG ? 'Indbakke' :
-                                    status === OpgaveStatus.TODO ? 'Klar til start' :
-                                        status === OpgaveStatus.IN_PROGRESS ? 'Igang' :
-                                            status === OpgaveStatus.TEST ? 'Test' : 'Færdig'}
-                                tasks={getFilteredTasks(status)}
-                                onTaskClick={async (t) => {
-                                    setEditingTask(t);
-                                    setIsModalOpen(true);
-                                    // Fetch full details (comments, history)
-                                    try {
-                                        const fullTask = await opgaveService.get(t.id);
-                                        setEditingTask(fullTask);
-                                    } catch (e) {
-                                        console.error("Failed to fetch task details", e);
-                                    }
-                                }}
-                                users={users}
-                                onAssigneeChange={handleAssigneeChange}
-                            />
-                        ))}
-                    </div>
-
-                    <DragOverlay>
-                        {activeDragTask ? <TaskCard opgave={activeDragTask} onClick={() => { }} /> : null}
-                    </DragOverlay>
-                </DndContext>
-            </div>
+            {isArchiveOpen && (
+                <ArchiveModal
+                    isOpen={isArchiveOpen}
+                    onClose={() => setIsArchiveOpen(false)}
+                    onRestore={fetchTasks}
+                    onTaskClick={(t) => {
+                        setEditingTask(t);
+                        setIsModalOpen(true);
+                    }}
+                />
+            )}
 
             {isModalOpen && (
                 <TaskDetailModal
@@ -294,7 +386,7 @@ const OpgaverPage: React.FC = () => {
                     users={users}
                 />
             )}
-        </div>
+        </DndContext>
     );
 };
 

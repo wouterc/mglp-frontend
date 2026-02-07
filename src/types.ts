@@ -530,6 +530,7 @@ export interface Opgave {
   index: number;
   status_historik?: OpgaveStatusLog[];
   status_direction?: number; // 1: UP, -1: DOWN, 0: SAME
+  arkiveret: boolean;
 }
 
 export interface OpgaveStatusLog {

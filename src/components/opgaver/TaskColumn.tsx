@@ -14,10 +14,18 @@ interface TaskColumnProps {
 }
 
 const TaskColumn: React.FC<TaskColumnProps> = ({ id, title, tasks, onTaskClick, users, onAssigneeChange }) => {
-    const { setNodeRef } = useDroppable({ id });
+    const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
-        <div className="flex flex-col h-full w-72 bg-gray-50/50 rounded-xl border border-gray-100/50 flex-shrink-0">
+        <div
+            className={`
+                flex flex-col h-full w-72 rounded-xl border-2 transition-all flex-shrink-0
+                ${isOver
+                    ? 'bg-blue-50 border-blue-400 shadow-lg scale-[1.01] z-20'
+                    : 'bg-gray-50/50 border-gray-100/50'
+                }
+            `}
+        >
             {/* Header */}
             <div className="px-3 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">

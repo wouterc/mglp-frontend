@@ -3,7 +3,7 @@ import Modal from '../Modal';
 import { Opgave, OpgavePriority, OpgaveStatus, User } from '../../types';
 import { opgaveService } from '../../services/opgaveService';
 import { useAppState } from '../../StateContext';
-import { X, Save, MessageSquare, Trash2, MessageCircleHeart, Edit } from 'lucide-react';
+import { X, Save, MessageSquare, Trash2, MessageCircleHeart, Edit, Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -371,6 +371,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, opga
                                 className="w-full py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg font-bold hover:bg-blue-100 flex justify-center items-center gap-2 text-sm"
                             >
                                 <MessageCircleHeart size={16} /> Send til Chat
+                            </button>
+                        )}
+
+                        {opgave && (
+                            <button
+                                onClick={async () => {
+                                    if (confirm('Arkiver denne opgave?')) {
+                                        await opgaveService.archive(opgave.id);
+                                        onSaved();
+                                        onClose();
+                                    }
+                                }}
+                                className="w-full py-2 bg-white text-orange-600 border border-orange-100 rounded-lg font-bold hover:bg-orange-50 flex justify-center items-center gap-2 text-sm"
+                            >
+                                <Archive size={16} /> Arkiver
                             </button>
                         )}
 

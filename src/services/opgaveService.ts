@@ -36,5 +36,18 @@ export const opgaveService = {
 
     deleteComment: async (commentId: number) => {
         return await api.delete(`/opgaver/opgave-kommentarer/${commentId}/`);
+    },
+
+    getStatusHistory: async (id: number) => {
+        return await api.get<any[]>(`/opgaver/opgaver/${id}/status_historik/`);
+    },
+    archive: async (id: number) => {
+        return await api.post(`/opgaver/opgaver/${id}/archive/`, {});
+    },
+    restore: async (id: number) => {
+        return await api.post(`/opgaver/opgaver/${id}/restore/`, {});
+    },
+    getArchived: async () => {
+        return await api.get<Opgave[]>(`/opgaver/opgaver/arkiverede/`);
     }
 };
