@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { api } from '../../../api';
 import { Sag, Aktivitet, SagsDokument, InformationsKilde, OutgoingEmail } from '../../../types';
+import { AktivitetService } from '../../../services/AktivitetService';
+import { DokumentService } from '../../../services/DokumentService';
+import { MailService } from '../../../services/MailService';
+import { LookupService } from '../../../services/LookupService';
 import { useAppState } from '../../../StateContext';
 import { Loader2, Copy, Trash2, Mail, FileText, CheckSquare, RefreshCw, GripVertical, ExternalLink, RotateCcw, CheckCircle } from 'lucide-react';
 import Tooltip from '../../Tooltip';
@@ -49,7 +52,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
 
     useEffect(() => {
         // Fetch source options
-        api.get<InformationsKilde[]>('/kerne/informationskilder/')
+        LookupService.getInformationsKilder()
             .then(setInformationsKilder)
             .catch(err => console.error("Could not fetch sources", err));
     }, []);
@@ -68,8 +71,8 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
         setLoading(true);
         try {
             // Fetch only items that are marked for mailing
-            const aktData = await api.get<Aktivitet[]>(`/aktiviteter/all/?sag=${sag.id}&skal_mailes=true`);
-            const dokData = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sag.id}&skal_mailes=true`);
+            const aktData = await AktivitetService.getMailBasket(sag.id);
+            const dokData = await DokumentService.getMailBasket(sag.id);
 
             setAktiviteter(aktData);
             setDokumenter(dokData);
@@ -99,7 +102,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
     const fetchOutgoing = async () => {
         if (!sag) return;
         try {
-            const data = await api.get<OutgoingEmail[]>(`/emails/outgoing/?sag=${sag.id}&limit=5`);
+            const data = await MailService.getOutgoingEmails(sag.id, 5);
             setOutgoingEmails(data);
         } catch (err) {
             console.error("Failed to fetch outgoing emails", err);
@@ -119,7 +122,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
         if (!sag) return;
         try {
             setLoading(true);
-            await api.post(`/sager/${sag.id}/reset_mail_basket/`);
+            await MailService.resetBasket(sag.id);
             await fetchData(true);
             if (onUpdate) onUpdate();
         } catch (error) {
@@ -133,11 +136,12 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
         const itemKey = `${type}-${id}`;
         setIsUpdating(prev => ({ ...prev, [itemKey]: true }));
         try {
-            const endpoint = type === 'aktivitet'
-                ? `/aktiviteter/${id}/`
-                : `/sager/sagsdokumenter/${id}/`;
+            if (type === 'aktivitet') {
+                await AktivitetService.removeFromBasket(id);
+            } else {
+                await DokumentService.removeFromBasket(id);
+            }
 
-            await api.patch(endpoint, { skal_mailes: false });
             await fetchData(true);
             if (onUpdate) onUpdate();
         } catch (error) {
@@ -217,7 +221,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
 
     const handleRetryEmail = async (id: number) => {
         try {
-            await api.post(`/emails/outgoing/${id}/retry/`);
+            await MailService.retryOutgoing(id);
             fetchOutgoing();
         } catch (err) {
             alert("Kunne ikke prøve igen.");
@@ -226,7 +230,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
 
     const handleCompleteEmail = async (id: number) => {
         try {
-            await api.post(`/emails/outgoing/${id}/mark_completed/`);
+            await MailService.completeOutgoing(id);
             fetchOutgoing();
             fetchData(true); // Full refresh of the basket
         } catch (err) {
@@ -241,7 +245,7 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
     const confirmDeleteEmail = async () => {
         if (confirmDeleteId === null) return;
         try {
-            await api.delete(`/emails/outgoing/${confirmDeleteId}/`);
+            await MailService.deleteOutgoing(confirmDeleteId);
             fetchOutgoing();
             setConfirmDeleteId(null);
         } catch (err) {
@@ -259,7 +263,11 @@ export default function MailKurvTab({ sag, onUpdate }: MailKurvTabProps) {
                 : `/sager/sagsdokumenter/${id}/`;
 
             // Use informations_kilde_id for validation/write
-            await api.patch(endpoint, { informations_kilde_id: sourceId });
+            if (type === 'aktivitet') {
+                await AktivitetService.updateAktivitet(id, { informations_kilde_id: sourceId });
+            } else {
+                await DokumentService.updateDokument(id, { informations_kilde_id: sourceId });
+            }
 
             // Refresh list
             await fetchData(true);

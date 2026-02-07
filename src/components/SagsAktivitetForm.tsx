@@ -1,8 +1,8 @@
 // --- Fil: src/components/SagsAktivitetForm.tsx ---
 import React, { useState, useEffect, ReactElement, ChangeEvent, FormEvent } from 'react';
-import { api } from '../api';
 import { Save, Maximize2 } from 'lucide-react';
 import type { Aktivitet } from '../types';
+import { AktivitetService } from '../services/AktivitetService';
 import Modal from './Modal';
 
 interface SagsAktivitetFormProps {
@@ -59,7 +59,7 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
         // Auto-save logic for the "Important" flag
         if (name === 'kommentar_vigtig' && erRedigering && aktivitet) {
             try {
-                await api.patch(`/aktiviteter/${aktivitet.id}/`, {
+                await AktivitetService.updateAktivitet(aktivitet.id, {
                     kommentar_vigtig: value
                 });
                 // Update baseAktivitet so the Save button dims again if no other changes
@@ -75,7 +75,9 @@ function SagsAktivitetForm({ onSave, onCancel, aktivitet, sagId, mode = 'komment
         setIsSaving(true);
 
         try {
-            await api.patch(`/aktiviteter/${aktivitet?.id}/`, formData);
+            if (aktivitet?.id) {
+                await AktivitetService.updateAktivitet(aktivitet.id, formData);
+            }
             onSave();
         } catch (error: any) {
             console.error('Fejl ved lagring af sagsaktivitet:', error);

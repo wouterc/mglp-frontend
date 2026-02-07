@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Sag, SagsDokument, Blokinfo, InformationsKilde, StandardMappe } from '../../../types';
-import { api } from '../../../api';
+import { DokumentService } from '../../../services/DokumentService';
 import { ChevronDown, ChevronUp, RefreshCw, FileText, CheckCircle2, AlertCircle, PlusCircle, Mail, Loader2, ChevronsDown, ChevronsUp, ChevronRight, Save } from 'lucide-react';
 import DokumentRow from '../../rows/DokumentRow';
 import { useAppState } from '../../../StateContext';
@@ -71,7 +71,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     useEffect(() => {
         const checkSync = async () => {
             try {
-                const res = await api.get<any>('/skabeloner/dokumenter/sync_check/');
+                const res = await DokumentService.checkSyncStatus();
                 setNyeDokumenterFindes(res.nye_dokumenter_findes || false);
             } catch (e) {
                 console.error("Sync check fejl:", e);
@@ -156,7 +156,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         }
 
         try {
-            const data = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sagId}`);
+            const data = await DokumentService.getDokumenter(sagId);
             dispatch({
                 type: 'SET_CACHED_DOKUMENTER',
                 payload: { sagId: sagId, dokumenter: data }
@@ -175,7 +175,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            await api.post(`/sager/${sag.id}/synkroniser_dokumenter/`);
+            await DokumentService.synkroniser(sag.id);
             await fetchDokumenter(true);
             setNyeDokumenterFindes(false);
             if (onUpdate) onUpdate();
@@ -201,21 +201,12 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         }
 
         try {
-            const formData = new FormData();
-            formData.append('fil', fileToUpload);
-            formData.append('last_modified', file.lastModified.toString());
 
             // Auto-set status to 80 (Udført) when file is uploaded
             const status80 = statusser.find(s => s.status_nummer === 80);
-            if (status80) {
-                formData.append('status_id', status80.id.toString());
-            }
+            const statusId = status80 ? status80.id : undefined;
 
-            if (undermappeId !== undefined) {
-                formData.append('undermappe_id', undermappeId ? undermappeId.toString() : '');
-            }
-
-            await api.patch(`/sager/sagsdokumenter/${docId}/`, formData);
+            await DokumentService.uploadFil(docId, fileToUpload, statusId, undermappeId);
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Upload fejl:", e);
@@ -230,7 +221,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const handleDeleteFile = async (docId: number) => {
         try {
-            await api.patch(`/sager/sagsdokumenter/${docId}/`, { fil: null });
+            await DokumentService.deleteFil(docId);
             await fetchDokumenter(true);
         } catch (e) {
             console.error("Slet fejl:", e);
@@ -244,7 +235,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const handleLinkFile = async (docId: number, path: string) => {
         try {
-            await api.post(`/sager/sagsdokumenter/${docId}/link_file/`, { path });
+            await DokumentService.linkFil(docId, path);
             await fetchDokumenter(true);
         } catch (e: any) {
             console.error("Link fejl:", e);
@@ -269,7 +260,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         if (!editingDoc) return;
         setIsSavingComment(true);
         try {
-            await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, {
+            await DokumentService.updateDokument(editingDoc.id, {
                 kommentar: editCommentText,
                 mail_titel: editMailTitle,
                 kommentar_vigtig: editCommentImportant
@@ -333,7 +324,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
         setIsRenaming(true);
         try {
-            await api.patch(`/sager/sagsdokumenter/${renamingDoc.id}/`, { filnavn: prefName });
+            await DokumentService.updateDokument(renamingDoc.id, { filnavn: prefName });
             await fetchDokumenter(true);
             setRenamingDoc(null);
         } catch (e) {
@@ -350,7 +341,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
 
     const handleInlineSave = async (docId: number, field: string, value: any) => {
         try {
-            const response = await api.patch<any>(`/sager/sagsdokumenter/${docId}/`, { [field]: value });
+            const response = await DokumentService.updateDokument(docId, { [field]: value });
             // Manual update in cache to avoid full reload
             dispatch({
                 type: 'UPDATE_CACHED_DOKUMENT',
@@ -383,8 +374,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         const nextNr = maxNr < 100 ? 101 : maxNr + 1;
 
         setIsSavingNy(prev => ({ ...prev, [gruppeId]: true }));
+        setIsSavingNy(prev => ({ ...prev, [gruppeId]: true }));
         try {
-            await api.post('/sager/sagsdokumenter/', {
+            await DokumentService.createDokumentRow({
                 sag: sag.id,
                 gruppe: gruppeId,
                 titel: navn,
@@ -459,8 +451,9 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         const nextNr = maxNr < 100 ? 101 : maxNr + 1;
 
         // 3. Gem via API
+        // 3. Gem via API
         try {
-            const response = await api.post<SagsDokument>('/sager/sagsdokumenter/', {
+            const response = await DokumentService.createDokumentRow({
                 sag: sag.id,
                 gruppe: gruppeId, // Brug 'gruppe' som i handleQuickAdd
                 titel: newTitle,
@@ -505,7 +498,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         if (!deleteConfirmDoc) return;
         const docId = deleteConfirmDoc.id;
         try {
-            await api.delete(`/sager/sagsdokumenter/${docId}/`);
+            await DokumentService.deleteDokumentRow(docId);
             dispatch({
                 type: 'SET_CACHED_DOKUMENTER',
                 payload: {
@@ -530,7 +523,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         if (!renamingTitleDoc) return;
         setIsRenamingTitle(true);
         try {
-            await api.patch(`/sager/sagsdokumenter/${renamingTitleDoc.id}/`, { titel: editTitle });
+            await DokumentService.updateDokument(renamingTitleDoc.id, { titel: editTitle });
             dispatch({
                 type: 'UPDATE_CACHED_DOKUMENT',
                 payload: {
@@ -561,7 +554,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
         if (!confirmTemplateDoc) return;
 
         try {
-            await api.post(`/sager/sagsdokumenter/${confirmTemplateDoc.id}/gem_til_skabelon/`);
+            await DokumentService.gemSomSkabelon(confirmTemplateDoc.id);
             // Update cache/fetch
             await fetchDokumenter(true);
             setNyeDokumenterFindes(true);
@@ -1140,7 +1133,7 @@ export default function DokumenterTab({ sag, onUpdate }: DokumenterTabProps) {
                                     if (editingDoc) {
                                         try {
                                             // Auto-save immediately for the checkbox
-                                            await api.patch(`/sager/sagsdokumenter/${editingDoc.id}/`, {
+                                            await DokumentService.updateDokument(editingDoc.id, {
                                                 kommentar_vigtig: val
                                             });
                                             // Update local state and cache

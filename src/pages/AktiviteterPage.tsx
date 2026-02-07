@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, Fragment, ReactElement, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../api';
+import { SagService } from '../services/SagService';
 import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, RefreshCw, PlusCircle, Mail, MoreVertical, Copy, Edit3, Trash2, CheckCircle2 } from 'lucide-react';
 import { useSager } from '../contexts/SagContext';
 import { useLookups } from '../contexts/LookupContext';
@@ -21,6 +22,8 @@ import CaseSelector from '../components/ui/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ActivityDocumentLinkerModal from '../components/modals/ActivityDocumentLinkerModal'; // @# New Import
 import { SagsDokument } from '../types'; // @# New Import
+import { AktivitetService } from '../services/AktivitetService';
+import { DokumentService } from '../services/DokumentService';
 import { Link as LinkIcon } from 'lucide-react'; // @# New Import
 import LinkOpenPreferenceModal from '../components/modals/LinkOpenPreferenceModal';
 import HelpButton from '../components/ui/HelpButton';
@@ -119,7 +122,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             if (sagsDokumenter.length === 0 && !isFetchingDocs) {
                 setIsFetchingDocs(true);
                 try {
-                    const docs = await api.get<SagsDokument[]>(`/sager/dokumenter/?sag_id=${valgtSag.id}`);
+                    const docs = await DokumentService.getDokumenter(valgtSag.id);
                     setSagsDokumenter(docs);
                 } catch (e) {
                     console.error("Fejl ved hentning af dokumenter til linking:", e);
@@ -201,18 +204,17 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
         try {
             // 1. Hent oversigter (summaries) - for rækkefølge og gruppe-info
-            const summaries = await api.get<AktivitetGruppeSummary[]>(`/aktiviteter/?sag=${sagId}`);
+            const summaries = await AktivitetService.getSummaries(sagId);
             adDispatch({ type: 'SET_SAG_GRUPPE_SUMMARIES', payload: { sagId, summaries } });
 
             // 2. Hent ALLE aktiviteter på én gang (Optimeret backend-kald)
-            const allResp = await api.get<any>(`/aktiviteter/all/?sag=${sagId}`);
-            const allAktiviteter = allResp.results || allResp;
+            const allAktiviteter = await AktivitetService.getAllAktiviteter(sagId);
 
             // Gem i cache
             adDispatch({ type: 'SET_CACHED_AKTIVITETER', payload: { sagId, aktiviteter: allAktiviteter } });
 
             // 3. Tjek for nye skabeloner
-            const syncRes = await api.get<any>('/skabeloner/aktiviteter/sync_check/');
+            const syncRes = await AktivitetService.checkSyncStatus();
             setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
         } catch (e: any) {
             if (!hasData) {
@@ -226,7 +228,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
     const handleSelectSag = async (sagId: number) => {
         try {
-            const fuldSag = await api.get<Sag>(`/sager/${sagId}/`);
+            const fuldSag = await SagService.getSag(sagId);
             adDispatch({ type: 'NULSTIL_HENTEDE_AKTIVITETER' });
             sagDispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
         } catch (e: any) { console.error(e.message); }
@@ -245,7 +247,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
         setIsSavingNy(prev => ({ ...prev, [gruppeId]: true }));
         try {
-            await api.post('/aktiviteter/', {
+            await AktivitetService.createAktivitet({
                 sag_id: valgtSag.id,
                 gruppe_id: gruppeId,
                 proces_id: procesId,
@@ -304,7 +306,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
         // 3. Gem via API
         try {
-            await api.post<Aktivitet>('/aktiviteter/', {
+            await AktivitetService.createAktivitet({
                 sag_id: valgtSag.id,
                 gruppe_id: gruppeId,
                 proces_id: sourceAktivitet.proces?.id || sourceAktivitet.gruppe?.proces_id,
@@ -334,7 +336,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const id = deleteConfirmAktivitet.id;
         const gruppeId = deleteConfirmAktivitet.gruppe?.id;
         try {
-            await api.delete(`/aktiviteter/${id}/`);
+            await AktivitetService.deleteAktivitet(id);
             if (gruppeId) {
                 fetchAktiviteterData(valgtSag.id);
             }
@@ -350,7 +352,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
         if (!valgtSag) return;
         try {
-            const updatedAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitetId}/`, { dokumenter: documentIds });
+            const updatedAktivitet = await AktivitetService.updateAktivitet(aktivitetId, { dokumenter: documentIds });
 
             const gId = updatedAktivitet.gruppe?.id;
             if (gId) {
@@ -371,7 +373,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (!renamingAktivitet || !valgtSag) return;
         setIsRenamingAktivitet(true);
         try {
-            const updatedDoc = await api.patch<Aktivitet>(`/aktiviteter/${renamingAktivitet.id}/`, { aktivitet: editAktivitetNavn });
+            const updatedDoc = await AktivitetService.updateAktivitet(renamingAktivitet.id, { aktivitet: editAktivitetNavn });
             const gId = updatedDoc.gruppe?.id;
             if (gId) {
                 fetchAktiviteterData(valgtSag.id);
@@ -394,7 +396,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (!confirmTemplateActivity || !valgtSag) return;
 
         try {
-            const response = await api.post<{ ny_aktivitet_nr: number }>(`/aktiviteter/${confirmTemplateActivity.id}/gem_til_skabelon/`);
+            const response = await AktivitetService.gemSomSkabelon(confirmTemplateActivity.id);
             const gruppeId = confirmTemplateActivity.gruppe?.id;
 
             if (gruppeId) {
@@ -544,7 +546,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         const feltNavn = field === 'status' ? 'status_id' : field;
         const payload = { [feltNavn]: value };
         try {
-            const opdateretAktivitet = await api.patch<Aktivitet>(`/aktiviteter/${aktivitet.id}/`, payload);
+            const opdateretAktivitet = await AktivitetService.updateAktivitet(aktivitet.id, payload);
             const gruppeId = opdateretAktivitet.gruppe?.id;
             if (gruppeId) {
                 fetchAktiviteterData(valgtSag.id);
@@ -578,7 +580,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         if (!valgtSag) return;
         setIsFetchingAll(true);
         try {
-            await api.post<any>(`/sager/${valgtSag.id}/synkroniser_aktiviteter/`);
+            await AktivitetService.synkroniser(valgtSag.id);
 
             // Genhent data
             await fetchAktiviteterData(valgtSag.id);

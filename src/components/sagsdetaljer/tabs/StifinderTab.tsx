@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Folder, File, ChevronRight, Upload, Trash2, Edit2, Plus, Download, RefreshCw, MoreVertical, FolderPlus, Home, Move, ExternalLink } from 'lucide-react';
 
-import { api } from '../../../api';
 import { API_BASE_URL } from '../../../config';
 import { useDropzone } from 'react-dropzone';
 import ConfirmModal from '../../ui/ConfirmModal';
@@ -12,19 +11,8 @@ import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensors, useSe
 import RenameFileModal from '../../ui/RenameFileModal';
 import MoveModal from '../../ui/MoveModal';
 
-interface FileItem {
-    name: string;
-    is_dir: boolean;
-    size: number;
-    modified: number;
-    path: string;
-    linked_info?: {
-        id: number;
-        titel: string;
-        gruppe_navn: string;
-        gruppe_nr: number;
-    } | null;
-}
+import { FilService } from '../../../services/FilService';
+import { FileItem } from '../../../types';
 
 interface StifinderTabProps {
     sag: {
@@ -342,10 +330,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
 
         showToast(`Forbereder download af ${selectedPaths.size} filer...`, 'info');
         try {
-            const response = await api.post<Response>(`/sager/filer/download_multiple/`, {
-                sag_id: sag.id,
-                paths: Array.from(selectedPaths)
-            }, { rawResponse: true } as any);
+            const response = await FilService.downloadMultiple(sag.id, Array.from(selectedPaths));
 
             if (!response.ok) {
                 const text = await response.text();
@@ -397,8 +382,9 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
     const fetchItems = async (path: string = currentPath) => {
         setLoading(true);
         setError(null);
+        setError(null);
         try {
-            const data = await api.get<FileItem[]>(`/sager/filer/?sag_id=${sag.id}&path=${encodeURIComponent(path)}`);
+            const data = await FilService.getFiler(sag.id, path);
             setItems(data);
         } catch (err: any) {
             setError(err.message || 'Kunne ikke hente filer');
@@ -432,7 +418,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         });
 
         try {
-            await api.post('/sager/filer/upload/', formData);
+            await FilService.uploadFiler(formData);
             showToast('Filer uploadet', 'success');
             fetchItems();
         } catch (err: any) {
@@ -476,12 +462,9 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
 
     const handleCreateFolder = async (name: string) => {
         if (!name) return;
+        if (!name) return;
         try {
-            await api.post('/sager/filer/create_folder/', {
-                sag_id: sag.id,
-                path: currentPath,
-                name: name
-            });
+            await FilService.createFolder(sag.id, currentPath, name);
             showToast('Mappe oprettet', 'success');
             fetchItems();
         } catch (err: any) {
@@ -505,11 +488,9 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
     const handleDelete = async () => {
         const item = confirmDelete.item;
         if (!item) return;
+        if (!item) return;
         try {
-            await api.post('/sager/filer/delete_entry/', {
-                sag_id: sag.id,
-                path: item.path
-            });
+            await FilService.deleteEntry(sag.id, item.path);
             showToast(`${item.is_dir ? 'Mappe' : 'Fil'} slettet`, 'success');
             setConfirmDelete({ isOpen: false, item: null });
             fetchItems();
@@ -600,11 +581,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         }
 
         try {
-            await api.post('/sager/filer/rename_entry/', {
-                sag_id: sag.id,
-                path: item.path,
-                new_name: finalName
-            });
+            await FilService.renameEntry(sag.id, item.path, finalName);
             showToast('Omdøbt succesfuldt', 'success');
             setPromptState(prev => ({ ...prev, isOpen: false }));
             setRenameState(prev => ({ ...prev, isOpen: false }));
@@ -652,11 +629,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         }
 
         try {
-            await api.post('/sager/filer/move_entry/', {
-                sag_id: sag.id,
-                source_path: sourcePath,
-                target_path: targetPath
-            });
+            await FilService.moveEntry(sag.id, sourcePath, targetPath);
             showToast('Flyttet succesfuldt', 'success');
             fetchItems();
         } catch (err: any) {
@@ -679,11 +652,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         if (!item) return;
 
         try {
-            await api.post('/sager/filer/move_entry/', {
-                sag_id: sag.id,
-                source_path: item.path,
-                target_path: targetPath
-            });
+            await FilService.moveEntry(sag.id, item.path, targetPath);
             showToast('Flyttet succesfuldt', 'success');
             setMoveState({ isOpen: false, item: null });
             fetchItems();
@@ -720,11 +689,7 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
                 return;
             }
 
-            await api.post('/sager/filer/move_entry/', {
-                sag_id: sag.id,
-                source_path: sourcePath,
-                target_path: targetPath
-            });
+            await FilService.moveEntry(sag.id, sourcePath, targetPath);
             showToast('Flyttet succesfuldt', 'success');
             fetchItems();
         } catch (err: any) {
@@ -748,10 +713,9 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         } else {
             try {
                 showToast('Henter fil...', 'info');
-                const url = `/sager/filer/download/?sag_id=${sag.id}&path=${encodeURIComponent(item.path)}&view=1`;
 
-                // Use the raw fetch wrapper but with our auth logic
-                const response = await api.get<Response>(url, { rawResponse: true } as any);
+                // Use service
+                const response = await FilService.downloadFil(sag.id, item.path, true);
 
                 // Read as Blob
                 const blob = await response.blob();

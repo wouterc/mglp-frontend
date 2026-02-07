@@ -13,7 +13,6 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { opgaveService } from '../services/opgaveService';
-import { api } from '../api';
 import { useAppState } from '../StateContext';
 import { Opgave, OpgaveStatus, User, OpgavePriority } from '../types';
 import TaskColumn from '../components/opgaver/TaskColumn';
@@ -75,18 +74,21 @@ const OpgaverPage: React.FC = () => {
         }
     }, [tasks]);
 
-    // Derived state: Group tasks by status
-    const tasksByStatus = {
-        [OpgaveStatus.BACKLOG]: tasks.filter(t => t.status === OpgaveStatus.BACKLOG),
-        [OpgaveStatus.TODO]: tasks.filter(t => t.status === OpgaveStatus.TODO),
-        [OpgaveStatus.IN_PROGRESS]: tasks.filter(t => t.status === OpgaveStatus.IN_PROGRESS),
-        [OpgaveStatus.TEST]: tasks.filter(t => t.status === OpgaveStatus.TEST),
-        [OpgaveStatus.DONE]: tasks.filter(t => t.status === OpgaveStatus.DONE),
-    };
+    // Memoized grouping and sorting
+    const memoizedTasksByStatus = React.useMemo(() => {
+        const groups: Record<OpgaveStatus, Opgave[]> = {
+            [OpgaveStatus.BACKLOG]: [],
+            [OpgaveStatus.TODO]: [],
+            [OpgaveStatus.IN_PROGRESS]: [],
+            [OpgaveStatus.TEST]: [],
+            [OpgaveStatus.DONE]: [],
+        };
 
-    // Filtered
-    const getFilteredTasks = (status: OpgaveStatus) => {
-        let list = tasksByStatus[status];
+        tasks.forEach(task => {
+            if (groups[task.status]) {
+                groups[task.status].push(task);
+            }
+        });
 
         // Priority weights
         const priorityWeight: Record<OpgavePriority, number> = {
@@ -96,17 +98,24 @@ const OpgaverPage: React.FC = () => {
             [OpgavePriority.LOW]: 1,
         };
 
-        // Sort by priority (descending) then by index
-        list.sort((a, b) => {
-            const weightA = priorityWeight[a.prioritet] || 0;
-            const weightB = priorityWeight[b.prioritet] || 0;
+        // Sort each group
+        Object.values(OpgaveStatus).forEach(status => {
+            groups[status].sort((a, b) => {
+                const weightA = priorityWeight[a.prioritet] || 0;
+                const weightB = priorityWeight[b.prioritet] || 0;
 
-            if (weightA !== weightB) {
-                return weightB - weightA; // Higher priority first
-            }
-            return a.index - b.index;
+                if (weightA !== weightB) {
+                    return weightB - weightA;
+                }
+                return (a.index || 0) - (b.index || 0);
+            });
         });
 
+        return groups;
+    }, [tasks]);
+
+    const getFilteredTasks = (status: OpgaveStatus) => {
+        let list = memoizedTasksByStatus[status];
         if (filterAnsvarlig) {
             list = list.filter(t => t.ansvarlig?.toString() === filterAnsvarlig);
         }
@@ -179,15 +188,18 @@ const OpgaverPage: React.FC = () => {
         }
 
         if (targetStatus && targetStatus !== activeTask.status) {
-            // Optimistic Update
-            const updatedTasks = tasks.map(t =>
+            // Optimistic Update (status only)
+            setTasks(prev => prev.map(t =>
                 t.id === activeTask.id ? { ...t, status: targetStatus! } : t
-            );
-            setTasks(updatedTasks);
+            ));
 
             // API Call
             try {
-                await opgaveService.updateStatus(activeTask.id, targetStatus);
+                const updatedTask = await opgaveService.updateStatus(activeTask.id, targetStatus);
+                // Update with full data from backend (including new history)
+                setTasks(prev => prev.map(t =>
+                    t.id === activeTask.id ? updatedTask : t
+                ));
             } catch (error) {
                 console.error("Failed to update status", error);
                 // Revert or show error
@@ -250,7 +262,17 @@ const OpgaverPage: React.FC = () => {
                                         status === OpgaveStatus.IN_PROGRESS ? 'Igang' :
                                             status === OpgaveStatus.TEST ? 'Test' : 'Færdig'}
                                 tasks={getFilteredTasks(status)}
-                                onTaskClick={(t) => { setEditingTask(t); setIsModalOpen(true); }}
+                                onTaskClick={async (t) => {
+                                    setEditingTask(t);
+                                    setIsModalOpen(true);
+                                    // Fetch full details (comments, history)
+                                    try {
+                                        const fullTask = await opgaveService.get(t.id);
+                                        setEditingTask(fullTask);
+                                    } catch (e) {
+                                        console.error("Failed to fetch task details", e);
+                                    }
+                                }}
                                 users={users}
                                 onAssigneeChange={handleAssigneeChange}
                             />

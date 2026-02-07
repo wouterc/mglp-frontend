@@ -5,7 +5,7 @@ import React, { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { Building2, Phone, Mail, Home, User, Check, Copy, Loader2, Edit, Save } from 'lucide-react';
 import { Sag, Virksomhed, Kontakt } from '../../../types';
 import { SagService } from '../../../services/SagService';
-import { api } from '../../../api'; // Stadig brugt til hentning af mæglere/kontakter
+import { LookupService } from '../../../services/LookupService';
 import useDebounce from '../../../hooks/useDebounce';
 import VirksomhedForm from '../../VirksomhedForm';
 import KontaktForm from '../../KontaktForm';
@@ -50,8 +50,8 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
         const fetchMaeglere = async () => {
             setIsLoadingMaeglere(true);
             try {
-                const data = await api.get<any>('/register/virksomheder/?er_maegler=true');
-                setAlleMaeglere(Array.isArray(data) ? data : data.results);
+                const data = await LookupService.getVirksomheder({ er_maegler: 'true' });
+                setAlleMaeglere(data);
             } catch (error) {
                 console.error("Fejl ved hentning af mæglere:", error);
             } finally {
@@ -66,8 +66,8 @@ function MaeglerTab({ sag, onUpdate }: MaeglerTabProps) {
             const fetchKontakter = async () => {
                 setIsLoadingKontakter(true);
                 try {
-                    const data = await api.get<any>(`/register/kontakter/?virksomhed=${sag.maegler_virksomhed?.id}&er_maegler_kontakt=true`);
-                    setKontakter(Array.isArray(data) ? data : data.results);
+                    const data = await LookupService.getKontakter({ virksomhed: sag.maegler_virksomhed?.id, er_maegler_kontakt: 'true' });
+                    setKontakter(data);
                 } catch (error) {
                     console.error("Fejl ved hentning af kontakter:", error);
                 } finally {

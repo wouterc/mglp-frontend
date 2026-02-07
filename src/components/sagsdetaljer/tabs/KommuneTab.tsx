@@ -3,7 +3,7 @@
 // @# 2025-11-23 12:15 - Tilføjet redigerings-mulighed (popup) for kommune-adresser.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Home, Phone, Mail, MapPin, Edit } from 'lucide-react';
-import { api } from '../../../api';
+import { LookupService } from '../../../services/LookupService';
 import { Sag, Virksomhed } from '../../../types';
 import VirksomhedForm from '../../VirksomhedForm';
 
@@ -25,8 +25,8 @@ function KommuneTab({ sag }: KommuneTabProps) {
 
         setIsLoading(true);
         try {
-            const data = await api.get<any>(`/register/virksomheder/?er_kommune=true&kommunekode=${sag.kommunekode}`);
-            setAdresser(Array.isArray(data) ? data : data.results || []);
+            const data = await LookupService.getVirksomheder({ er_kommune: 'true', kommunekode: sag.kommunekode });
+            setAdresser(data);
         } catch (error) {
             console.error(error);
         } finally {

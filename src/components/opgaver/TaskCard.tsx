@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Opgave, OpgavePriority, User } from '../../types';
-import { Calendar, MessageSquare, User as UserIcon, ChevronDown } from 'lucide-react';
+import { Calendar, MessageSquare, User as UserIcon, ChevronDown, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 
 interface TaskCardProps {
@@ -59,9 +59,33 @@ const TaskCard: React.FC<TaskCardProps> = ({ opgave, onClick, users, onAssigneeC
             {...attributes}
             {...listeners}
             onClick={() => onClick(opgave)}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group mb-3"
+            className="bg-white p-4 rounded-xl shadow-sm border border-gray-300 hover:shadow-md transition-all cursor-pointer group mb-3 relative overflow-hidden"
         >
-            <div className="flex justify-between items-start mb-2">
+            {/* Status Flow Indicator */}
+            {(() => {
+                if (opgave.status_direction === 1) {
+                    return (
+                        <div className="absolute top-0 right-0 p-2">
+                            <div className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 shadow-sm" title="Flyttet frem">
+                                <ArrowRight size={12} />
+                                <span className="uppercase tracking-wider">Frem</span>
+                            </div>
+                        </div>
+                    );
+                } else if (opgave.status_direction === -1) {
+                    return (
+                        <div className="absolute top-0 right-0 p-2">
+                            <div className="flex items-center gap-1 bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200 shadow-sm" title="Sendt retur">
+                                <ArrowLeft size={12} />
+                                <span className="uppercase tracking-wider">Retur</span>
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            })()}
+
+            <div className="flex justify-between items-start mb-2 mt-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${priorityColors[opgave.prioritet]}`}>
                     {opgave.prioritet}
                 </span>

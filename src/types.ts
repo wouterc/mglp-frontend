@@ -396,6 +396,47 @@ export interface OutlookAccount {
   os_user?: string;
 }
 
+export interface Attachment {
+  id: number;
+  filename: string;
+  file_size: number;
+  is_inline: boolean;
+  saved_document_id?: number | null;
+}
+
+export interface FileItem {
+  name: string;
+  is_dir: boolean;
+  size: number;
+  modified: number;
+  path: string;
+  linked_info?: {
+    id: number;
+    titel: string;
+    gruppe_navn: string;
+    gruppe_nr: number;
+  } | null;
+}
+
+export interface IncomingEmail {
+  id: number;
+  subject: string;
+  sender: string;
+  received_at: string;
+  status: string;
+  is_handled: boolean;
+  body_preview: string;
+  has_attachments: boolean;
+  kommentar?: string;
+  kommentar_vigtig?: boolean;
+}
+
+export interface IncomingEmailDetail extends IncomingEmail {
+  body_text: string;
+  sender_email: string;
+  attachments: Attachment[];
+}
+
 export interface OutgoingEmail {
   id: number;
   recipient: string;
@@ -484,8 +525,20 @@ export interface Opgave {
   oprettet_af_details?: User;
   oprettet: string;
   opdateret: string;
-  kommentarer: OpgaveKommentar[];
+  kommentarer?: OpgaveKommentar[];
   kommentarer_count: number;
   index: number;
+  status_historik?: OpgaveStatusLog[];
+  status_direction?: number; // 1: UP, -1: DOWN, 0: SAME
+}
+
+export interface OpgaveStatusLog {
+  id: number;
+  gammel_status: OpgaveStatus;
+  ny_status: OpgaveStatus;
+  bruger: number;
+  bruger_navn: string;
+  tidspunkt: string;
+  direction: 'UP' | 'DOWN' | 'SAME' | 'UNKNOWN';
 }
 

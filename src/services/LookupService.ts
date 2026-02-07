@@ -33,5 +33,17 @@ export const LookupService = {
         const resp = await api.get<any>('/emails/accounts/');
         const accounts = Array.isArray(resp) ? resp : resp.results || [];
         return accounts;
+    },
+
+    async getVirksomheder(params?: Record<string, any>): Promise<any[]> {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        const resp = await api.get<any>(`/register/virksomheder/${query}`);
+        return Array.isArray(resp) ? resp : resp.results || [];
+    },
+
+    async getKontakter(params?: Record<string, any>): Promise<any[]> {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        const resp = await api.get<any>(`/register/kontakter/${query}`);
+        return Array.isArray(resp) ? resp : resp.results || [];
     }
 };

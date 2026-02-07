@@ -6,6 +6,10 @@ export const opgaveService = {
         return await api.get<Opgave[]>('/opgaver/opgaver/');
     },
 
+    get: async (id: number) => {
+        return await api.get<Opgave>(`/opgaver/opgaver/${id}/`);
+    },
+
     create: async (data: Partial<Opgave>) => {
         return await api.post<Opgave>('/opgaver/opgaver/', data);
     },

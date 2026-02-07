@@ -3,7 +3,8 @@
 // @# 2025-11-23 11:30 - Opdateret layout: Stakket vertikalt, ikoner altid synlige, redigerings-popup tilføjet.
 import React, { useState, useEffect, useMemo, MouseEvent } from 'react';
 import { Droplet, Flame, Waves, Phone, Mail, Home, Copy, Check, Loader2, Edit } from 'lucide-react';
-import { api } from '../../../api';
+import { SagService } from '../../../services/SagService';
+import { LookupService } from '../../../services/LookupService';
 import { Sag, Virksomhed } from '../../../types';
 import SearchableSelect, { SearchableOption } from '../../SearchableSelect';
 import VirksomhedForm from '../../VirksomhedForm';
@@ -32,8 +33,8 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
         const fetchForsyninger = async () => {
             setIsLoading(true);
             try {
-                const data = await api.get<any>('/register/virksomheder/?er_forsyning=true');
-                setAlleForsyninger(Array.isArray(data) ? data : data.results);
+                const data = await LookupService.getVirksomheder({ er_forsyning: 'true' });
+                setAlleForsyninger(data);
             } catch (error) {
                 console.error("Fejl ved hentning af forsyning:", error);
             } finally {
@@ -46,7 +47,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, opdatering);
+            await SagService.updateSag(sag.id, opdatering);
             onUpdate();
         } catch (e) {
             console.error(e);

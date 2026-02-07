@@ -3,8 +3,9 @@
 // @# 2025-11-23 11:30 - Opdateret layout: Ikoner, Rediger-knapper og Popups.
 import React, { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { Landmark, Phone, Mail, Home, User, Check, Copy, Loader2, Edit, Save } from 'lucide-react';
-import { api } from '../../../api';
 import { Sag, Virksomhed, Kontakt } from '../../../types';
+import { SagService } from '../../../services/SagService';
+import { LookupService } from '../../../services/LookupService';
 import useDebounce from '../../../hooks/useDebounce';
 import VirksomhedForm from '../../VirksomhedForm';
 import KontaktForm from '../../KontaktForm';
@@ -49,8 +50,8 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
         const fetchBanker = async () => {
             setIsLoadingBanker(true);
             try {
-                const data = await api.get<any>('/register/virksomheder/?er_bank=true');
-                setAlleBanker(Array.isArray(data) ? data : data.results);
+                const data = await LookupService.getVirksomheder({ er_bank: 'true' });
+                setAlleBanker(data);
             } catch (error) {
                 console.error("Fejl ved hentning af banker:", error);
             } finally {
@@ -65,8 +66,8 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
             const fetchKontakter = async () => {
                 setIsLoadingKontakter(true);
                 try {
-                    const data = await api.get<any>(`/register/kontakter/?virksomhed=${sag.bank_virksomhed?.id}&er_bank_kontakt=true`);
-                    setKontakter(Array.isArray(data) ? data : data.results);
+                    const data = await LookupService.getKontakter({ virksomhed: sag.bank_virksomhed?.id, er_bank_kontakt: 'true' });
+                    setKontakter(data);
                 } catch (error) {
                     console.error("Fejl ved hentning af kontakter:", error);
                 } finally {
@@ -82,7 +83,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, opdatering);
+            await SagService.updateSag(sag.id, opdatering);
             onUpdate();
         } catch (e) {
             console.error(e);
@@ -94,7 +95,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
     const saveSagsNr = async (value: string) => {
         setIsSavingSagsNr(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, { bank_sagsnr: value });
+            await SagService.updateSag(sag.id, { bank_sagsnr: value });
             onUpdate();
         } catch (e) {
             console.error(e);

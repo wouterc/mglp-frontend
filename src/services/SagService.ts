@@ -58,5 +58,12 @@ export const SagService = {
      */
     async synkroniserDokumenter(id: number): Promise<any> {
         return await api.post(`/sager/${id}/synkroniser_dokumenter/`, {});
+    },
+
+    /**
+     * Henter rådgivertilknytninger for en sag.
+     */
+    async getRaadgiverTilknytninger(id: number): Promise<any[]> {
+        return await api.get<any[]>(`/sager/raadgivere/?sag_id=${id}`);
     }
 };

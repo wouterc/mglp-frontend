@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { api } from '../api';
 import { API_BASE_URL } from '../config';
 import { Mail, Search, Paperclip, Calendar, User, FileText, ChevronRight, X, Loader2, Inbox, Sparkles, Check, MessageSquare, Save, ChevronDown, ChevronUp, File } from 'lucide-react';
-import { SagsDokument } from '../types';
+import { SagsDokument, IncomingEmail, IncomingEmailDetail, Attachment } from '../types';
+import { DokumentService } from '../services/DokumentService';
+import { MailService } from '../services/MailService';
+import { SagService } from '../services/SagService';
 
 
 import Modal from '../components/Modal';
@@ -12,32 +14,7 @@ import { useAppState } from '../StateContext';
 import CaseSelector from '../components/ui/CaseSelector';
 import HelpButton from '../components/ui/HelpButton';
 
-interface Attachment {
-    id: number;
-    filename: string;
-    file_size: number;
-    is_inline: boolean;
-    saved_document_id?: number | null;
-}
 
-interface IncomingEmail {
-    id: number;
-    subject: string;
-    sender: string;
-    received_at: string;
-    status: string;
-    is_handled: boolean;
-    body_preview: string;
-    has_attachments: boolean;
-    kommentar?: string;
-    kommentar_vigtig?: boolean;
-}
-
-interface IncomingEmailDetail extends IncomingEmail {
-    body_text: string;
-    sender_email: string;
-    attachments: Attachment[];
-}
 
 interface SagsMailPageProps {
     sagId: number | null;
@@ -74,8 +51,8 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
 
             setIsLoading(true);
             try {
-                const data = await api.get<{ emails: IncomingEmail[] }>(`/emails/case/${sagId}/`);
-                setEmails(data.emails);
+                const emails = await MailService.getEmailsForSag(sagId);
+                setEmails(emails);
                 setSelectedEmail(null);
             } catch (e) {
                 console.error("Failed to load case emails", e);
@@ -88,7 +65,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
             if (!sagId) return;
             setLoadingDocs(true);
             try {
-                const data = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sagId}`);
+                const data = await DokumentService.getDokumenter(sagId);
                 setSagsDokumenter(data);
             } catch (e) {
                 console.error("Failed to fetch docs", e);
@@ -104,7 +81,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
     const refreshDocs = async () => {
         if (!sagId) return;
         try {
-            const data = await api.get<SagsDokument[]>(`/sager/sagsdokumenter/?sag_id=${sagId}`);
+            const data = await DokumentService.getDokumenter(sagId);
             setSagsDokumenter(data);
         } catch (e) { console.error(e); }
     };
@@ -192,13 +169,14 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
         if (isNaN(attId)) return;
 
         setProcessingDocId(doc.id);
+        setProcessingDocId(doc.id);
         try {
-            await api.post(`/sager/sagsdokumenter/${doc.id}/attach_email_file/`, { attachment_id: attId });
+            await MailService.attachEmailFileToDoc(doc.id, attId);
             // Refresh
             await refreshDocs();
             // Also refresh email detail to update 'saved_document_id' on attachments
             if (selectedEmail) {
-                const detail = await api.get<IncomingEmailDetail>(`/emails/message/${selectedEmail.id}/`);
+                const detail = await MailService.getEmailDetail(selectedEmail.id);
                 setSelectedEmail(detail);
             }
         } catch (error) {
@@ -212,7 +190,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
     const handleEmailClick = async (email: IncomingEmail) => {
         setIsLoadingDetail(true);
         try {
-            const detail = await api.get<IncomingEmailDetail>(`/emails/message/${email.id}/`);
+            const detail = await MailService.getEmailDetail(email.id);
             setSelectedEmail(detail);
         } catch (e) {
             console.error("Failed to fetch detail", e);
@@ -234,7 +212,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
 
     const handleSelectSag = async (id: number) => {
         try {
-            const fuldSag = await api.get<any>(`/sager/${id}/`);
+            const fuldSag = await SagService.getSag(id);
             dispatch({ type: 'SET_VALGT_SAG', payload: fuldSag });
         } catch (e) { console.error(e); }
     };
@@ -242,7 +220,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
     const handleToggleHandled = async (e: React.MouseEvent, emailId: number) => {
         e.stopPropagation();
         try {
-            await api.post('/emails/toggle-handled/', { email_id: emailId });
+            await MailService.toggleHandled(emailId);
             // Update local state
             setEmails(prev => prev.map(em => em.id === emailId ? { ...em, is_handled: !em.is_handled } : em));
         } catch (err) {
@@ -261,11 +239,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
         if (!editingEmail) return;
         setIsSavingComment(true);
         try {
-            const res = await api.post<any>('/emails/comment/', {
-                email_id: editingEmail.id,
-                kommentar: editCommentText,
-                kommentar_vigtig: editCommentImportant
-            });
+            const res = await MailService.addComment(editingEmail.id, editCommentText, editCommentImportant);
             // Update local state
             const updatedComment = res.kommentar;
             const updatedImportant = res.kommentar_vigtig;

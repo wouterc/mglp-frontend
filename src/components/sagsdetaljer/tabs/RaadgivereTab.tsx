@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, ClipboardList, Check, Copy, Loader2, Phone, Mail, Home } from 'lucide-react';
-import { api } from '../../../api';
 import { Sag, SagRaadgiverTilknytning, Kontakt } from '../../../types';
+import { SagService } from '../../../services/SagService';
+import { LookupService } from '../../../services/LookupService';
 import RaadgiverStyring from '../../RaadgiverStyring';
 import useDebounce from '../../../hooks/useDebounce';
 
@@ -41,12 +42,12 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
             setIsLoading(true);
             try {
                 // Hent tilknytninger
-                const data = await api.get<SagRaadgiverTilknytning[]>(`/sager/raadgivere/?sag_id=${sag.id}`);
+                const data = await SagService.getRaadgiverTilknytninger(sag.id);
                 setTilknytninger(data || []);
 
                 // Hent alle rådgiver-kontakter (til dropdown)
-                const kData = await api.get<any>('/register/kontakter/?er_raadgiver_kontakt=true');
-                setAlleRaadgiverKontakter(Array.isArray(kData) ? kData : kData.results);
+                const kData = await LookupService.getKontakter({ er_raadgiver_kontakt: 'true' });
+                setAlleRaadgiverKontakter(kData);
             } catch (e: any) {
                 setError(e.message);
             } finally {
@@ -67,7 +68,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
     const saveSagUpdate = async (opdatering: any) => {
         setIsSaving(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, opdatering);
+            await SagService.updateSag(sag.id, opdatering);
             onUpdate();
         } catch (e) {
             console.error(e);
@@ -79,7 +80,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
     const saveSagsNr = async (value: string) => {
         setIsSavingSagsNr(true);
         try {
-            await api.patch(`/sager/${sag.id}/`, { raadgiver_sagsnr: value });
+            await SagService.updateSag(sag.id, { raadgiver_sagsnr: value });
             onUpdate();
         } catch (e) {
             console.error(e);
