@@ -50,7 +50,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, opga
     const [beskrivelse, setBeskrivelse] = useState('');
     const [status, setStatus] = useState<OpgaveStatus>(OpgaveStatus.BACKLOG);
     const [prioritet, setPrioritet] = useState<OpgavePriority>(OpgavePriority.MEDIUM);
-    const [ansvarlig, setAnsvarlig] = useState<number | ''>('');
+    const [ansvarlige, setAnsvarlige] = useState<number[]>([]);
     const [deadline, setDeadline] = useState('');
 
     // Comment States
@@ -68,14 +68,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, opga
                 setBeskrivelse(opgave.beskrivelse);
                 setStatus(opgave.status);
                 setPrioritet(opgave.prioritet);
-                setAnsvarlig(opgave.ansvarlig || '');
+                setAnsvarlige(opgave.ansvarlige || []);
                 setDeadline(opgave.deadline || '');
             } else {
                 setTitel('');
                 setBeskrivelse('');
                 setStatus(OpgaveStatus.BACKLOG);
                 setPrioritet(OpgavePriority.MEDIUM);
-                setAnsvarlig('');
+                setAnsvarlige([]);
                 setDeadline('');
             }
             setNewComment('');
@@ -91,7 +91,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, opga
             beskrivelse,
             status,
             prioritet,
-            ansvarlig: ansvarlig === '' ? null : Number(ansvarlig),
+            ansvarlige,
             deadline: deadline || null,
         };
 
@@ -324,20 +324,48 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, opga
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ansvarlig</label>
-                        <select
-                            value={ansvarlig}
-                            onChange={(e) => setAnsvarlig(e.target.value === '' ? '' : Number(e.target.value))}
-                            className="w-full px-3 py-2 bg-white border rounded-lg text-sm"
-                        >
-                            <option value="">Ingen</option>
-                            {users
-                                .filter(u => (u.opgave_sortering || 0) > 0)
-                                .sort((a, b) => (a.opgave_sortering || 0) - (b.opgave_sortering || 0))
-                                .map((u) => (
-                                    <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
-                                ))}
-                        </select>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ansvarlige</label>
+                        <div className="flex flex-col gap-2">
+                            {/* Selected Users */}
+                            <div className="flex flex-wrap gap-1">
+                                {ansvarlige.map(id => {
+                                    const user = users.find(u => u.id === id);
+                                    if (!user) return null;
+                                    return (
+                                        <div key={id} className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-bold border border-blue-100">
+                                            <span>{user.first_name} {user.last_name}</span>
+                                            <button
+                                                onClick={() => setAnsvarlige(prev => prev.filter(p => p !== id))}
+                                                className="hover:text-blue-900 rounded-full hover:bg-blue-200 p-0.5"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Add User Dropdown */}
+                            <select
+                                value=""
+                                onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    if (val && !ansvarlige.includes(val)) {
+                                        setAnsvarlige(prev => [...prev, val]);
+                                    }
+                                }}
+                                className="w-full px-3 py-2 bg-white border rounded-lg text-sm"
+                            >
+                                <option value="">+ Tilføj ansvarlig</option>
+                                {users
+                                    .filter(u => !ansvarlige.includes(u.id))
+                                    .filter(u => (u.opgave_sortering || 0) > 0)
+                                    .sort((a, b) => (a.opgave_sortering || 0) - (b.opgave_sortering || 0))
+                                    .map((u) => (
+                                        <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+                                    ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div>

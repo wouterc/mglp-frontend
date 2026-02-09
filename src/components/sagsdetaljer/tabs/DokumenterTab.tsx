@@ -828,10 +828,9 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
         <div className="flex h-full gap-2">
             {/* Main Content Area */}
             <div className="flex-1 min-w-0 flex flex-col gap-2">
-                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex flex-col gap-2">
-
-                        {hasIdFilter && (
+                {hasIdFilter && (
+                    <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex flex-col gap-2">
                             <button
                                 onClick={() => {
                                     const params = new URLSearchParams(location.search);
@@ -843,9 +842,9 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
                                 <RefreshCw size={12} className="inline" />
                                 Nulstil filter (Vis alle emner)
                             </button>
-                        )}
+                        </div>
                     </div>
-                </div>
+                )}
 
 
                 {/* Mail Basket Reset Button */}
@@ -875,12 +874,14 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
                                 <tr>
                                     <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
                                         <div className="flex flex-col items-center">
-                                            <FileText size={32} className="text-gray-300 mb-2" />
-                                            <p>Ingen dokumenter fundet.</p>
+                                            <FileText size={32} className={`text-gray-300 mb-2 ${loading ? 'animate-pulse' : ''}`} />
+                                            <p>{loading ? 'Indlæser...' : 'Ingen dokumenter fundet.'}</p>
                                             <p className="text-xs mt-1">
-                                                {dokumenter.length === 0
-                                                    ? 'Klik på "Synkroniser" for at hente skabeloner.'
-                                                    : 'Prøv at justere dine filtre.'}
+                                                {loading
+                                                    ? 'Henter dokumenter, vent venligst.'
+                                                    : dokumenter.length === 0
+                                                        ? 'Klik på "Synkroniser" for at hente skabeloner.'
+                                                        : 'Prøv at justere dine filtre.'}
                                             </p>
                                         </div>
                                     </td>

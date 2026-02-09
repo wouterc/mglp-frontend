@@ -53,32 +53,33 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
     const isChanged = JSON.stringify([...valgteIds].sort()) !== JSON.stringify((sag.valgte_processer?.map(p => p.id) || []).sort());
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
+        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-400">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-xl font-bold text-gray-800">Sagens processer</h2>
                     <p className="text-gray-500 text-sm">Vælg hvilke overordnede processer der er relevante for denne sag.</p>
                 </div>
 
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving || !isChanged}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${isChanged
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                >
-                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                    Gem ændringer
-                </button>
-            </div>
-
-            {message && (
-                <div className={`mb-4 p-3 rounded-md text-sm font-medium ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-                    }`}>
-                    {message.text}
+                <div className="flex items-center gap-2">
+                    {/* Gem knap */}
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving || !isChanged}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${isChanged
+                            ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                            }`}
+                    >
+                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                        Gem ændringer
+                    </button>
+                    {message && (
+                        <div className={`px-4 py-2 rounded-md text-sm font-medium animate-pulse ${message.type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'}`}>
+                            {message.text}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {alleProcesser.map((proces) => {
@@ -88,20 +89,20 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                             key={proces.id}
                             onClick={() => toggleProces(proces.id)}
                             className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border-2 transition-all ${isSelected
-                                ? 'border-blue-500 bg-blue-50 shadow-sm'
-                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                                ? 'border-blue-500 bg-blue-50 shadow-md'
+                                : 'border-gray-400 hover:border-gray-500 bg-white hover:bg-gray-50'
                                 }`}
                         >
                             <div className="flex flex-col">
-                                <span className={`text-xs font-bold uppercase tracking-wider ${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
+                                <span className={`text-xs font-bold uppercase tracking-wider ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
                                     Proces {proces.nr}
                                 </span>
-                                <span className={`font-semibold ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>
+                                <span className={`font-semibold ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>
                                     {proces.titel_kort}
                                 </span>
                             </div>
 
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${isSelected
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors ${isSelected
                                 ? 'bg-blue-600 border-blue-600 text-white'
                                 : 'bg-white border-gray-300 text-transparent'
                                 }`}>

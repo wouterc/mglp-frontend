@@ -6,14 +6,15 @@ import TaskCard from './TaskCard';
 
 interface TaskColumnProps {
     id: string;
-    title: string;
+    title: React.ReactNode;
     tasks: Opgave[];
     onTaskClick: (opgave: Opgave) => void;
     users?: User[];
-    onAssigneeChange?: (opgaveId: number, userId: number | null) => void;
+    onAssigneeChange?: (opgaveId: number, userIds: number[]) => void;
+    headerAction?: React.ReactNode;
 }
 
-const TaskColumn: React.FC<TaskColumnProps> = ({ id, title, tasks, onTaskClick, users, onAssigneeChange }) => {
+const TaskColumn: React.FC<TaskColumnProps> = ({ id, title, tasks, onTaskClick, users, onAssigneeChange, headerAction }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -34,6 +35,7 @@ const TaskColumn: React.FC<TaskColumnProps> = ({ id, title, tasks, onTaskClick, 
                         {tasks.length}
                     </span>
                 </div>
+                {headerAction && <div>{headerAction}</div>}
             </div>
 
             {/* Droppable Area */}

@@ -199,7 +199,10 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
 
           {/* User Profile */}
           <Link to="/min_konto" className={`flex items-center ${erMenuAaben ? 'px-2 py-3' : 'justify-center py-2'} rounded-md hover:bg-gray-700 transition-colors mb-2`} title="Min Konto">
-            <div className="bg-blue-600 rounded-full w-8 h-8 flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-sm text-white">
+            <div
+              className="rounded-full w-8 h-8 flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-sm text-white"
+              style={{ backgroundColor: currentUser?.color || '#2563EB' }}
+            >
               {currentUser?.username?.substring(0, 2).toUpperCase() || 'U'}
             </div>
             {erMenuAaben && (

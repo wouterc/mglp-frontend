@@ -61,7 +61,7 @@ const MedarbejderePage: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {employees.map(emp => (
-                        <div key={emp.id} className="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col relative">
+                        <div key={emp.id} className="bg-white rounded-lg border border-gray-400 p-2 flex flex-col relative">
                             {/* Online Indicator */}
                             <div className={`absolute top-4 right-4 flex items-center gap-1 text-xs font-medium ${emp.is_online ? 'text-green-600' : 'text-gray-400'}`}>
                                 <div className={`w-3 h-3 rounded-full ${emp.is_online ? 'bg-green-500' : 'bg-gray-300'}`}></div>
@@ -69,8 +69,11 @@ const MedarbejderePage: React.FC = () => {
                             </div>
 
                             <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
-                                    {getName(emp).charAt(0).toUpperCase()}
+                                <div
+                                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg select-none"
+                                    style={{ backgroundColor: (emp as any).color || '#2563EB' }}
+                                >
+                                    {(getName(emp).split(' ').map(n => n[0]).join('').substring(0, 2)).toUpperCase()}
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{getName(emp)}</h3>

@@ -11,7 +11,7 @@ interface TaskCardProps {
     opgave: Opgave;
     onClick: (opgave: Opgave) => void;
     users?: User[];
-    onAssigneeChange?: (opgaveId: number, userId: number | null) => void;
+    onAssigneeChange?: (opgaveId: number, userIds: number[]) => void;
     isOverlay?: boolean;
 }
 
@@ -33,17 +33,16 @@ const TaskCardUI: React.FC<TaskCardProps & {
 }> = ({ opgave, onClick, users, onAssigneeChange, innerRef, style, attributes, listeners, isOverlay, isOver, isOverArchive }) => {
     const buttonRef = useRef<HTMLDivElement>(null);
     const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+    const [assigneePopupPos, setAssigneePopupPos] = useState({ top: 0, left: 0, flip: false });
+    const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
+    const assigneeRef = useRef<HTMLDivElement>(null);
+    const assigneePopupRef = useRef<HTMLDivElement>(null);
 
     const [history, setHistory] = useState<any[] | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-    const handleAssigneeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        if (onAssigneeChange) {
-            const val = e.target.value;
-            onAssigneeChange(opgave.id, val ? Number(val) : null);
-        }
-    };
+
 
     const toggleHistory = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -73,11 +72,24 @@ const TaskCardUI: React.FC<TaskCardProps & {
     };
 
     useEffect(() => {
-        if (!showHistory) return;
-        const handleDown = () => setShowHistory(false);
+        if (!showHistory && !showAssigneeSelector) return;
+        const handleDown = (e: MouseEvent) => {
+            // Check if click is inside the assignee popup (portal) or the button (ref)
+            if (showAssigneeSelector) {
+                const isInData = assigneePopupRef.current && assigneePopupRef.current.contains(e.target as Node);
+                const isInButton = assigneeRef.current && assigneeRef.current.contains(e.target as Node);
+
+                if (!isInData && !isInButton) {
+                    setShowAssigneeSelector(false);
+                }
+            }
+            if (showHistory) {
+                setShowHistory(false);
+            }
+        };
         window.addEventListener('mousedown', handleDown);
         return () => window.removeEventListener('mousedown', handleDown);
-    }, [showHistory]);
+    }, [showHistory, showAssigneeSelector]);
 
     const getCardStyles = () => {
         // PRIORITY 1: Archive feedback (requested by user)
@@ -207,40 +219,107 @@ const TaskCardUI: React.FC<TaskCardProps & {
 
             <div className="grid grid-cols-3 items-center pt-1.5 mt-0">
                 {/* Left: Assignee */}
-                <div className="flex items-center gap-2 relative group/assignee" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative">
-                        {users && onAssigneeChange && (
-                            <select
-                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                                value={opgave.ansvarlig || ''}
-                                onChange={handleAssigneeChange}
-                                title="Skift ansvarlig"
-                            >
-                                <option value="">Ingen</option>
-                                {users
-                                    .filter(u => (u.opgave_sortering || 0) > 0)
-                                    .sort((a, b) => (a.opgave_sortering || 0) - (b.opgave_sortering || 0))
-                                    .map(u => (
-                                        <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
-                                    ))}
-                            </select>
-                        )}
-                        {opgave.ansvarlig_details ? (
-                            <div className="flex items-center gap-1">
-                                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 border border-blue-200" title={opgave.ansvarlig_details.first_name}>
-                                    {opgave.ansvarlig_details.first_name[0]}{opgave.ansvarlig_details.last_name[0]}
+                {/* Left: Assignees */}
+                <div
+                    className="flex items-center relative group/assignee cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // Determine if we should show the selector
+                        if (users && onAssigneeChange) {
+                            if (!showAssigneeSelector && assigneeRef.current) {
+                                const rect = assigneeRef.current.getBoundingClientRect();
+                                const popoverHeight = 300; // Estimated max height
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const flip = spaceBelow < popoverHeight;
+
+                                setAssigneePopupPos({
+                                    top: flip ? (rect.top + window.scrollY - 8) : (rect.bottom + window.scrollY + 8),
+                                    left: rect.left + window.scrollX,
+                                    flip
+                                });
+                            }
+                            setShowAssigneeSelector(!showAssigneeSelector);
+                        }
+                    }}
+                    ref={assigneeRef}
+                >
+                    <div className="flex -space-x-2 overflow-hidden pl-1 py-1">
+                        {opgave.ansvarlige_details && opgave.ansvarlige_details.length > 0 ? (
+                            opgave.ansvarlige_details.map((user) => (
+                                <div
+                                    key={user.id}
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-white ring-1 ring-gray-100 shadow-sm z-10 hover:z-20 hover:scale-110 transition-all relative"
+                                    title={`${user.first_name} ${user.last_name}`}
+                                    style={{ backgroundColor: user.color || '#2563EB' }}
+                                >
+                                    {user.first_name?.[0]}{user.last_name?.[0]}
                                 </div>
-                                {users && <ChevronDown size={10} className="text-gray-400 opacity-0 group-hover/assignee:opacity-100 transition-opacity" />}
-                            </div>
+                            ))
                         ) : (
-                            <div className="flex items-center gap-1">
-                                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200">
-                                    <UserIcon size={12} />
-                                </div>
-                                {users && <ChevronDown size={10} className="text-gray-400 opacity-0 group-hover/assignee:opacity-100 transition-opacity" />}
+                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200" title="Ingen ansvarlig">
+                                <UserIcon size={12} />
                             </div>
                         )}
                     </div>
+
+                    {/* Hover indicator that it's clickable */}
+                    {users && onAssigneeChange && (
+                        <div className="ml-1 opacity-0 group-hover/assignee:opacity-100 transition-opacity text-gray-400">
+                            <ChevronDown size={10} />
+                        </div>
+                    )}
+
+                    {/* Popover for selection */}
+                    {showAssigneeSelector && users && onAssigneeChange && createPortal(
+                        <div
+                            className="fixed bg-white rounded-lg shadow-xl border border-gray-200 w-56 z-[9999] max-h-60 overflow-y-auto animate-in fade-in zoom-in duration-150"
+                            style={{
+                                top: `${assigneePopupPos.top}px`,
+                                left: `${assigneePopupPos.left}px`,
+                                transform: assigneePopupPos.flip ? 'translateY(-100%)' : 'none'
+                            }}
+                            ref={assigneePopupRef}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-2 border-b border-gray-100 bg-gray-50 text-xs font-bold text-gray-500 sticky top-0">
+                                Vælg ansvarlige
+                            </div>
+                            <div className="p-1">
+                                {users
+                                    .filter(u => (u.opgave_sortering || 0) > 0)
+                                    .sort((a, b) => (a.opgave_sortering || 0) - (b.opgave_sortering || 0))
+                                    .map(user => {
+                                        const isSelected = opgave.ansvarlige && opgave.ansvarlige.includes(user.id);
+                                        return (
+                                            <div
+                                                key={user.id}
+                                                className="flex items-center gap-2 px-2 py-1.5 hover:bg-blue-50 rounded cursor-pointer text-sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const currentIds = opgave.ansvarlige || [];
+                                                    let newIds: number[];
+                                                    if (isSelected) {
+                                                        newIds = currentIds.filter(id => id !== user.id);
+                                                    } else {
+                                                        newIds = [...currentIds, user.id];
+                                                    }
+                                                    onAssigneeChange(opgave.id, newIds);
+                                                }}
+                                            >
+                                                <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
+                                                    {isSelected && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                                </div>
+                                                <div className="flex-1 truncate">
+                                                    {user.first_name} {user.last_name}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                }
+                            </div>
+                        </div>,
+                        document.body
+                    )}
                 </div>
 
                 {/* Center: Created Date */}

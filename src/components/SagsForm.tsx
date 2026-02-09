@@ -185,7 +185,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     const fetchUsers = async () => {
       try {
         const allUsers = await LookupService.getUsers();
-        setUsers(allUsers.filter(u => u.is_active));
+        setUsers(allUsers.filter(u => u.is_active && u.er_sagsbehandler !== false));
       } catch (error) {
         console.error('Fejl ved hentning af brugere:', error);
       }

@@ -1,5 +1,6 @@
 export const STATUS_LABELS: Record<string, string> = {
     'BACKLOG': 'Indbakke',
+    'ON_HOLD': 'On Hold',
     'TODO': 'Klar til start',
     'IN_PROGRESS': 'Igang',
     'TEST': 'Test',

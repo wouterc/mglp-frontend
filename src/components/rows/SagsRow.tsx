@@ -1,11 +1,12 @@
 
 import React, { useState, MouseEvent } from 'react';
-import { Edit, FileText, ListChecks, Folder, Loader2, Copy, Check, Inbox } from 'lucide-react';
-import { Sag, Status, Virksomhed } from '../../types';
+import { Edit, FileText, ListChecks, Folder, Loader2, Copy, Check, Inbox, AlertCircle, Clock } from 'lucide-react';
+import { Sag, Status, Virksomhed, User } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
 interface SagsRowProps {
     sag: Sag;
+    users: User[];
     statusser: Status[];
     isExpanded: boolean;
     isCreatingActivities: boolean;
@@ -26,6 +27,7 @@ const formatVirksomhedsnavn = (v: Virksomhed | null | undefined): string => {
 
 export default function SagsRow({
     sag,
+    users,
     statusser,
     isExpanded,
     isCreatingActivities,
@@ -41,6 +43,15 @@ export default function SagsRow({
     const navigate = useNavigate();
     const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
 
+    const getAnsvarligDisplay = (navn: string) => {
+        if (!navn) return '';
+        const user = users.find(u => {
+            const fullName = `${u.first_name} ${u.last_name}`.trim();
+            return fullName === navn || u.username === navn;
+        });
+        return user ? user.username : navn;
+    };
+
     const handleCopyEmail = (email: string, key: string, e: MouseEvent) => {
         e.stopPropagation();
         if (navigator.clipboard) {
@@ -53,10 +64,50 @@ export default function SagsRow({
         }
     };
 
+    const getDeadlineStatus = () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const dates = [sag.dato_intern, sag.dato_ekstern].filter(Boolean) as string[];
+        let statusColor = null; // null = ok, orange = close, red = overdue
+
+        for (const dStr of dates) {
+            const d = new Date(dStr);
+            d.setHours(0, 0, 0, 0);
+            const diffTime = d.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) {
+                statusColor = 'red';
+                break;
+            } else if (diffDays <= 3) {
+                if (statusColor !== 'red') statusColor = 'orange';
+            }
+        }
+        return statusColor;
+    };
+
+    const deadlineStatus = getDeadlineStatus();
+
+    let rowClass = "border-b border-gray-200 cursor-pointer transition-colors border-l-4";
+    if (deadlineStatus === 'red') {
+        rowClass += " border-l-red-500 bg-red-50";
+    } else if (deadlineStatus === 'orange') {
+        rowClass += " border-l-orange-500 bg-orange-50";
+    } else {
+        rowClass += " border-l-transparent hover:bg-gray-100";
+    }
+
     return (
         <>
-            <tr onClick={onToggleExpand} className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors">
-                <td className="py-1 px-2">{sag.sags_nr}</td>
+            <tr onClick={onToggleExpand} className={rowClass}>
+                <td className="py-1 px-2">
+                    <div className="flex items-center gap-1">
+                        {sag.sags_nr}
+                        {deadlineStatus === 'red' && <Clock size={20} className="text-red-600" title={`Frist overskredet! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`} />}
+                        {deadlineStatus === 'orange' && <Clock size={20} className="text-orange-500" title={`Frist tæt på! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`} />}
+                    </div>
+                </td>
                 <td className="py-1 px-2">{sag.alias}</td>
                 <td className="py-1 px-2">
                     <select
@@ -71,7 +122,7 @@ export default function SagsRow({
                         ))}
                     </select>
                 </td>
-                <td className="py-1 px-2">{sag.hovedansvarlige}</td>
+                <td className="py-1 px-2">{getAnsvarligDisplay(sag.hovedansvarlige)}</td>
                 <td className="py-1 px-2">{sag.fuld_adresse}</td>
                 <td className="py-1 px-2">
                     <div className="flex items-center space-x-3">
@@ -121,6 +172,17 @@ export default function SagsRow({
             {isExpanded && (
                 <tr className="bg-gray-50 border-b border-gray-200">
                     <td colSpan={6} className="p-4 cursor-auto" onClick={(e) => e.stopPropagation()}>
+                        {(deadlineStatus === 'red' || deadlineStatus === 'orange') && (
+                            <div className={`mb-4 p-3 rounded-md border flex items-center gap-2 ${deadlineStatus === 'red'
+                                ? 'bg-red-50 border-red-200 text-red-700'
+                                : 'bg-orange-50 border-orange-200 text-orange-700'
+                                }`}>
+                                <Clock size={18} />
+                                <span className="text-sm font-medium">
+                                    Der er mindst én aktivitet eller et dokument, der overskrider deadlinen.
+                                </span>
+                            </div>
+                        )}
                         {/* Original række */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
@@ -135,6 +197,11 @@ export default function SagsRow({
                             <div>
                                 <h4 className="font-bold text-gray-700 text-xs uppercase mb-1">Hovedansvarlig (Intern)</h4>
                                 <p className="text-sm">{sag.hovedansvarlige || "Ikke angivet"}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-gray-700 text-xs uppercase mb-1">Deadlines</h4>
+                                <p className="text-sm"><span className="font-semibold">Intern:</span> {sag.dato_intern || "-"}</p>
+                                <p className="text-sm"><span className="font-semibold">Ekstern:</span> {sag.dato_ekstern || "-"}</p>
                             </div>
                         </div>
 

@@ -19,6 +19,7 @@ const RedigerProfilModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const [workPhone, setWorkPhone] = useState('');
     const [privatePhone, setPrivatePhone] = useState('');
     const [privateAddress, setPrivateAddress] = useState('');
+    const [color, setColor] = useState('#2563EB'); // Default blue
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ const RedigerProfilModal: React.FC<Props> = ({ isOpen, onClose }) => {
             setWorkPhone(currentUser.work_phone || '');
             setPrivatePhone(currentUser.private_phone || '');
             setPrivateAddress(currentUser.private_address || '');
+            setColor(currentUser.color || '#2563EB');
             setError(null);
         }
     }, [currentUser, isOpen]);
@@ -45,7 +47,8 @@ const RedigerProfilModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 email: email,
                 work_phone: workPhone,
                 private_phone: privatePhone,
-                private_address: privateAddress
+                private_address: privateAddress,
+                color: color
             });
 
             // Opdater global state
@@ -123,6 +126,19 @@ const RedigerProfilModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         onChange={(e) => setPrivateAddress(e.target.value)}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Personlig Farve</label>
+                    <div className="flex items-center gap-3 mt-1">
+                        <input
+                            type="color"
+                            value={color}
+                            onChange={(e) => setColor(e.target.value)}
+                            className="h-10 w-20 rounded border border-gray-300 cursor-pointer"
+                        />
+                        <span className="text-sm text-gray-500">Vælg en farve til din profil (bruges til avatarer og opgaver)</span>
+                    </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">

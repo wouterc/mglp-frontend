@@ -18,6 +18,8 @@ interface User {
     is_active: boolean;
     last_login: string | null;
     is_online: boolean; // Added
+    opgave_sortering?: number;
+    er_sagsbehandler?: boolean;
 }
 
 const UserListPage: React.FC = () => {
@@ -99,6 +101,8 @@ const UserListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Online</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" title="Opgave Sortering">Sort</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" title="Er Sagsbehandler">SB</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Handlinger</th>
                             </tr>
                         </thead>
@@ -131,9 +135,17 @@ const UserListPage: React.FC = () => {
                                         <button
                                             onClick={() => handleShowActivity(user)}
                                             title="Klik for at se login historik"
-                                            className="focus:outline-none transition-transform hover:scale-110"
+                                            className="focus:outline-none transition-transform hover:scale-110 relative inline-block"
                                         >
-                                            <div className={`h-3 w-3 rounded-full mx-auto shadow-sm ${user.is_online ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                                            <div
+                                                className={`h-6 w-6 rounded-full mx-auto shadow-sm flex items-center justify-center text-[10px] text-white font-bold ${(user as any).color ? '' : (user.is_online ? 'bg-green-500' : 'bg-gray-300')}`}
+                                                style={{ backgroundColor: (user as any).color || undefined }}
+                                            >
+                                                {(user as any).color ? (user.username.substring(0, 1).toUpperCase()) : ''}
+                                                {user.is_online && (
+                                                    <span className="absolute -top-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-green-400" />
+                                                )}
+                                            </div>
                                         </button>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -145,6 +157,16 @@ const UserListPage: React.FC = () => {
                                             <div className="flex items-center text-red-600">
                                                 <XCircle size={16} className="mr-1" /> Inaktiv
                                             </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                                        {user.opgave_sortering || 0}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                        {user.er_sagsbehandler ? (
+                                            <CheckCircle size={16} className="text-green-500 mx-auto" />
+                                        ) : (
+                                            <span className="text-gray-300">-</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

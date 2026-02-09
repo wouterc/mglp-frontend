@@ -145,6 +145,9 @@ export interface Sag {
   adressebetegnelse: string | null;
   kommunekode: number | null;
 
+  dato_intern: string | null;
+  dato_ekstern: string | null;
+
   bolig_type: string | null;
   bolig_matrikel: string | null;
   bolig_anvendelse: BbrAnvendelse | null;
@@ -336,6 +339,8 @@ export interface User {
   is_online?: boolean;
   last_seen?: string;
   opgave_sortering?: number;
+  er_sagsbehandler?: boolean;
+  color?: string;
 }
 
 export interface SagsDokument {
@@ -490,6 +495,7 @@ export interface HjaelpPunkt {
 
 export enum OpgaveStatus {
   BACKLOG = 'BACKLOG',
+  ON_HOLD = 'ON_HOLD',
   TODO = 'TODO',
   IN_PROGRESS = 'IN_PROGRESS',
   TEST = 'TEST',
@@ -518,8 +524,8 @@ export interface Opgave {
   beskrivelse: string;
   status: OpgaveStatus;
   prioritet: OpgavePriority;
-  ansvarlig: number | null;
-  ansvarlig_details?: User;
+  ansvarlige: number[];
+  ansvarlige_details?: User[];
   deadline: string | null;
   oprettet_af: number;
   oprettet_af_details?: User;

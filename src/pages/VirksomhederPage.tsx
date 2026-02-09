@@ -288,7 +288,7 @@ function VirksomhederPage({ navigateTo }: VirksomhederPageProps): ReactElement {
                 </div>
             </div>
 
-            <div className="mb-4 py-4 px-2 bg-gray-50 rounded-lg border border-gray-200 flex">
+            <div className="mb-4 p-2 bg-gray-300 rounded-lg border border-gray-400 flex">
                 <div className="relative w-[25%] pr-4">
                     <input
                         id="filter-navn"

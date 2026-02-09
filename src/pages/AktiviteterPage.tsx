@@ -198,6 +198,15 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     // --- Hent oversigter ved sags-skift ---
     useEffect(() => {
         if (!valgtSag) return;
+
+        // Skip auto-fetch if we already have cached data for this case
+        const hasData = !!state.aktivitetsGrupper[valgtSag.id] && !!state.cachedAktiviteter[valgtSag.id];
+        if (hasData) {
+            // Optional: Background check for sync status without loading state?
+            // For now, we just respect the cache to solve the "spinning wheel" user complaint.
+            return;
+        }
+
         fetchAktiviteterData(valgtSag.id);
     }, [valgtSag?.id, adDispatch]);
 
@@ -683,19 +692,20 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                                     {copyNotify.message}
                                 </div>
                             )}
-                            {valgtSag && (nyeAktiviteterFindes || isFetchingAll) && (
-                                <Tooltip content="Nye aktiviteter fundet - Klik for at rulle ud til alle sager">
-                                    <button
-                                        onClick={handleSynkroniser}
-                                        disabled={isFetchingAll}
-                                        className={`
-                                            ml-2 p-1.5 rounded-full transition-all border
-                                            ${isFetchingAll ? 'animate-spin opacity-50 text-blue-600 border-transparent' : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 animate-pulse'}
-                                        `}
-                                    >
-                                        <RefreshCw size={16} />
-                                    </button>
-                                </Tooltip>
+                            {valgtSag && (
+                                <button
+                                    onClick={() => nyeAktiviteterFindes ? handleSynkroniser() : fetchAktiviteterData(valgtSag.id)}
+                                    disabled={isFetchingAll}
+                                    className={`
+                                        flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors border border-transparent
+                                        ${isFetchingAll ? 'opacity-50 text-blue-600' :
+                                            nyeAktiviteterFindes ? 'bg-blue-600 text-white shadow-md shadow-blue-100 animate-pulse hover:bg-blue-700' :
+                                                'text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:border-200'}
+                                    `}
+                                >
+                                    <RefreshCw size={14} className={isFetchingAll ? 'animate-spin' : ''} />
+                                    {nyeAktiviteterFindes ? "Synkroniser" : "Opdater liste"}
+                                </button>
                             )}
                         </div>
                     }

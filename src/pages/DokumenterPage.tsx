@@ -37,11 +37,10 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
     return () => console.log("DokumenterPage unmounting");
   }, [sagId, location.pathname]);
 
-  // @# Resolve effective sagId (prop > URL)
-  // ... remaining logic updated to use sagDispatch for SET_VALGT_SAG ...
+  // @# Resolve effective sagId (prop > URL > Global Context)
   const queryParams = new URLSearchParams(location.search);
   const urlSagId = queryParams.get('sag_id');
-  const effectiveSagId = sagId || (urlSagId ? parseInt(urlSagId, 10) : null);
+  const effectiveSagId = sagId || (urlSagId ? parseInt(urlSagId, 10) : null) || valgtSag?.id;
 
   const [activeTab, setActiveTab] = useState<'tjekliste' | 'stifinder'>((queryParams.get('tab') as any) || 'tjekliste');
 
@@ -96,12 +95,14 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
   }, [effectiveSagId, valgtSag, dispatch]);
 
   const handleSelectSag = async (id: number) => {
+    // 1. Fetch & Update Global + Local State immediately to prevent blank screen / weird transitions
     setLoading(true);
     try {
       const targetSag = await api.get<Sag>(`/sager/${id}/`);
       sagDispatch({ type: 'SET_VALGT_SAG', payload: targetSag });
+      setLocalSag(targetSag);
 
-      // Update URL so navigation/refresh works
+      // 2. Update URL
       const params = new URLSearchParams(location.search);
       params.set('sag_id', id.toString());
       navigate(`${location.pathname}?${params.toString()}`, { replace: true });
@@ -152,32 +153,20 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
           rightContent={
             <div className="flex items-center gap-4">
               <div className="min-w-64">
-                <CaseSelector
-                  value={localSag.id}
-                  onChange={handleSelectSag}
-                  label={`${localSag.sags_nr}${localSag.alias ? ' - ' + localSag.alias : ''}`}
-                  className="shadow-none border-gray-200"
-                  placeholder="Skift til en anden sag..."
-                />
+                <div className="p-2 border border-gray-300 rounded bg-gray-100 text-gray-500 text-sm italic">
+                  Søgefunktion midlertidigt ude af drift
+                </div>
               </div>
-
-              <button
-                onClick={() => window.open(`/dokumenter?sag_id=${localSag.id}&tab=stifinder`, '_blank', 'width=1200,height=800')}
-                title="Åbn Stifinder i nyt vindue"
-                className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
-              >
-                <FolderSearch size={16} />
-              </button>
             </div>
           }
           bottomContent={
             <div className="flex items-center w-full gap-32">
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shadow-sm">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleTabChange('tjekliste')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'tjekliste'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   <ListChecks size={20} />
@@ -186,8 +175,8 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
                 <button
                   onClick={() => handleTabChange('stifinder')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all mr-12 ${activeTab === 'stifinder'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   <FolderSearch size={20} />
@@ -198,6 +187,14 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
               {/* Dynamic Toolbar Content (Counters, Collapse, etc.) */}
               <div className="flex items-center gap-2 animate-in fade-in">
                 {toolbarContent}
+
+                <button
+                  onClick={() => window.open(`/dokumenter?sag_id=${localSag.id}&tab=stifinder`, '_blank', 'width=1200,height=800')}
+                  title="Åbn Stifinder i nyt vindue"
+                  className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 ml-4"
+                >
+                  <FolderSearch size={16} />
+                </button>
               </div>
             </div>
           }
@@ -208,7 +205,7 @@ function DokumenterPage({ sagId }: DokumenterPageProps): ReactElement {
         <div className="h-full space-y-6">
 
           {activeTab === 'tjekliste' ? (
-            <DokumenterTab sag={localSag} onToolbarUpdate={setToolbarContent} />
+            <DokumenterTab key={localSag.id} sag={localSag} onToolbarUpdate={setToolbarContent} />
           ) : (
             <StifinderTab sag={localSag} />
           )}

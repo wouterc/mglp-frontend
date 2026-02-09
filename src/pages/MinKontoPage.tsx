@@ -110,6 +110,16 @@ function MinKontoPage(): ReactElement {
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Privat adresse</label>
                             <div className="text-gray-900 whitespace-pre-wrap">{currentUser.private_address || "-"}</div>
                         </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Personlig Farve</label>
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="w-6 h-6 rounded-full border border-gray-200 shadow-sm"
+                                    style={{ backgroundColor: currentUser.color || '#2563EB' }}
+                                ></div>
+                                <span className="text-gray-900 text-sm font-medium">{currentUser.color || '#2563EB'}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

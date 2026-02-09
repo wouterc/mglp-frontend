@@ -84,7 +84,8 @@ function AdresseSøgning({ onAdresseValgt }: AdresseSøgningProps): ReactElement
         value={søgning}
         onChange={(e) => setSøgning(e.target.value)}
         onKeyDown={handleKeyDown}
-        autoComplete="off"
+        autoComplete="new-password"
+        name="søgning_adresse_no_autofill"
         placeholder="Start med at skrive en adresse..."
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
       />

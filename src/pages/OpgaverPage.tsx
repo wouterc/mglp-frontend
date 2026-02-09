@@ -23,7 +23,7 @@ import { Opgave, OpgaveStatus, User, OpgavePriority } from '../types';
 import TaskColumn from '../components/opgaver/TaskColumn';
 import TaskCard from '../components/opgaver/TaskCard';
 import TaskDetailModal from '../components/opgaver/TaskDetailModal';
-import { Plus, Filter, Search, X } from 'lucide-react';
+import { Plus, Filter, Search, X, User as UserIcon, ChevronLeft, ChevronRight, PauseCircle } from 'lucide-react';
 import ArchiveDropZone from '../components/opgaver/ArchiveDropZone';
 import ArchiveModal from '../components/opgaver/ArchiveModal';
 
@@ -41,9 +41,23 @@ const OpgaverBoardContent: React.FC<{
     setIsModalOpen: (v: boolean) => void;
     setEditingTask: (t: Opgave | undefined) => void;
     fetchTasks: () => void;
-    handleAssigneeChange: (id: number, uid: number | null) => void;
+    handleAssigneeChange: (id: number, uids: number[]) => void;
     getFilteredTasks: (status: OpgaveStatus) => Opgave[];
+    currentUser: User | null;
+    showOnHold: boolean;
+    setShowOnHold: (v: boolean) => void;
 }> = (props) => {
+
+    const handleTaskClick = async (t: Opgave) => {
+        props.setEditingTask(t);
+        props.setIsModalOpen(true);
+        try {
+            const fullTask = await opgaveService.get(t.id);
+            props.setEditingTask(fullTask);
+        } catch (e) {
+            console.error(e);
+        }
+    };
     const { setNodeRef: setArchiveRef, isOver: archiveIsOver } = useDroppable({
         id: 'archive-dropzone',
     });
@@ -82,6 +96,27 @@ const OpgaverBoardContent: React.FC<{
                         )}
                     </div>
 
+                    {/* Quick Filter: My Tasks */}
+                    {props.currentUser && (
+                        <button
+                            onClick={() => {
+                                const myId = String(props.currentUser?.id);
+                                if (props.filterAnsvarlig === myId) {
+                                    props.setFilterAnsvarlig('');
+                                } else {
+                                    props.setFilterAnsvarlig(myId);
+                                }
+                            }}
+                            className={`p-1.5 rounded-lg border transition-colors ${props.filterAnsvarlig === String(props.currentUser.id)
+                                ? 'bg-blue-100 text-blue-600 border-blue-200'
+                                : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                }`}
+                            title="Mine opgaver"
+                        >
+                            <UserIcon size={16} />
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
                         <Filter size={14} className="text-gray-400" />
                         <select
@@ -114,25 +149,57 @@ const OpgaverBoardContent: React.FC<{
             {/* Board Area */}
             <div className="flex-1 overflow-x-auto overflow-y-hidden p-2">
                 <div className="flex h-full gap-2 min-w-max">
-                    {Object.values(OpgaveStatus).map(status => (
+                    {/* Backlog Column with Toggle Button */}
+                    <TaskColumn
+                        key={OpgaveStatus.BACKLOG}
+                        id={OpgaveStatus.BACKLOG}
+                        title="Indbakke"
+                        tasks={props.getFilteredTasks(OpgaveStatus.BACKLOG)}
+                        onTaskClick={handleTaskClick}
+                        users={props.users}
+                        onAssigneeChange={props.handleAssigneeChange}
+                        headerAction={
+                            <button
+                                onClick={() => props.setShowOnHold(!props.showOnHold)}
+                                className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                                title={props.showOnHold ? "Skjul On Hold" : "Vis On Hold"}
+                            >
+                                {props.showOnHold ?
+                                    <ChevronLeft size={16} className="text-gray-500" /> :
+                                    <ChevronRight size={16} className="text-gray-500" />
+                                }
+                            </button>
+                        }
+                    />
+
+                    {/* On Hold / Afventer Column */}
+                    {props.showOnHold && (
+                        <TaskColumn
+                            key={OpgaveStatus.ON_HOLD}
+                            id={OpgaveStatus.ON_HOLD}
+                            title={
+                                <div className="flex items-center gap-2">
+                                    <PauseCircle size={18} className="text-gray-500" />
+                                    <span>On Hold</span>
+                                </div>
+                            }
+                            tasks={props.getFilteredTasks(OpgaveStatus.ON_HOLD)}
+                            onTaskClick={handleTaskClick}
+                            users={props.users}
+                            onAssigneeChange={props.handleAssigneeChange}
+                        />
+                    )}
+
+                    {/* Other Columns */}
+                    {[OpgaveStatus.TODO, OpgaveStatus.IN_PROGRESS, OpgaveStatus.TEST, OpgaveStatus.DONE].map(status => (
                         <TaskColumn
                             key={status}
                             id={status}
-                            title={status === OpgaveStatus.BACKLOG ? 'Indbakke' :
-                                status === OpgaveStatus.TODO ? 'Klar til start' :
-                                    status === OpgaveStatus.IN_PROGRESS ? 'Igang' :
-                                        status === OpgaveStatus.TEST ? 'Test' : 'Færdig'}
+                            title={status === OpgaveStatus.TODO ? 'Klar til start' :
+                                status === OpgaveStatus.IN_PROGRESS ? 'Igang' :
+                                    status === OpgaveStatus.TEST ? 'Test' : 'Færdig'}
                             tasks={props.getFilteredTasks(status)}
-                            onTaskClick={async (t: Opgave) => {
-                                props.setEditingTask(t);
-                                props.setIsModalOpen(true);
-                                try {
-                                    const fullTask = await opgaveService.get(t.id);
-                                    props.setEditingTask(fullTask);
-                                } catch (e) {
-                                    console.error(e);
-                                }
-                            }}
+                            onTaskClick={handleTaskClick}
                             users={props.users}
                             onAssigneeChange={props.handleAssigneeChange}
                         />
@@ -168,6 +235,7 @@ const OpgaverPage: React.FC = () => {
     const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
     const [filterAnsvarlig, setFilterAnsvarlig] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showOnHold, setShowOnHold] = useState(false);
 
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -206,6 +274,13 @@ const OpgaverPage: React.FC = () => {
         }
     }, [tasks]);
 
+    useEffect(() => {
+        if (searchQuery.trim()) {
+            const onHoldMatches = getFilteredTasks(OpgaveStatus.ON_HOLD);
+            setShowOnHold(onHoldMatches.length > 0);
+        }
+    }, [searchQuery, tasks, filterAnsvarlig]); // React to search, data, or filter changes
+
     const customCollisionDetection: CollisionDetection = (args) => {
         const archiveContainer = args.droppableContainers.find(c => c.id === 'archive-dropzone');
         if (archiveContainer) {
@@ -223,6 +298,7 @@ const OpgaverPage: React.FC = () => {
     const memoizedTasksByStatus = React.useMemo(() => {
         const groups: Record<OpgaveStatus, Opgave[]> = {
             [OpgaveStatus.BACKLOG]: [],
+            [OpgaveStatus.ON_HOLD]: [],
             [OpgaveStatus.TODO]: [],
             [OpgaveStatus.IN_PROGRESS]: [],
             [OpgaveStatus.TEST]: [],
@@ -250,28 +326,52 @@ const OpgaverPage: React.FC = () => {
 
         // Filter by Assignee
         if (filterAnsvarlig) {
-            list = list.filter(t => t.ansvarlig?.toString() === filterAnsvarlig);
+            const filterId = Number(filterAnsvarlig);
+            list = list.filter(t => t.ansvarlige && t.ansvarlige.includes(filterId));
         }
 
         // Filter by Search Query (Title and Description)
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            list = list.filter(t =>
-                t.titel.toLowerCase().includes(query) ||
-                (t.beskrivelse && t.beskrivelse.toLowerCase().includes(query))
-            );
+            list = list.filter(t => {
+                const titleMatch = t.titel.toLowerCase().includes(query);
+
+                // Strip HTML from description and handle entities
+                const descriptionText = t.beskrivelse
+                    ? t.beskrivelse
+                        .replace(/<[^>]*>/g, ' ') // Replace tags with space to avoid fusing words
+                        .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+                        .replace(/\s+/g, ' ')    // Normalize whitespace to single space
+                        .toLowerCase()
+                    : '';
+
+                return titleMatch || descriptionText.includes(query);
+            });
         }
 
         return list;
     };
 
-    const handleAssigneeChange = async (opgaveId: number, userId: number | null) => {
+
+
+    const handleAssigneeChange = async (opgaveId: number, userIds: number[]) => {
+        // Optimistic update
         setTasks(prev => prev.map(t =>
-            t.id === opgaveId ? { ...t, ansvarlig: userId, ansvarlig_details: users.find(u => u.id === userId) } : t
+            t.id === opgaveId ? {
+                ...t,
+                ansvarlige: userIds,
+                ansvarlige_details: users.filter(u => userIds.includes(u.id))
+            } : t
         ));
+
         try {
-            await opgaveService.update(opgaveId, { ansvarlig: userId });
-        } catch (error) { fetchTasks(); }
+            const updatedTask = await opgaveService.update(opgaveId, { ansvarlige: userIds });
+            // Confirm with server response
+            setTasks(prev => prev.map(t => t.id === opgaveId ? updatedTask : t));
+        } catch (error) {
+            console.error("Failed to update assignee:", error);
+            fetchTasks(); // Revert on error
+        }
     };
 
     const sensors = useSensors(
@@ -363,6 +463,9 @@ const OpgaverPage: React.FC = () => {
                 fetchTasks={fetchTasks}
                 handleAssigneeChange={handleAssigneeChange}
                 getFilteredTasks={getFilteredTasks}
+                currentUser={state.currentUser}
+                showOnHold={showOnHold}
+                setShowOnHold={setShowOnHold}
             />
 
             {isArchiveOpen && (
