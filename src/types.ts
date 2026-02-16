@@ -495,11 +495,11 @@ export interface HjaelpPunkt {
 
 export enum OpgaveStatus {
   BACKLOG = 'BACKLOG',
-  ON_HOLD = 'ON_HOLD',
   TODO = 'TODO',
   IN_PROGRESS = 'IN_PROGRESS',
   TEST = 'TEST',
-  DONE = 'DONE'
+  DONE = 'DONE',
+  ON_HOLD = 'ON_HOLD'
 }
 
 export enum OpgavePriority {
