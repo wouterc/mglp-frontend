@@ -51,7 +51,7 @@ export default defineConfig({
   ],
   server: {
     host: '127.0.0.1', // Dette tvinger serveren til at bruge IP-adressen
-    port: 5173,
+    port: 5174,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',

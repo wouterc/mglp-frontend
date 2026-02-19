@@ -10,11 +10,12 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   headerActions?: ReactNode;
-  maxWidth?: string; // New prop
+  maxWidth?: string;
   wide?: boolean;
+  contentClassName?: string;
+  noContentPadding?: boolean;
 }
-
-function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWidth = 'max-w-md', wide }: ModalProps): React.ReactElement | null {
+function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWidth = 'max-w-md', wide, contentClassName = '', noContentPadding = false }: ModalProps): React.ReactElement | null {
   const [isMaximized, setIsMaximized] = React.useState(false);
   const resolvedMaxWidth = isMaximized ? 'w-full h-full max-w-none m-0 rounded-none' : (wide ? 'max-w-4xl' : maxWidth);
   // Reset maximized when closed
@@ -36,13 +37,17 @@ function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWid
     return () => {
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, title]); // Added title to deps just to be safe, though not strictly needed for this effect
 
   if (!isOpen) return null;
 
   const classes = isMaximized
     ? "bg-white shadow-xl w-full h-full m-0 flex flex-col fixed inset-0 z-50 rounded-none"
     : `bg-white rounded-lg shadow-xl w-full ${resolvedMaxWidth} m-4 max-h-[95vh] flex flex-col transition-all duration-200`;
+
+  const defaultContentClass = "p-6 overflow-y-auto min-h-0 custom-scrollbar flex-1";
+  const noPaddingContentClass = "overflow-hidden min-h-0 flex-1 flex flex-col"; // flex col to allow child to fill height
+  const finalContentClass = noContentPadding ? noPaddingContentClass : defaultContentClass;
 
   return (
     <div
@@ -69,7 +74,7 @@ function Modal({ isOpen, onClose, title, children, footer, headerActions, maxWid
             </button>
           </div>
         </div>
-        <div className="p-6 overflow-y-auto min-h-0 custom-scrollbar flex-1">
+        <div className={`${finalContentClass} ${contentClassName}`}>
           {children}
         </div>
         {footer && (

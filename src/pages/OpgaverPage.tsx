@@ -23,7 +23,7 @@ import { Opgave, OpgaveStatus, User, OpgavePriority } from '../types';
 import TaskColumn from '../components/opgaver/TaskColumn';
 import TaskCard from '../components/opgaver/TaskCard';
 import TaskDetailModal from '../components/opgaver/TaskDetailModal';
-import { Plus, Filter, Search, X, User as UserIcon, ChevronLeft, ChevronRight, PauseCircle } from 'lucide-react';
+import { Plus, Filter, Search, X, User as UserIcon, ChevronLeft, ChevronRight, PauseCircle, SquareParking } from 'lucide-react';
 import ArchiveDropZone from '../components/opgaver/ArchiveDropZone';
 import ArchiveModal from '../components/opgaver/ArchiveModal';
 
@@ -161,9 +161,10 @@ const OpgaverBoardContent: React.FC<{
                         headerAction={
                             <button
                                 onClick={() => props.setShowOnHold(!props.showOnHold)}
-                                className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                                className="p-1 hover:bg-gray-200 rounded-full transition-colors flex items-center"
                                 title={props.showOnHold ? "Skjul On Hold" : "Vis On Hold"}
                             >
+                                <span className="flex items-center justify-center w-4 h-4 bg-blue-600 text-white rounded text-[10px] font-bold mr-1 leading-none shadow-sm">P</span>
                                 {props.showOnHold ?
                                     <ChevronLeft size={16} className="text-gray-500" /> :
                                     <ChevronRight size={16} className="text-gray-500" />
