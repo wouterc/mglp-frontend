@@ -40,7 +40,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const { state: adState, dispatch: adDispatch } = useAktivitetDokument();
     const { state: lookupState } = useLookups();
     const { state: sagState, dispatch: sagDispatch } = useSager();
-    const { dispatch: authDispatch } = useAuth();
+    const { state: authState, dispatch: authDispatch } = useAuth();
     const location = useLocation();
 
     // @# DEBUG: Navigation issue
@@ -504,7 +504,16 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                         g.filtered_faerdig_count++;
                     }
                 }
-                g.filteredAktiviteter.sort((a, b) => (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0));
+                // @# Sort adjustment based on user preference
+                const sortOrder = authState.currentUser?.aktivitet_sortering || 'nummer';
+                g.filteredAktiviteter.sort((a, b) => {
+                    if (sortOrder === 'alfabetisk') {
+                        const nameA = a.aktivitet || '';
+                        const nameB = b.aktivitet || '';
+                        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                    }
+                    return (a.aktivitet_nr || 0) - (b.aktivitet_nr || 0);
+                });
                 actMap[key] = g.filteredAktiviteter;
                 groupsMap[key] = g;
             }
@@ -525,7 +534,7 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             console.error("CRITICAL ERROR in Activities calculation:", error);
             return { filteredGroups: [], groupedActivities: {}, samletTaeling: { total: 0, faerdige: 0 } };
         }
-    }, [valgtSag, state.aktivitetsGrupper, state.cachedAktiviteter, aktiviteterFilters, location.search]);
+    }, [valgtSag, state.aktivitetsGrupper, state.cachedAktiviteter, aktiviteterFilters, location.search, authState.currentUser]);
 
 
     const handleToggleAlleGrupper = (vis: boolean) => {

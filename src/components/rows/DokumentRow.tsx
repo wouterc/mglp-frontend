@@ -432,7 +432,7 @@ const DokumentRow = React.memo(function DokumentRow({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <option value="">Vælg...</option>
-                        {statusser.map((s: any) => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
+                        {statusser.filter((s: any) => s.aktiv || s.id === doc.status?.id).map((s: any) => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                     </select>
                 </div>
             </td>

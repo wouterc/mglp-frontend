@@ -23,7 +23,7 @@ const TaskColumn: React.FC<TaskColumnProps> = ({ id, title, tasks, onTaskClick, 
                 flex flex-col h-full w-72 rounded-xl border-2 transition-all flex-shrink-0
                 ${isOver
                     ? 'bg-blue-50 border-blue-400 shadow-lg scale-[1.01] z-20'
-                    : 'bg-gray-50/50 border-gray-100/50'
+                    : 'bg-gray-300 border-gray-100/50'
                 }
             `}
         >

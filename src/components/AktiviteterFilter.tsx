@@ -7,13 +7,14 @@ import { api } from '../api';
 import { useAppState } from '../StateContext';
 import FilterSidebar from './FilterSidebar';
 import type { Status, AktiviteterFilterState, User } from '../types';
+import { ChevronDown, ChevronUp, ArrowDown01, ArrowDownAZ } from 'lucide-react';
 import Button from './ui/Button'; // Importer den nye knap
 
 // Importer AktiviteterFilterState
 
 function AktiviteterFilter() {
     const { state, dispatch } = useAppState();
-    const { aktiviteterFilters, users: colleagues, aktivitetStatusser, informationsKilder } = state;
+    const { aktiviteterFilters, users: colleagues, aktivitetStatusser, informationsKilder, currentUser } = state;
 
     // @# 2025-12-21 - Opdaterer nu direkte den GLOBALE state for instant respons.
     const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -52,9 +53,41 @@ function AktiviteterFilter() {
         });
     };
 
+    const toggleSort = () => {
+        if (!currentUser) return;
+        const current = currentUser.aktivitet_sortering || 'nummer';
+        const next = current === 'nummer' ? 'alfabetisk' : 'nummer';
+        // Optimistic update
+        dispatch({ type: 'SET_CURRENT_USER', payload: { ...currentUser, aktivitet_sortering: next } });
+        // API call
+        api.patch('/kerne/me/', { aktivitet_sortering: next }).catch(console.error);
+    };
+
     return (
         <FilterSidebar onNulstil={handleNulstilFiltre}>
             <div className="space-y-4">
+                {/* Sortering Toggle */}
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Sortering</span>
+                    <button
+                        onClick={toggleSort}
+                        className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-50 flex items-center gap-1 transition-colors"
+                        title={currentUser?.aktivitet_sortering === 'alfabetisk' ? 'Skift til nummerorden' : 'Skift til alfabetisk'}
+                    >
+                        {currentUser?.aktivitet_sortering === 'alfabetisk' ? (
+                            <>
+                                <ArrowDownAZ size={14} className="text-blue-600" />
+                                <span className="font-medium">Alfabetisk</span>
+                            </>
+                        ) : (
+                            <>
+                                <ArrowDown01 size={14} className="text-blue-600" />
+                                <span className="font-medium">Nummer</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+
                 <input
                     id="filter-aktivitet"
                     type="text"

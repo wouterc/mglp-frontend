@@ -7,10 +7,11 @@
 // @# 2025-11-17 22:40 - Endelig rettelse af import-sti og prop-typer
 // @# 2025-11-23 20:00 - Tilføjet useEffect til at hente Current User ved start.
 import React, { ReactNode, useContext, useEffect, useState } from 'react'; // @# Tilføj useEffect
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { api } from './api';
 
 import Layout from './components/Layout';
+import SkabelonerLayout from './components/SkabelonerLayout';
 import ConfirmModal from './components/ui/ConfirmModal';
 import SagsoversigtPage from './pages/SagsoversigtPage';
 import SagsdetaljerPage from './pages/SagsdetaljerPage';
@@ -22,6 +23,7 @@ import KontakterPage from './pages/KontakterPage';
 import BlokInfoSkabelonerPage from './pages/BlokInfoSkabelonerPage';
 import AktivitetsskabelonerPage from './pages/AktivitetsskabelonerPage';
 import DokumentskabelonerPage from './pages/DokumentskabelonerPage';
+import { VarelistePage } from './pages/VarelistePage';
 import MinKontoPage from './pages/MinKontoPage';
 import LoginPage from './pages/LoginPage';
 import GlemtAdgangskodePage from './pages/GlemtAdgangskodePage';
@@ -144,9 +146,18 @@ function App() {
             <Route path="/mail_kurv" element={<MailKurvPage />} />
             <Route path="/virksomheder" element={<VirksomhederPage navigateTo={navigateTo} />} />
             <Route path="/kontakter" element={<KontakterPage navigateTo={navigateTo} />} />
-            <Route path="/blokinfo_skabeloner" element={<BlokInfoSkabelonerPage />} />
-            <Route path="/aktivitetsskabeloner" element={<AktivitetsskabelonerPage />} />
-            <Route path="/dokumentskabeloner" element={<DokumentskabelonerPage />} />
+            <Route path="/skabeloner" element={<SkabelonerLayout />}>
+              <Route index element={<Navigate to="blokinfo" replace />} />
+              <Route path="blokinfo" element={<BlokInfoSkabelonerPage />} />
+              <Route path="aktiviteter" element={<AktivitetsskabelonerPage />} />
+              <Route path="dokumenter" element={<DokumentskabelonerPage />} />
+              <Route path="vareliste" element={<VarelistePage />} />
+            </Route>
+            {/* Redirects for legacy routes */}
+            <Route path="/blokinfo_skabeloner" element={<Navigate to="/skabeloner/blokinfo" replace />} />
+            <Route path="/aktivitetsskabeloner" element={<Navigate to="/skabeloner/aktiviteter" replace />} />
+            <Route path="/dokumentskabeloner" element={<Navigate to="/skabeloner/dokumenter" replace />} />
+
             <Route path="/medarbejdere" element={<MedarbejderePage />} />
             <Route path="/min_konto" element={<MinKontoPage />} />
             {/* Login-relaterede sider er allerede håndteret ovenfor */}

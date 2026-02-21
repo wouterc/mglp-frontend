@@ -65,5 +65,33 @@ export const SagService = {
      */
     async getRaadgiverTilknytninger(id: number): Promise<any[]> {
         return await api.get<any[]>(`/sager/raadgivere/?sag_id=${id}`);
+    },
+
+    /**
+     * Henter fakturalinjer for en sag.
+     */
+    async getFakturaLines(id: number): Promise<any[]> {
+        return await api.get<any[]>(`/sager/sagsfaktura/?sag_id=${id}`);
+    },
+
+    /**
+     * Opretter en fakturalinje.
+     */
+    async createFakturaLine(data: any): Promise<any> {
+        return await api.post<any>('/sager/sagsfaktura/', data);
+    },
+
+    /**
+     * Opdaterer en fakturalinje.
+     */
+    async updateFakturaLine(id: number, data: any): Promise<any> {
+        return await api.patch<any>(`/sager/sagsfaktura/${id}/`, data);
+    },
+
+    /**
+     * Sletter en fakturalinje.
+     */
+    async deleteFakturaLine(id: number): Promise<void> {
+        await api.delete(`/sager/sagsfaktura/${id}/`);
     }
 };

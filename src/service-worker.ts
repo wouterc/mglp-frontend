@@ -10,7 +10,13 @@ precacheAndRoute(self.__WB_MANIFEST);
 
 // Handle SPA routing: all navigation requests should go to /index.html
 const handler = createHandlerBoundToURL('/index.html');
-const navigationRoute = new NavigationRoute(handler);
+const navigationRoute = new NavigationRoute(handler, {
+    denylist: [
+        /^\/admin/,
+        /^\/static/,
+        /^\/media/
+    ]
+});
 registerRoute(navigationRoute);
 
 self.skipWaiting();

@@ -1,5 +1,5 @@
 import { api } from '../api';
-import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BbrAnvendelse } from '../types';
+import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BbrAnvendelse, BoligType } from '../types';
 
 export const LookupService = {
     async getUsers(): Promise<User[]> {
@@ -29,6 +29,11 @@ export const LookupService = {
         return await api.get<BbrAnvendelse[]>('/kerne/bbr-anvendelser/');
     },
 
+    async getBoligTyper(): Promise<BoligType[]> {
+        const resp = await api.get<any>('/kerne/boligtyper/');
+        return Array.isArray(resp) ? resp : resp.results || [];
+    },
+
     async getEmailAccounts(): Promise<any[]> {
         const resp = await api.get<any>('/emails/accounts/');
         const accounts = Array.isArray(resp) ? resp : resp.results || [];
@@ -44,6 +49,11 @@ export const LookupService = {
     async getKontakter(params?: Record<string, any>): Promise<any[]> {
         const query = params ? '?' + new URLSearchParams(params).toString() : '';
         const resp = await api.get<any>(`/register/kontakter/${query}`);
+        return Array.isArray(resp) ? resp : resp.results || [];
+    },
+
+    async getVareliste(): Promise<any[]> {
+        const resp = await api.get<any>('/skabeloner/vareliste/');
         return Array.isArray(resp) ? resp : resp.results || [];
     }
 };

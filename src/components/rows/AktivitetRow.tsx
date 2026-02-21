@@ -325,7 +325,7 @@ function AktivitetRow({
                             }`}
                     >
                         <option value="">Vælg...</option>
-                        {statusser.map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
+                        {statusser.filter(s => s.aktiv || s.id === aktivitet.status?.id).map(s => <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>)}
                     </select>
                 </div>
             </td>

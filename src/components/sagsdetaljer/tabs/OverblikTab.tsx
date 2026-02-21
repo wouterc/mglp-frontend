@@ -136,7 +136,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                     {/* Rad 2: Property Basic */}
                     <div>
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Boligtype</div>
-                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_type || '-'}</p>
+                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_type_obj?.navn || sag.bolig_type || '-'}</p>
                     </div>
                     <div>
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Matrikel</div>
@@ -171,7 +171,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                                     ${sag.status?.status_kategori === 9 ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200'}
                                 `}
                             >
-                                {statusser.map(s => (
+                                {statusser.filter(s => s.aktiv || s.id === sag.status?.id).map(s => (
                                     <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
                                 ))}
                             </select>

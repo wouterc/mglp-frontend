@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
     ArrowLeft, Search, Loader2, MailPlus, ListChecks,
-    List, Info, ListTodo, Files, Mail, Inbox
+    List, Info, ListTodo, Files, Mail, Inbox, ReceiptText
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
@@ -15,7 +15,7 @@ import useDebounce from '../../hooks/useDebounce';
 import { SagService } from '../../services/SagService';
 import SagsHeader from './SagsHeader';
 
-export type TabType = 'overblik' | 'processer' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
+export type TabType = 'overblik' | 'processer' | 'faktura' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
 interface SagsdetaljerLayoutProps {
     children: ReactNode;
@@ -29,6 +29,7 @@ interface SagsdetaljerLayoutProps {
 const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'overblik', label: 'Overblik', icon: LayoutDashboard },
     { id: 'processer', label: 'Processer', icon: ListChecks },
+    { id: 'faktura', label: 'Faktura', icon: ReceiptText },
     { id: 'maegler', label: 'Mægler', icon: Building2 },
     { id: 'saelgere', label: 'Sælgere', icon: User },
     { id: 'koebere', label: 'Købere', icon: User },
@@ -242,10 +243,8 @@ function SagsdetaljerLayout({
                 </nav>
 
                 {/* Højre Indhold (Aktiv Fane) */}
-                <main className="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
-                    <div className="w-full">
-                        {children}
-                    </div>
+                <main className="flex-1 overflow-hidden flex flex-col bg-gray-50 p-4">
+                    {children}
                 </main>
 
             </div>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { api } from '../api';
 import { LookupService } from '../services/LookupService';
-import { User, Status, InformationsKilde, StandardMappe, Blokinfo } from '../types';
+import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BoligType } from '../types';
 import { useAuth } from './AuthContext';
 
 interface LookupState {
@@ -13,6 +13,7 @@ interface LookupState {
     informationsKilder: InformationsKilde[];
     standardMapper: StandardMappe[];
     blokinfoSkabeloner: Blokinfo[];
+    boligTyper: BoligType[];
     isLoading: boolean;
 }
 
@@ -31,6 +32,7 @@ const initialState: LookupState = {
     informationsKilder: [],
     standardMapper: [],
     blokinfoSkabeloner: [],
+    boligTyper: [],
     isLoading: false,
 };
 
@@ -69,14 +71,15 @@ export const LookupProvider = ({ children }: { children: ReactNode }) => {
         isFetching.current = true;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const [users, actStatuses, sagStatuses, docStatuses, sources, groups, mappers] = await Promise.all([
+            const [users, actStatuses, sagStatuses, docStatuses, sources, groups, mappers, bTyper] = await Promise.all([
                 LookupService.getUsers(),
                 LookupService.getStatusser(2),
                 LookupService.getStatusser(1),
                 LookupService.getStatusser(3),
                 LookupService.getInformationsKilder(),
                 LookupService.getBlokinfoSkabeloner(),
-                LookupService.getStandardMapper()
+                LookupService.getStandardMapper(),
+                LookupService.getBoligTyper()
             ]);
 
             dispatch({
@@ -89,7 +92,8 @@ export const LookupProvider = ({ children }: { children: ReactNode }) => {
                     dokumentStatusser: docStatuses,
                     informationsKilder: sources,
                     blokinfoSkabeloner: groups,
-                    standardMapper: mappers || []
+                    standardMapper: mappers || [],
+                    boligTyper: bTyper
                 }
             });
         } catch (e) {

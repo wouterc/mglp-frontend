@@ -2,6 +2,14 @@
 // @# 2025-11-19 20:25 - Tilføjet 'kommunekode' til Sag-typen.
 // @# 2025-11-21 20:45 - Tilføjet forsynings-felter til Sag og kommunekode til Virksomhed.
 // @# 2025-11-22 11:00 - Tilføjet specifikke forsynings-flags til VirksomhedGruppe.
+// @# 2026-02-19 - Tilføjet BoligType.
+
+export interface BoligType {
+  id: number;
+  navn: string;
+  sortering: number;
+  aktiv: boolean;
+}
 
 export interface Blokinfo {
   id: number;
@@ -49,6 +57,8 @@ export interface Status {
   status_nummer: number;
   beskrivelse: string;
   status_kategori: number;
+  aktiv: boolean;
+  farve?: string;
 }
 
 export interface BbrAnvendelse {
@@ -149,6 +159,8 @@ export interface Sag {
   dato_ekstern: string | null;
 
   bolig_type: string | null;
+  bolig_type_obj?: BoligType | null;
+  bolig_type_id?: number | null;
   bolig_matrikel: string | null;
   bolig_anvendelse: BbrAnvendelse | null;
   bolig_bfe: string | null;
@@ -341,6 +353,7 @@ export interface User {
   opgave_sortering?: number;
   er_sagsbehandler?: boolean;
   color?: string;
+  aktivitet_sortering?: 'nummer' | 'alfabetisk';
 }
 
 export interface SagsDokument {
@@ -549,3 +562,40 @@ export interface OpgaveStatusLog {
   direction: 'UP' | 'DOWN' | 'SAME' | 'UNKNOWN';
 }
 
+export interface Varetype {
+  id: number;
+  navn: string;
+  sortering: number;
+}
+
+export interface Vareliste {
+  id: number;
+  varenummer?: number;
+  titel: string;
+  pris_ex_moms?: number;
+  kommentar?: string;
+  varetype?: Varetype;
+  varetype_id?: number | null;
+  itemgruppe?: Blokinfo;
+  itemgruppe_id?: number | null;
+  aktiv: boolean;
+  oprettet: string;
+  sidst_opdateret: string;
+}
+
+export interface FakturaLine {
+  id: number;
+  sag: number;
+  vare: Vareliste | null;
+  vare_id?: number | null;
+  varenummer: number | null;
+  beskrivelse: string;
+  pris: string;
+  dato: string | null;
+  faktura_nummer: string | null;
+  status: Status | null;
+  status_id?: number | null;
+  kommentar: string | null;
+  oprettet_dato: string;
+  sidst_opdateret: string;
+}

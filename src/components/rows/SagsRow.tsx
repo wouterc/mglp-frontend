@@ -117,7 +117,7 @@ export default function SagsRow({
                         onClick={(e) => e.stopPropagation()}
                         className="p-1 border border-gray-300 rounded-md bg-white w-full text-xs"
                     >
-                        {statusser.map(s => (
+                        {statusser.filter(s => s.aktiv || s.id === sag.status?.id).map(s => (
                             <option key={s.id} value={s.id}>{s.status_nummer} - {s.beskrivelse}</option>
                         ))}
                     </select>

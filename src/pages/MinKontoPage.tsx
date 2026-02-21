@@ -2,7 +2,7 @@ import React, { ReactElement, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
-import { User, Shield, Mail, Key, Loader2, UserCircle, Monitor, Settings, AppWindow, ExternalLink, CircleHelp } from 'lucide-react';
+import { User, Shield, Mail, Key, Loader2, UserCircle, Monitor, Settings, AppWindow, ExternalLink, CircleHelp, ArrowDown01, ArrowDownAZ } from 'lucide-react';
 import Button from '../components/ui/Button';
 import HelpButton from '../components/ui/HelpButton';
 import Tooltip from '../components/Tooltip';
@@ -16,11 +16,11 @@ function MinKontoPage(): ReactElement {
     const [visSkiftKodeModal, setVisSkiftKodeModal] = useState(false);
     const [updatingPref, setUpdatingPref] = useState(false);
 
-    const handleUpdateLinkPreference = async (mode: string) => {
+    const handleUpdateLinkPreference = async (updates: any) => {
         if (!currentUser || updatingPref) return;
         setUpdatingPref(true);
         try {
-            const updatedUser = await api.patch<any>('/kerne/me/', { preferred_link_open_mode: mode });
+            const updatedUser = await api.patch<any>('/kerne/me/', updates);
             dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
         } catch (e) {
             console.error("Fejl ved opdatering af præference:", e);
@@ -150,7 +150,7 @@ function MinKontoPage(): ReactElement {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
-                                    onClick={() => handleUpdateLinkPreference('window')}
+                                    onClick={() => handleUpdateLinkPreference({ preferred_link_open_mode: 'window' })}
                                     className={`flex-1 flex items-center p-3 border rounded-md transition-all ${currentUser.preferred_link_open_mode === 'window'
                                         ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
                                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
@@ -165,7 +165,7 @@ function MinKontoPage(): ReactElement {
                                 </button>
 
                                 <button
-                                    onClick={() => handleUpdateLinkPreference('tab')}
+                                    onClick={() => handleUpdateLinkPreference({ preferred_link_open_mode: 'tab' })}
                                     className={`flex-1 flex items-center p-3 border rounded-md transition-all ${currentUser.preferred_link_open_mode === 'tab'
                                         ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
                                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
@@ -181,7 +181,50 @@ function MinKontoPage(): ReactElement {
                             </div>
                         </div>
                     </div>
+
+                    <div className="md:col-span-2 border-t pt-4">
+                        <div className="flex items-center mb-2">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mr-2">
+                                Aktivitet Sortering
+                            </label>
+                            <Tooltip content="Vælg om aktivitetslister skal sorteres efter nummer (standard) eller alfabetisk efter navn.">
+                                <CircleHelp size={14} className="text-gray-400 hover:text-blue-500 cursor-help" />
+                            </Tooltip>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                                onClick={() => handleUpdateLinkPreference({ aktivitet_sortering: 'nummer' })}
+                                className={`flex-1 flex items-center p-3 border rounded-md transition-all ${(!currentUser.aktivitet_sortering || currentUser.aktivitet_sortering === 'nummer')
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                                    }`}
+                            >
+                                <ArrowDown01 size={18} className={`mr-3 ${(!currentUser.aktivitet_sortering || currentUser.aktivitet_sortering === 'nummer') ? 'text-blue-600' : 'text-gray-400'}`} />
+                                <div className="text-left">
+                                    <div className="text-sm font-semibold">Nummerorden</div>
+                                    <div className="text-[10px] text-gray-500">1, 2, 3...</div>
+                                </div>
+                                {(!currentUser.aktivitet_sortering || currentUser.aktivitet_sortering === 'nummer') && <div className="ml-auto w-2 h-2 rounded-full bg-blue-600"></div>}
+                            </button>
+
+                            <button
+                                onClick={() => handleUpdateLinkPreference({ aktivitet_sortering: 'alfabetisk' })}
+                                className={`flex-1 flex items-center p-3 border rounded-md transition-all ${currentUser.aktivitet_sortering === 'alfabetisk'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                                    }`}
+                            >
+                                <ArrowDownAZ size={18} className={`mr-3 ${currentUser.aktivitet_sortering === 'alfabetisk' ? 'text-blue-600' : 'text-gray-400'}`} />
+                                <div className="text-left">
+                                    <div className="text-sm font-semibold">Alfabetisk</div>
+                                    <div className="text-[10px] text-gray-500">A - Å</div>
+                                </div>
+                                {currentUser.aktivitet_sortering === 'alfabetisk' && <div className="ml-auto w-2 h-2 rounded-full bg-blue-600"></div>}
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
 
                 {/* Sikkerhed Kort */}
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
@@ -246,6 +289,8 @@ function MinKontoPage(): ReactElement {
 
             </div>
 
+
+
             <RedigerProfilModal
                 isOpen={visRedigerModal}
                 onClose={() => setVisRedigerModal(false)}
@@ -255,7 +300,7 @@ function MinKontoPage(): ReactElement {
                 isOpen={visSkiftKodeModal}
                 onClose={() => setVisSkiftKodeModal(false)}
             />
-        </div>
+        </div >
     );
 }
 

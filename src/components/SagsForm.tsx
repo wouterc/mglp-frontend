@@ -50,6 +50,7 @@ interface SagsDataState {
   // @# 2025-11-19 20:30 - Tilføjet kommunekode til state (som string for nemheds skyld i forms)
   kommunekode: string;
   bolig_type: string;
+  bolig_type_id: string; // Tilføjet
   bolig_bfe: string;
   bolig_matrikel: string;
   bolig_anpart: string;
@@ -67,7 +68,7 @@ interface SagsDataState {
 
 function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const { state: lookupState } = useLookups();
-  const { sagsStatusser: statusser } = lookupState;
+  const { sagsStatusser: statusser, boligTyper } = lookupState;
   const [sagsData, setSagsData] = useState<SagsDataState>({
     alias: '',
     hovedansvarlige: '',
@@ -84,6 +85,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     // @# 2025-11-19 20:30 - Init
     kommunekode: '',
     bolig_type: '',
+    bolig_type_id: '',
     bolig_bfe: '',
     bolig_matrikel: '',
     bolig_anpart: '',
@@ -104,18 +106,13 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const [isFetchingDetails, setIsFetchingDetails] = useState<boolean>(false);
   const erRedigering = sagTilRedigering != null;
 
-  const BOLIG_TYPER = [
-    { value: 'Villa', label: 'Villa' },
-    { value: 'Rækkehus', label: 'Rækkehus' },
-    { value: 'Ejerlejlighed', label: 'Ejerlejlighed' },
-    { value: 'Andelsbolig', label: 'Andelsbolig' },
-    { value: 'Landejendom', label: 'Landejendom' },
-    { value: 'Sommerhus', label: 'Sommerhus' },
-    { value: 'Byggegrund', label: 'Byggegrund' },
-    { value: 'Villalejlighed', label: 'Villalejlighed' },
-    { value: 'Ideel anpart', label: 'Ideel anpart' },
-    { value: 'Erhverv', label: 'Erhverv' },
-  ];
+  const BOLIG_TYPER_OPTIONS = boligTyper
+    .filter(bt => bt.aktiv || String(bt.id) === String(sagsData.bolig_type_id))
+    .map(bt => ({
+      value: bt.navn,
+      label: bt.navn,
+      id: bt.id
+    }));
 
   // @# 2025-11-10 19:30 - Rettet type-mismatch. Mapper nu eksplicit null -> ''
   useEffect(() => {
@@ -144,6 +141,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         kommunekode: sagTilRedigering.kommunekode ? String(sagTilRedigering.kommunekode) : '',
 
         bolig_type: sagTilRedigering.bolig_type || '',
+        bolig_type_id: sagTilRedigering.bolig_type_obj ? String(sagTilRedigering.bolig_type_obj.id) : '',
         bolig_bfe: sagTilRedigering.bolig_bfe || '',
         bolig_matrikel: sagTilRedigering.bolig_matrikel || '',
         bolig_anpart: sagTilRedigering.bolig_anpart || '',
@@ -312,6 +310,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       standard_outlook_account_id: sagsData.standard_outlook_account_id === '' ? null : parseInt(sagsData.standard_outlook_account_id, 10),
       // @# 2025-11-19 20:30 - Konverter kommunekode til int eller null
       kommunekode: sagsData.kommunekode ? parseInt(sagsData.kommunekode, 10) : null,
+      bolig_type_id: sagsData.bolig_type_id === '' ? null : parseInt(sagsData.bolig_type_id, 10),
       raadgiver_kontakt_id: sagsData.raadgiver_kontakt_id === '' ? null : parseInt(sagsData.raadgiver_kontakt_id, 10),
     };
 
@@ -447,7 +446,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
                 className="mt-0.5 block w-full px-2 py-1 border border-gray-300 bg-white rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
                 <option value="">Vælg status...</option>
-                {statusser.map(status => (
+                {statusser.filter(s => s.aktiv || String(s.id) === String(sagsData.status_id)).map(status => (
                   <option key={status.id} value={status.id}>
                     {status.status_nummer} - {status.beskrivelse}
                   </option>
@@ -495,8 +494,15 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
               <SearchableSelect
                 id="bolig_type"
                 value={sagsData.bolig_type || ''}
-                onChange={(val) => setSagsData(prev => ({ ...prev, bolig_type: val }))}
-                options={BOLIG_TYPER}
+                onChange={(val) => {
+                  const selected = boligTyper.find(bt => bt.navn === val);
+                  setSagsData(prev => ({
+                    ...prev,
+                    bolig_type: val,
+                    bolig_type_id: selected ? String(selected.id) : ''
+                  }));
+                }}
+                options={BOLIG_TYPER_OPTIONS}
                 placeholder="Vælg boligtype..."
               />
             </div>

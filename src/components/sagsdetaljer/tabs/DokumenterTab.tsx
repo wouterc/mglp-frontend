@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Sag, SagsDokument, Blokinfo, InformationsKilde, StandardMappe } from '../../../types';
 import { DokumentService } from '../../../services/DokumentService';
-import { ChevronDown, ChevronUp, RefreshCw, FileText, CheckCircle2, AlertCircle, PlusCircle, Mail, Loader2, ChevronsDown, ChevronsUp, ChevronRight, Save } from 'lucide-react';
+import { api } from '../../../api';
+import { ChevronDown, ChevronUp, RefreshCw, FileText, CheckCircle2, AlertCircle, PlusCircle, Mail, Loader2, ChevronsDown, ChevronsUp, ChevronRight, Save, ArrowDown01, ArrowDownAZ } from 'lucide-react';
 import DokumentRow from '../../rows/DokumentRow';
 import { useAppState } from '../../../StateContext';
 import Modal from '../../Modal';
@@ -37,7 +38,7 @@ interface DokumentFilterState {
 
 export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: DokumenterTabProps) {
     const { state, dispatch } = useAppState();
-    const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner, standardMapper } = state;
+    const { users: colleagues, dokumentStatusser: statusser, informationsKilder, blokinfoSkabeloner, standardMapper, currentUser } = state;
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -744,15 +745,23 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
         // 4. Convert to array and Sort groups by number
         const result = Object.entries(groups)
             .map(([name, data]) => {
-                // Sort documents within the group by dokument_nr
-                const sortedDocs = [...data.docs].sort((a, b) => (a.dokument_nr || 0) - (b.dokument_nr || 0));
+                // Sort documents within the group
+                const sortOrder = currentUser?.aktivitet_sortering || 'nummer';
+                const sortedDocs = [...data.docs].sort((a, b) => {
+                    if (sortOrder === 'alfabetisk') {
+                        const nameA = a.titel || a.filnavn || 'Uden navn';
+                        const nameB = b.titel || b.filnavn || 'Uden navn';
+                        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                    }
+                    return (a.dokument_nr || 0) - (b.dokument_nr || 0);
+                });
                 return { name, ...data, docs: sortedDocs };
             })
             .filter(g => g.docs.length > 0) // Only show groups that have matching documents after filter
             .sort((a, b) => a.nr - b.nr);
 
         return { processedGroups: result, globalStats };
-    }, [cachedDocs, filters, masterGroups, sag, location.search]);
+    }, [cachedDocs, filters, masterGroups, sag, location.search, currentUser]);
 
     const handleExpandAll = useCallback(() => {
         const allKeys: Record<string, boolean> = {};
@@ -823,6 +832,16 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
 
         onToolbarUpdate(content);
     }, [globalStats, copyNotify, nyeDokumenterFindes, syncing, onToolbarUpdate, handleExpandAll, handleCollapseAll]);
+
+    const toggleSort = () => {
+        if (!currentUser) return;
+        const current = currentUser.aktivitet_sortering || 'nummer';
+        const next = current === 'nummer' ? 'alfabetisk' : 'nummer';
+        // Optimistic update
+        dispatch({ type: 'SET_CURRENT_USER', payload: { ...currentUser, aktivitet_sortering: next } });
+        // API call
+        api.patch('/kerne/me/', { aktivitet_sortering: next }).catch(console.error);
+    };
 
     return (
         <div className="flex h-full gap-2">
@@ -987,6 +1006,28 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
             {/* Filter Sidebar */}
             <FilterSidebar onNulstil={resetFilters}>
                 <div className="space-y-4">
+                    {/* Sortering Toggle */}
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                        <span className="text-xs font-semibold text-gray-500 uppercase">Sortering</span>
+                        <button
+                            onClick={toggleSort}
+                            className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-50 flex items-center gap-1 transition-colors"
+                            title={currentUser?.aktivitet_sortering === 'alfabetisk' ? 'Skift til nummerorden' : 'Skift til alfabetisk'}
+                        >
+                            {currentUser?.aktivitet_sortering === 'alfabetisk' ? (
+                                <>
+                                    <ArrowDownAZ size={14} className="text-blue-600" />
+                                    <span className="font-medium">Alfabetisk</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowDown01 size={14} className="text-blue-600" />
+                                    <span className="font-medium">Nummer</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+
                     <input
                         type="text"
                         name="tekst"

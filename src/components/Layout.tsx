@@ -110,9 +110,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     {
       titel: 'SKABELONER',
       items: [
-        { id: 'blokinfo_skabeloner', navn: 'BlokInfo Skabeloner', ikon: SquareStack },
-        { id: 'aktivitetsskabeloner', navn: 'Aktivitetsskabeloner', ikon: CheckSquare },
-        { id: 'dokumentskabeloner', navn: 'Dokumentskabeloner', ikon: FileStack },
+        { id: 'skabeloner', navn: 'Skabeloner', ikon: SquareStack },
       ],
     },
     {
@@ -225,7 +223,10 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       </aside>
 
       <main
-        className={`flex-1 min-h-0 h-full relative ${aktivSide.includes('kommunikation') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto overflow-x-hidden'}`}
+        className={`flex-1 min-h-0 h-full relative ${aktivSide.includes('kommunikation') || aktivSide === 'sagsdetaljer'
+            ? 'overflow-hidden flex flex-col'
+            : 'overflow-y-auto overflow-x-hidden'
+          }`}
       >
         {children}
       </main>

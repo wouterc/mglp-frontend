@@ -20,6 +20,7 @@ import RaadgivereTab from '../components/sagsdetaljer/tabs/RaadgivereTab';
 import KommuneTab from '../components/sagsdetaljer/tabs/KommuneTab';
 import ForsyningTab from '../components/sagsdetaljer/tabs/ForsyningTab';
 import ProcesserTab from '../components/sagsdetaljer/tabs/ProcesserTab';
+import FakturaTab from '../components/sagsdetaljer/tabs/FakturaTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
@@ -212,6 +213,8 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 />;
             case 'processer':
                 return <ProcesserTab sag={sag} onUpdate={handleUpdateSag} />;
+            case 'faktura':
+                return <FakturaTab sag={sag} onUpdate={handleUpdateSag} />;
             case 'maegler':
                 return <MaeglerTab sag={sag} onUpdate={handleUpdateSag} />;
             case 'bank':
