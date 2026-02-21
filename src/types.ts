@@ -154,6 +154,7 @@ export interface Sag {
   adresse_id_dawa: string | null;
   adressebetegnelse: string | null;
   kommunekode: number | null;
+  regionsnr: number | null; // Tilføjet
 
   dato_intern: string | null;
   dato_ekstern: string | null;

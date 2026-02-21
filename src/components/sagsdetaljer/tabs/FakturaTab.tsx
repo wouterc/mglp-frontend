@@ -16,7 +16,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
     const [lines, setLines] = useState<FakturaLine[]>([]);
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [availableItems, setAvailableItems] = useState<Vareliste[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingLines, setIsLoadingLines] = useState(true); // Kun til linjer-listen
     const [isSaving, setIsSaving] = useState(false);
 
     // Alert Modal State
@@ -55,7 +55,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
     }, [sag.id]);
 
     const fetchData = async () => {
-        setIsLoading(true);
+        setIsLoadingLines(true);
         try {
             const [linesData, itemsData, statusData] = await Promise.all([
                 SagService.getFakturaLines(sag.id),
@@ -75,7 +75,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
         } catch (error) {
             console.error("Fejl ved hentning af fakturadata:", error);
         } finally {
-            setIsLoading(false);
+            setIsLoadingLines(false);
         }
     };
 
@@ -230,14 +230,6 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
         });
     }, [lines, searchTerm, statusFilter, itemFilter]);
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin text-blue-600" size={48} />
-            </div>
-        );
-    }
-
     return (
         <div className="flex-1 flex flex-col min-h-0 h-full">
             <div className="bg-white flex flex-col flex-1 rounded-lg shadow-md border border-gray-300 overflow-hidden">
@@ -386,6 +378,15 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                             </thead>
                             <tbody>
 
+                                {/* Loading skeleton */}
+                                {isLoadingLines && (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-12 text-center">
+                                            <Loader2 className="animate-spin text-blue-400 mx-auto" size={28} />
+                                        </td>
+                                    </tr>
+                                )}
+
                                 {/* List Rows */}
                                 {filteredLines.map(line => (
                                     <tr key={line.id} className="border-b border-gray-200 hover:bg-gray-100 transition-colors">
@@ -469,7 +470,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                                     </tr>
                                 ))}
 
-                                {filteredLines.length === 0 && (
+                                {!isLoadingLines && filteredLines.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="px-4 py-12 text-center text-gray-400 italic">
                                             Ingen fakturalinjer fundet.

@@ -49,6 +49,7 @@ interface SagsDataState {
   adressebetegnelse: string;
   // @# 2025-11-19 20:30 - Tilføjet kommunekode til state (som string for nemheds skyld i forms)
   kommunekode: string;
+  regionsnr: string; // Tilføjet
   bolig_type: string;
   bolig_type_id: string; // Tilføjet
   bolig_bfe: string;
@@ -70,34 +71,39 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const { state: lookupState } = useLookups();
   const { sagsStatusser: statusser, boligTyper } = lookupState;
   const [sagsData, setSagsData] = useState<SagsDataState>({
-    alias: '',
-    hovedansvarlige: '',
-    standard_outlook_account_id: '',
-    status_id: '',
-    adresse_vej: '',
-    adresse_husnr: '',
-    adresse_etage: '',
-    adresse_doer: '',
-    adresse_post_nr: '',
-    adresse_by: '',
-    adresse_id_dawa: null,
-    adressebetegnelse: '',
-    // @# 2025-11-19 20:30 - Init
-    kommunekode: '',
-    bolig_type: '',
-    bolig_type_id: '',
-    bolig_bfe: '',
-    bolig_matrikel: '',
-    bolig_anpart: '',
-    bolig_anvendelse_id: '',
-    bolig_link: '',
-    kommentar: '',
-    byggeaar: '',
-    boligareal: '',
-    maegler_sagsnr: '',
-    bank_sagsnr: '',
-    raadgiver_sagsnr: '',
-    raadgiver_kontakt_id: '',
+    id: sagTilRedigering?.id,
+    sags_nr: sagTilRedigering?.sags_nr || '',
+    alias: sagTilRedigering?.alias || '',
+    hovedansvarlige: sagTilRedigering?.hovedansvarlige || '',
+    standard_outlook_account_id: sagTilRedigering?.standard_outlook_account_id ? String(sagTilRedigering.standard_outlook_account_id) : '',
+    status_id: sagTilRedigering?.status ? String(sagTilRedigering.status.id) : '',
+
+    adresse_vej: sagTilRedigering?.adresse_vej || '',
+    adresse_husnr: sagTilRedigering?.adresse_husnr || '',
+    adresse_etage: sagTilRedigering?.adresse_etage || '',
+    adresse_doer: sagTilRedigering?.adresse_doer || '',
+    adresse_post_nr: sagTilRedigering?.adresse_post_nr || '',
+    adresse_by: sagTilRedigering?.adresse_by || '',
+    adresse_id_dawa: sagTilRedigering?.adresse_id_dawa || null,
+    adressebetegnelse: sagTilRedigering?.adressebetegnelse || '',
+    kommunekode: (sagTilRedigering?.kommunekode ?? (sagTilRedigering as any)?.kommune_kode) != null ? String(sagTilRedigering?.kommunekode ?? (sagTilRedigering as any)?.kommune_kode) : '',
+    regionsnr: (sagTilRedigering?.regionsnr ?? (sagTilRedigering as any)?.regions_nr) != null ? String(sagTilRedigering?.regionsnr ?? (sagTilRedigering as any)?.regions_nr) : '',
+
+    bolig_type: sagTilRedigering?.bolig_type || '',
+    bolig_type_id: sagTilRedigering?.bolig_type_obj ? String(sagTilRedigering.bolig_type_obj.id) : '',
+    bolig_bfe: sagTilRedigering?.bolig_bfe || '',
+    bolig_matrikel: sagTilRedigering?.bolig_matrikel || '',
+    bolig_anpart: sagTilRedigering?.bolig_anpart || '',
+    bolig_anvendelse_id: sagTilRedigering?.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : '',
+    bolig_link: sagTilRedigering?.bolig_link || '',
+    byggeaar: sagTilRedigering?.byggeaar || '',
+    boligareal: sagTilRedigering?.boligareal || '',
+
+    kommentar: sagTilRedigering?.kommentar || '',
+    maegler_sagsnr: sagTilRedigering?.maegler_sagsnr || '',
+    bank_sagsnr: sagTilRedigering?.bank_sagsnr || '',
+    raadgiver_sagsnr: sagTilRedigering?.raadgiver_sagsnr || '',
+    raadgiver_kontakt_id: sagTilRedigering?.raadgiver_kontakt ? String(sagTilRedigering.raadgiver_kontakt.id) : '',
   });
   // const [statusser, setStatusser] = useState<Status[]>([]); // Uses context now
   const [outlookAccounts, setOutlookAccounts] = useState<any[]>([]);
@@ -118,10 +124,6 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   useEffect(() => {
     if (erRedigering && sagTilRedigering) {
       setSagsData({
-        // Bevar felter, der kun findes på SagsDataState (som byggeaar)
-        ...sagsData,
-
-        // Udfyld fra sagTilRedigering og konverter 'null' til 'string'
         id: sagTilRedigering.id,
         sags_nr: sagTilRedigering.sags_nr || '',
         alias: sagTilRedigering.alias || '',
@@ -129,6 +131,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         standard_outlook_account_id: sagTilRedigering.standard_outlook_account_id ? String(sagTilRedigering.standard_outlook_account_id) : '',
         status_id: sagTilRedigering.status ? String(sagTilRedigering.status.id) : '',
 
+        // Adresse
         adresse_vej: sagTilRedigering.adresse_vej || '',
         adresse_husnr: sagTilRedigering.adresse_husnr || '',
         adresse_etage: sagTilRedigering.adresse_etage || '',
@@ -137,9 +140,10 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         adresse_by: sagTilRedigering.adresse_by || '',
         adresse_id_dawa: sagTilRedigering.adresse_id_dawa || null,
         adressebetegnelse: sagTilRedigering.adressebetegnelse || '',
-        // @# 2025-11-19 20:30 - Hent kommunekode
-        kommunekode: sagTilRedigering.kommunekode ? String(sagTilRedigering.kommunekode) : '',
+        kommunekode: (sagTilRedigering.kommunekode ?? (sagTilRedigering as any).kommune_kode) != null ? String(sagTilRedigering.kommunekode ?? (sagTilRedigering as any).kommune_kode) : '',
+        regionsnr: (sagTilRedigering.regionsnr ?? (sagTilRedigering as any).regions_nr) != null ? String(sagTilRedigering.regionsnr ?? (sagTilRedigering as any).regions_nr) : '',
 
+        // Bolig
         bolig_type: sagTilRedigering.bolig_type || '',
         bolig_type_id: sagTilRedigering.bolig_type_obj ? String(sagTilRedigering.bolig_type_obj.id) : '',
         bolig_bfe: sagTilRedigering.bolig_bfe || '',
@@ -147,7 +151,10 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         bolig_anpart: sagTilRedigering.bolig_anpart || '',
         bolig_anvendelse_id: sagTilRedigering.bolig_anvendelse ? String(sagTilRedigering.bolig_anvendelse.id) : '',
         bolig_link: sagTilRedigering.bolig_link || '',
+        byggeaar: sagTilRedigering.byggeaar || '',
+        boligareal: sagTilRedigering.boligareal || '',
 
+        // Øvrigt
         kommentar: sagTilRedigering.kommentar || '',
         maegler_sagsnr: sagTilRedigering.maegler_sagsnr || '',
         bank_sagsnr: sagTilRedigering.bank_sagsnr || '',
@@ -240,7 +247,8 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       bolig_bfe: '',
       bolig_matrikel: '',
       bolig_anvendelse_id: '',
-      kommunekode: '', // Nulstil
+      kommunekode: '',
+      regionsnr: '',
       byggeaar: '',
       boligareal: '',
     }));
@@ -255,8 +263,9 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       const matrikelnr = adgangsAdresseData?.jordstykke?.matrikelnr || '';
       const bfeNummer = adgangsAdresseData?.bfe_nummer || '';
 
-      // @# 2025-11-19 20:30 - Hent kommunekode fra DAWA (ligger i adgangsadresse -> kommune -> kode)
-      const kommunekodeRaw = adgangsAdresseData?.kommune?.kode || '';
+      // @# 2025-11-19 20:30 - Hent kommunekode fra DAWA
+      const kommunekodeRaw = adgangsAdresseData?.kommune?.kode ? String(adgangsAdresseData.kommune.kode) : '';
+      const regionskodeRaw = adgangsAdresseData?.region?.kode ? String(adgangsAdresseData.region.kode) : '';
 
       const bygningHref = adgangsAdresseData?.bygninger?.[0]?.href;
       let bbrKode = '';
@@ -278,7 +287,8 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         bolig_matrikel: matrikelnr,
         bolig_bfe: bfeNummer,
         bolig_anvendelse_id: anvendelseId,
-        kommunekode: kommunekodeRaw, // Gem kommunekoden
+        kommunekode: kommunekodeRaw,
+        regionsnr: regionskodeRaw,
         byggeaar: byggeaar,
         boligareal: boligareal,
       }));
@@ -310,6 +320,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       standard_outlook_account_id: sagsData.standard_outlook_account_id === '' ? null : parseInt(sagsData.standard_outlook_account_id, 10),
       // @# 2025-11-19 20:30 - Konverter kommunekode til int eller null
       kommunekode: sagsData.kommunekode ? parseInt(sagsData.kommunekode, 10) : null,
+      regionsnr: sagsData.regionsnr ? parseInt(sagsData.regionsnr, 10) : null,
       bolig_type_id: sagsData.bolig_type_id === '' ? null : parseInt(sagsData.bolig_type_id, 10),
       raadgiver_kontakt_id: sagsData.raadgiver_kontakt_id === '' ? null : parseInt(sagsData.raadgiver_kontakt_id, 10),
     };
@@ -382,6 +393,10 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         <div className="p-3 border rounded-md">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">Adresse</h3>
           <div className="mb-3">
+            {/* DEBUG: Fjernes n\u00e5r fejlen er fundet */}
+            <div className="text-[10px] text-gray-400 bg-gray-100 p-1 mb-2 rounded border border-dashed border-gray-300">
+              Debug - Prop: {sagTilRedigering?.regionsnr ?? 'UNDEFINED'} | State: {sagsData.regionsnr || 'EMPTY'}
+            </div>
             <AdresseSøgning onAdresseValgt={handleAdresseValgt} />
             {isFetchingDetails && <div className="mt-1 text-xs text-blue-500 flex items-center"><div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div> Henter detaljer fra DAWA...</div>}
           </div>
@@ -412,9 +427,13 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
               <label htmlFor="adresse_by_vis" className="block text-xs font-medium text-gray-500">By</label>
               <input type="text" id="adresse_by_vis" value={sagsData.adresse_by || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm" />
             </div>
-            <div className="col-span-12 sm:col-span-2">
+            <div className="col-span-12 sm:col-span-1">
               <label htmlFor="kommunekode_vis" className="block text-xs font-medium text-gray-500">Kommune</label>
               <input type="text" id="kommunekode_vis" value={sagsData.kommunekode || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm text-center" />
+            </div>
+            <div className="col-span-12 sm:col-span-1">
+              <label htmlFor="regionsnr_vis" className="block text-xs font-medium text-gray-500">Region</label>
+              <input type="text" id="regionsnr_vis" value={sagsData.regionsnr || ''} disabled className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm bg-gray-50 text-sm text-center" />
             </div>
           </div>
         </div>

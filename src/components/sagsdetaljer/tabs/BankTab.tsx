@@ -146,7 +146,7 @@ function BankTab({ sag, onUpdate }: BankTabProps) {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 bg-gray-300 p-4 -m-4 flex-1 flex flex-col">
             {/* Topbar: Bank Sagsnummer */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <div className="flex justify-between items-center mb-1">

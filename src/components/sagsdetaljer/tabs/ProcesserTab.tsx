@@ -53,10 +53,10 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
     const isChanged = JSON.stringify([...valgteIds].sort()) !== JSON.stringify((sag.valgte_processer?.map(p => p.id) || []).sort());
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-400">
+        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-300">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-800">Sagens processer</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">Sagens processer</h2>
                     <p className="text-gray-500 text-sm">Vælg hvilke overordnede processer der er relevante for denne sag.</p>
                 </div>
 
@@ -88,9 +88,9 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                         <div
                             key={proces.id}
                             onClick={() => toggleProces(proces.id)}
-                            className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border-2 transition-all ${isSelected
-                                ? 'border-blue-500 bg-blue-50 shadow-md'
-                                : 'border-gray-400 hover:border-gray-500 bg-white hover:bg-gray-50'
+                            className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border transition-all ${isSelected
+                                ? 'border-blue-600 bg-blue-50 shadow-sm'
+                                : 'border-gray-200 hover:border-gray-400 bg-white hover:bg-gray-50'
                                 }`}
                         >
                             <div className="flex flex-col">

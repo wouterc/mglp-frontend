@@ -12,13 +12,16 @@ interface RaadgivereTabProps {
 }
 
 function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
-    const [tilknytninger, setTilknytninger] = useState<SagRaadgiverTilknytning[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Brug data der allerede er hentet i sag-objektet som starttilstand
+    const [tilknytninger, setTilknytninger] = useState<SagRaadgiverTilknytning[]>(sag.raadgiver_tilknytninger || []);
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingSagsNr, setIsSavingSagsNr] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Dropdown-data - starter tom, hentes i baggrunden
     const [alleRaadgiverKontakter, setAlleRaadgiverKontakter] = useState<Kontakt[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    // Lokal state for valgt kontakt-ID (til øjeblikkelig visning af virksomhed uden at vente på onUpdate)
+    const [selectedKontaktId, setSelectedKontaktId] = useState<number | null>(sag.raadgiver_kontakt?.id || null);
 
     // Lokal state for sagsnummer for at undgå API-kald ved hvert tastetryk
     const [localSagsNr, setLocalSagsNr] = useState(sag.raadgiver_sagsnr || '');
@@ -29,6 +32,12 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
         setLocalSagsNr(sag.raadgiver_sagsnr || '');
     }, [sag.raadgiver_sagsnr]);
 
+    // Opdater tilknytninger + valgt kontakt hvis sag-objektet opdateres udefra
+    useEffect(() => {
+        setTilknytninger(sag.raadgiver_tilknytninger || []);
+        setSelectedKontaktId(sag.raadgiver_kontakt?.id || null);
+    }, [sag.raadgiver_tilknytninger, sag.raadgiver_kontakt]);
+
     // Effekt til automatisk gemning (debounce)
     useEffect(() => {
         if (debouncedSagsNr !== (sag.raadgiver_sagsnr || '')) {
@@ -36,42 +45,39 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
         }
     }, [debouncedSagsNr]);
 
-    // Hent data ved mount (Lazy Load)
+    // Separat funktion til kun at genindlæse tilknytninger (hurtig refresh)
+    const fetchTilknytninger = async () => {
+        try {
+            const data = await SagService.getRaadgiverTilknytninger(sag.id);
+            setTilknytninger(data || []);
+        } catch (e: any) {
+            console.error('Fejl ved genindlæsning af tilknytninger:', e);
+        }
+    };
+
+    // Hent kun dropdown-data i baggrunden - blokerer IKKE visningen
     useEffect(() => {
-        const fetchRaadgivere = async () => {
-            setIsLoading(true);
-            try {
-                // Hent tilknytninger
-                const data = await SagService.getRaadgiverTilknytninger(sag.id);
-                setTilknytninger(data || []);
-
-                // Hent alle rådgiver-kontakter (til dropdown)
-                const kData = await LookupService.getKontakter({ er_raadgiver_kontakt: 'true' });
-                setAlleRaadgiverKontakter(kData);
-            } catch (e: any) {
-                setError(e.message);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchRaadgivere();
-    }, [sag.id]);
-
-    if (isLoading) {
-        return <div className="p-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
-    }
+        LookupService.getKontakter({ er_raadgiver_kontakt: 'true' })
+            .then(kData => setAlleRaadgiverKontakter(kData))
+            .catch(e => console.error('Fejl ved hentning af rådgiver-kontakter:', e));
+    }, []);
 
     if (error) {
         return <div className="p-4 text-red-600 bg-red-50 rounded border border-red-200">Fejl: {error}</div>;
     }
 
-    const saveSagUpdate = async (opdatering: any) => {
+    // Gem valg af primær rådgiver med optimistisk UI-opdatering
+    const savePrimaerRaadgiver = async (kontaktId: number | null) => {
+        // Opdater lokalt med det samme → virksomhedsblokken opdateres øjeblikkeligt
+        setSelectedKontaktId(kontaktId);
         setIsSaving(true);
         try {
-            await SagService.updateSag(sag.id, opdatering);
+            await SagService.updateSag(sag.id, { raadgiver_kontakt_id: kontaktId });
             onUpdate();
         } catch (e) {
             console.error(e);
+            // Rul tilbage ved fejl
+            setSelectedKontaktId(sag.raadgiver_kontakt?.id || null);
         } finally {
             setIsSaving(false);
         }
@@ -96,8 +102,14 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
         });
     };
 
+    // Find den valgte kontakt i vores lokale liste (har fuld virksomhedsdata inkl. virksomhed)
+    // Fallback til sag.raadgiver_kontakt hvis dropdown-listen endnu ikke er hentet
+    const visKontakt = alleRaadgiverKontakter.find(k => k.id === selectedKontaktId)
+        ?? (sag.raadgiver_kontakt?.id === selectedKontaktId ? sag.raadgiver_kontakt : null);
+    const virksomhed = visKontakt?.virksomhed ?? null;
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 bg-gray-300 p-4 -m-4 flex-1 flex flex-col">
             {/* Topbar: Rådgiver sagsnummer */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <div className="flex justify-between items-center mb-1">
@@ -136,61 +148,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Venstre kolonne: Virksomhedsinfo (Read-only baseret på valgt kontakt) */}
-                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex flex-col">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold text-gray-700 flex items-center">
-                            <ClipboardList size={24} className="mr-3 text-gray-400" />
-                            Rådgivningsvirksomhed
-                        </h2>
-                    </div>
-
-                    <div className="w-full p-2 border border-transparent mb-2 bg-transparent text-sm h-[38px]">
-                        {/* Placeholder for alignment with dropdown */}
-                        {sag.raadgiver_kontakt?.virksomhed ? (
-                            <span className="font-medium text-gray-900">{sag.raadgiver_kontakt.virksomhed.navn}</span>
-                        ) : (
-                            <span className="text-gray-400 italic">Afventer valg af rådgiver...</span>
-                        )}
-                    </div>
-
-                    <div className="flex-grow">
-                        {sag.raadgiver_kontakt?.virksomhed ? (
-                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                                {/* Telefon */}
-                                <div className="flex items-center text-sm text-gray-600">
-                                    <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                    <span>{sag.raadgiver_kontakt.virksomhed.telefon || "-"}</span>
-                                </div>
-
-                                {/* Email */}
-                                <div className="flex items-center text-sm">
-                                    <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                    {sag.raadgiver_kontakt.virksomhed.email ? (
-                                        <a href={`mailto:${sag.raadgiver_kontakt.virksomhed.email}`} className="text-blue-600 hover:underline truncate">
-                                            {sag.raadgiver_kontakt.virksomhed.email}
-                                        </a>
-                                    ) : <span className="text-gray-600">-</span>}
-                                </div>
-
-                                {/* Adresse */}
-                                <div className="flex items-start text-sm text-gray-600">
-                                    <Home size={16} className="mr-3 mt-1 text-gray-400 flex-shrink-0" />
-                                    <div className="flex-grow">
-                                        <div>{sag.raadgiver_kontakt.virksomhed.adresse_vej}</div>
-                                        <div>{sag.raadgiver_kontakt.virksomhed.adresse_postnr} {sag.raadgiver_kontakt.virksomhed.adresse_by}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-400 italic">
-                                Ingen virksomhed tilknyttet
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Højre kolonne: Primær Rådgiver (Kontakt) */}
+                {/* Venstre kolonne: Primær Rådgiver (aktiv styring) */}
                 <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center">
@@ -203,8 +161,8 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                     <select
                         id="raadgiver_kontakt_id"
                         name="raadgiver_kontakt_id"
-                        value={sag.raadgiver_kontakt?.id || ''}
-                        onChange={(e) => saveSagUpdate({ raadgiver_kontakt_id: e.target.value ? parseInt(e.target.value) : null })}
+                        value={selectedKontaktId ?? ''}
+                        onChange={(e) => savePrimaerRaadgiver(e.target.value ? parseInt(e.target.value) : null)}
                         className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 outline-none mb-2 bg-white text-sm"
                         aria-label="Vælg primær rådgiver"
                     >
@@ -215,23 +173,20 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                     </select>
 
                     <div className="flex-grow">
-                        {sag.raadgiver_kontakt ? (
+                        {visKontakt ? (
                             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                                {/* Telefon */}
                                 <div className="flex items-center text-sm text-gray-600">
                                     <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                    <span>{sag.raadgiver_kontakt.telefon || "-"}</span>
+                                    <span>{visKontakt.telefon || "-"}</span>
                                 </div>
-
-                                {/* Email */}
                                 <div className="flex items-center text-sm">
                                     <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
-                                    {sag.raadgiver_kontakt.email ? (
+                                    {visKontakt.email ? (
                                         <>
-                                            <a href={`mailto:${sag.raadgiver_kontakt.email}`} className="text-blue-600 hover:underline mr-2 truncate">
-                                                {sag.raadgiver_kontakt.email}
+                                            <a href={`mailto:${visKontakt.email}`} className="text-blue-600 hover:underline mr-2 truncate">
+                                                {visKontakt.email}
                                             </a>
-                                            <button onClick={() => handleCopy(sag.raadgiver_kontakt!.email!, 'k-email')} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                                            <button onClick={() => handleCopy(visKontakt!.email!, 'k-email')} className="p-1 rounded hover:bg-gray-100 transition-colors">
                                                 {copiedId === 'k-email' ? <Check size={14} className="text-green-500" /> : <Copy size={14} className="text-gray-300" />}
                                             </button>
                                         </>
@@ -245,8 +200,60 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                         )}
                     </div>
                 </div>
+
+                {/* Højre kolonne: Rådgivningsvirksomhed (automatisk afledt af valgt kontakt) */}
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold text-gray-700 flex items-center">
+                            <ClipboardList size={24} className="mr-3 text-gray-400" />
+                            Rådgivningsvirksomhed
+                        </h2>
+                    </div>
+
+                    {/* Vises automatisk baseret på den valgte rådgivers virksomhed */}
+                    <div className="w-full p-2 mb-2 bg-gray-50 rounded text-sm h-[38px] flex items-center">
+                        {virksomhed ? (
+                            <span className="font-semibold text-gray-900">{virksomhed.navn}</span>
+                        ) : (
+                            <span className="text-gray-400 italic">
+                                {selectedKontaktId ? 'Kontakt er ikke tilknyttet en virksomhed' : 'Udfyldes automatisk når rådgiver er valgt...'}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex-grow">
+                        {virksomhed ? (
+                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Phone size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    <span>{virksomhed.telefon || "-"}</span>
+                                </div>
+                                <div className="flex items-center text-sm">
+                                    <Mail size={16} className="mr-3 text-gray-400 flex-shrink-0" />
+                                    {virksomhed.email ? (
+                                        <a href={`mailto:${virksomhed.email}`} className="text-blue-600 hover:underline truncate">
+                                            {virksomhed.email}
+                                        </a>
+                                    ) : <span className="text-gray-600">-</span>}
+                                </div>
+                                <div className="flex items-start text-sm text-gray-600">
+                                    <Home size={16} className="mr-3 mt-1 text-gray-400 flex-shrink-0" />
+                                    <div>
+                                        <div>{virksomhed.adresse_vej}</div>
+                                        <div>{virksomhed.adresse_postnr} {virksomhed.adresse_by}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-400 italic">
+                                Ingen virksomhed tilknyttet
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
+            {/* Alle tilknyttede rådgivere */}
             <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
                     <User size={18} className="mr-2 text-gray-500" />
@@ -255,7 +262,7 @@ function RaadgivereTab({ sag, onUpdate }: RaadgivereTabProps) {
                 <RaadgiverStyring
                     sagId={sag.id}
                     initialTilknytninger={tilknytninger}
-                    onTilknytningOpdateret={onUpdate}
+                    onTilknytningOpdateret={fetchTilknytninger}
                 />
             </div>
         </div>

@@ -29,20 +29,20 @@ const StatusCard = ({ label, icon: Icon, isOk, onClick }: StatusCardProps) => (
     <div
         onClick={onClick}
         className={`
-            p-4 rounded-lg border shadow-sm cursor-pointer transition-all hover:shadow-md flex items-center justify-between
+            p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:shadow-md flex items-center justify-between
             ${isOk ? 'bg-white border-gray-300' : 'bg-red-50 border-red-200'}
         `}
     >
         <div className="flex items-center space-x-3">
-            <div className={`p-2 rounded-full ${isOk ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                <Icon size={20} />
+            <div className={`p-1.5 rounded-full ${isOk ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                <Icon size={18} />
             </div>
-            <span className={`font-medium ${isOk ? 'text-gray-700' : 'text-red-700'}`}>{label}</span>
+            <span className={`font-medium text-sm ${isOk ? 'text-gray-700' : 'text-red-700'}`}>{label}</span>
         </div>
         {isOk ? (
-            <CheckCircle2 size={20} className="text-green-500" />
+            <CheckCircle2 size={18} className="text-green-500" />
         ) : (
-            <AlertCircle size={20} className="text-red-500" />
+            <AlertCircle size={18} className="text-red-500" />
         )}
     </div>
 );
@@ -116,7 +116,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
                     {/* Rad 1: Adresse og Sagsnr */}
                     <div className="md:col-span-2">
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Adresse</div>
@@ -146,6 +146,12 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BFE Nummer</div>
                         <p className="text-gray-900 text-sm font-medium">{sag.bolig_bfe || '-'}</p>
                     </div>
+                    <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Kommune / Region</div>
+                        <p className="text-gray-900 text-sm font-medium">
+                            {sag.kommunekode || '-'} / {sag.regionsnr || '-'}
+                        </p>
+                    </div>
 
                     {/* Rad 3: Ansvarlig, Mail, Status */}
                     <div>
@@ -158,6 +164,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                             {sag.standard_outlook_account_details ? `${sag.standard_outlook_account_details.account_name}` : '-'}
                         </p>
                     </div>
+                    {/* Rad 4: Status, Bolig Link og BBR */}
                     <div>
                         <label htmlFor="status_select" className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Nuværende Status</label>
                         <div className="mt-0.5">
@@ -178,8 +185,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         </div>
                     </div>
 
-                    {/* Rad 4: Bolig Link og Anpart */}
-                    <div className="md:col-span-2">
+                    <div>
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Bolig system</div>
                         <div className="flex items-center">
                             {sag.bolig_link && <CopyButton text={sag.bolig_link} id="bolig_link" />}
@@ -198,15 +204,12 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                             )}
                         </div>
                     </div>
-                    <div>
-                        <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Anpart</div>
-                        <p className="text-gray-900 text-sm font-medium">{sag.bolig_anpart || '-'}</p>
-                    </div>
 
-                    {/* Rad 5: BBR */}
-                    <div className="md:col-span-3">
+                    <div>
                         <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">BBR Anvendelse</div>
-                        <p className="text-gray-900 text-sm">{sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}</p>
+                        <p className="text-gray-900 text-sm font-medium truncate" title={sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}>
+                            {sag.bolig_anvendelse ? `${sag.bolig_anvendelse.kode} - ${sag.bolig_anvendelse.beskrivelse}` : '-'}
+                        </p>
                     </div>
 
                     {/* Sagsnumre sektion - Samlet på én række (3 kolonner) */}
@@ -238,7 +241,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                         </div>
                     )}
 
-                    <div className="md:col-span-2 mt-0">
+                    <div className="md:col-span-3 mt-0">
                         <div className="flex items-center gap-2 mb-0.5 min-h-[20px]">
                             <label htmlFor="kommentar_textarea" className="text-[10px] text-gray-500 uppercase font-bold tracking-wide">Kommentar</label>
                             {erAendret && (
@@ -269,7 +272,7 @@ function OverblikTab({ sag, statusser, onNavigateToTab, onEditStamdata, onStatus
                             onChange={(e) => setLocalComment(e.target.value)}
                             placeholder="Skriv en kommentar..."
                             className={`
-                                w-full text-gray-700 text-sm bg-gray-50 p-2 rounded border outline-none focus:ring-1 focus:ring-blue-400 focus:bg-white transition-all resize-none min-h-[60px]
+                                w-full text-gray-700 text-sm bg-gray-50 p-2 rounded border outline-none focus:ring-1 focus:ring-blue-400 focus:bg-white transition-all resize-none min-h-[40px]
                                 ${erAendret ? 'border-blue-300 bg-white' : 'border-gray-200'}
                             `}
                         />

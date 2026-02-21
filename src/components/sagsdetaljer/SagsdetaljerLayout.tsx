@@ -243,7 +243,7 @@ function SagsdetaljerLayout({
                 </nav>
 
                 {/* Højre Indhold (Aktiv Fane) */}
-                <main className="flex-1 overflow-hidden flex flex-col bg-gray-50 p-4">
+                <main className="flex-1 overflow-y-auto flex flex-col bg-gray-50 p-4">
                     {children}
                 </main>
 

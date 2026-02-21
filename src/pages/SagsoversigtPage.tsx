@@ -302,8 +302,6 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
   };
 
   if (error) return <div className="p-8 flex flex-col items-center justify-center text-red-600"><AlertCircle size={48} className="mb-4" /><h2 className="text-xl font-bold mb-2">Fejl</h2><p>{error}</p></div>;
-  if (visForm) return <SagsForm onSave={handleSaveSag} onCancel={handleAnnuller} sagTilRedigering={sagTilRedigering} />;
-
   return (
     <div className="p-4">
       <Modal
@@ -320,6 +318,19 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
         }
       >
         {modalInfo.message}
+      </Modal>
+
+      <Modal
+        isOpen={visForm}
+        onClose={handleAnnuller}
+        title={sagTilRedigering ? `Rediger Sag: ${sagTilRedigering.sags_nr}` : 'Opret Ny Sag'}
+        wide
+      >
+        <SagsForm
+          onSave={handleSaveSag}
+          onCancel={handleAnnuller}
+          sagTilRedigering={sagTilRedigering}
+        />
       </Modal>
 
       <div className="flex justify-between items-center mb-4">

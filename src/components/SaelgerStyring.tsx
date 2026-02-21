@@ -384,7 +384,7 @@ function SaelgerStyring({ sagId, initialSaelgere, onSaelgerOpdateret, primaerSae
         )}
         {/* @# 2025-11-10 21:55 - Mapper 'sorteredeSaelgere' */}
         {sorteredeSaelgere.map(saelger => (
-          <div key={saelger.id} className="p-2 bg-gray-100 rounded-md">
+          <div key={saelger.id} className={`p-4 bg-white rounded-lg border-2 shadow-sm transition-all ${saelger.id === lokalPrimaerId ? 'border-blue-600 bg-blue-50/30' : 'border-gray-400'}`}>
 
             {/* @# 2025-11-10 22:15 - START: Top-række (Navn, Primær Status/Knap, Rediger/Slet) */}
             <div className="flex justify-between items-center">

@@ -158,12 +158,11 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
     );
 
     return (
-        <>
-            {/* Ændret grid til 1 kolonne for at stable dem */}
-            <div className="grid grid-cols-1 gap-6 max-w-2xl">
+        <div className="space-y-6 bg-gray-300 p-4 -m-4 flex-1 flex flex-col">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* VAND */}
-                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300 flex-none">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-blue-600">
                             <Droplet size={24} className="mr-2" />
@@ -191,7 +190,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                 </div>
 
                 {/* VARME */}
-                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-red-600">
                             <Flame size={24} className="mr-2" />
@@ -217,7 +216,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                 </div>
 
                 {/* SPILDEVAND */}
-                <div className="bg-white p-6 rounded shadow-md border border-gray-300">
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center text-green-700">
                             <Waves size={24} className="mr-2" />
@@ -251,7 +250,7 @@ function ForsyningTab({ sag, onUpdate }: ForsyningTabProps) {
                     onCancel={() => setVisVirksomhedForm(false)}
                 />
             )}
-        </>
+        </div>
     );
 }
 

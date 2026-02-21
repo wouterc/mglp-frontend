@@ -73,7 +73,7 @@ function KommuneTab({ sag }: KommuneTabProps) {
     }
 
     return (
-        <>
+        <div className="bg-gray-300 p-4 -m-4 flex-1 flex flex-col">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {adresser.map(k => (
                     <div key={k.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-300">
@@ -129,7 +129,7 @@ function KommuneTab({ sag }: KommuneTabProps) {
                     onCancel={() => setVisForm(false)}
                 />
             )}
-        </>
+        </div>
     );
 }
 

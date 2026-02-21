@@ -448,16 +448,55 @@ const DokumentRow = React.memo(function DokumentRow({
                             </span>
                         ) : doc.fil ? (
                             <div className="flex items-center justify-between w-full gap-1">
-                                <a
-                                    href={`${API_BASE_URL}/sager/sagsdokumenter/${doc.id}/open_file/`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="flex items-center gap-2 text-blue-600 hover:underline truncate group/link"
-                                    onClick={(e) => e.stopPropagation()}
+                                <button
+                                    className="flex items-center gap-2 text-blue-600 hover:underline truncate group/link text-left"
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                            const res = await fetch(`${API_BASE_URL}/sager/sagsdokumenter/${doc.id}/open_file/`, { credentials: 'include' });
+                                            if (!res.ok) {
+                                                const text = await res.text().catch(() => '');
+                                                alert(text || 'Filen kunne ikke åbnes. Prøv igen eller kontakt administrator.');
+                                                return;
+                                            }
+                                            const blob = await res.blob();
+                                            const contentType = res.headers.get('content-type') || 'application/octet-stream';
+                                            const typedBlob = new Blob([blob], { type: contentType });
+                                            const url = URL.createObjectURL(typedBlob);
+
+                                            // Extract filename from Content-Disposition header
+                                            const disposition = res.headers.get('content-disposition') || '';
+                                            let filename = (doc.filnavn || 'dokument').trim();
+                                            const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
+                                            if (filenameMatch) {
+                                                filename = decodeURIComponent(filenameMatch[1]);
+                                            }
+
+                                            // For browser-viewable types (PDF, images), open inline
+                                            const inlineTypes = ['application/pdf', 'image/', 'text/'];
+                                            const canInline = inlineTypes.some(t => contentType.startsWith(t));
+
+                                            if (canInline) {
+                                                window.open(url, '_blank');
+                                            } else {
+                                                // For non-viewable types, trigger a download with the correct filename
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = filename;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                            }
+
+                                            setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                        } catch {
+                                            alert('Filen kunne ikke findes på serveren. Kontakt administrator.');
+                                        }
+                                    }}
                                 >
                                     <FileText size={14} className="flex-shrink-0" />
                                     <span className="truncate text-xs font-medium">{doc.filnavn || 'Hent fil'}</span>
-                                </a>
+                                </button>
                                 <div className="flex items-center gap-0.5 flex-shrink-0">
                                     <button
                                         onClick={handleRenameClick}

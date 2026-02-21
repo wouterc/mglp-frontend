@@ -198,7 +198,7 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
             const extension = file.name.split('.').pop();
             // The backend handles prefixing with sags_nr, so we just provide the clean descriptive name
             const baseName = (doc.titel || 'Dokument').trim();
-            const newName = `${baseName}.${extension} `;
+            const newName = `${baseName}.${extension}`;
             fileToUpload = new File([file], newName, { type: file.type });
         }
 

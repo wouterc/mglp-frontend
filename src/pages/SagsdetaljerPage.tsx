@@ -24,6 +24,7 @@ import FakturaTab from '../components/sagsdetaljer/tabs/FakturaTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
+import Modal from '../components/Modal';
 
 interface SagsdetaljerPageProps {
     sagId: number | null;
@@ -44,16 +45,13 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
     // UI State
     const [activeTab, setActiveTab] = useState<TabType>('overblik');
     const [visRedigerStamdata, setVisRedigerStamdata] = useState(false);
+    // Lazy mount: Track hvilke tabs der er blevet aktiveret
+    // En tab mountes første gang den besøges og forbliver monteret derefter
+    const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(new Set(['overblik']));
 
     // 1. Hent kun sagens stamdata (Letvægts fetch)
     const fetchSag = useCallback(async (id: number, silent = false) => {
         const hasLoadedMatch = sagState.valgtSag && sagState.valgtSag.id === id;
-
-        // Hvis vi har sagen og ikke beder om en tvungen opdatering, så stop her.
-        if (hasLoadedMatch && !silent) {
-            if (!sag) setSag(sagState.valgtSag);
-            return;
-        }
 
         if (!silent && !hasLoadedMatch) {
             setIsLoading(true);
@@ -73,7 +71,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
         } finally {
             setIsLoading(false);
         }
-    }, [sagDispatch, sagState.valgtSag, sag]);
+    }, [sagDispatch, sagState.valgtSag]);
 
     // 1b. Sørg for at statusser er indlæst (Lookups håndteres nu i StateContext)
     // Men vi behøver stadig sags-statusser (formaal=1) som måske ikke er dem i global state?
@@ -91,13 +89,18 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
     useEffect(() => {
         if (sagId) {
             const navState = location.state as { initialTab?: TabType } | null;
-            if (navState?.initialTab) {
-                setActiveTab(navState.initialTab);
-            } else {
-                setActiveTab('overblik');
-            }
+            const startTab = navState?.initialTab || 'overblik';
+            setActiveTab(startTab);
+            // Reset mountede tabs når vi skifter til en ny sag
+            setMountedTabs(new Set([startTab]));
         }
     }, [sagId, location.state]); // Kør når vi skifter sag eller hopper ind med en specifik fane
+
+    // Registrér tab som monteret når den aktiveres
+    const handleTabChange = (tab: TabType) => {
+        setActiveTab(tab);
+        setMountedTabs(prev => new Set([...prev, tab]));
+    };
 
     // 2. Håndter navigation (Næste/Forrige/Søgning) fra Layoutet
     const handleNavigateToSag = async (targetId: number) => {
@@ -199,70 +202,88 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
         );
     }
 
-    // Vælg indhold baseret på aktiv fane
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'overblik':
-                return <OverblikTab
-                    sag={sag}
-                    statusser={statusser} // @# Send liste med
-                    onNavigateToTab={setActiveTab}
-                    onEditStamdata={() => setVisRedigerStamdata(true)}
-                    onStatusChange={handleStatusChange} // @# Send handler med
-                    onUpdate={handleUpdateSag}
-                />;
-            case 'processer':
-                return <ProcesserTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'faktura':
-                return <FakturaTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'maegler':
-                return <MaeglerTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'bank':
-                return <BankTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'saelgere':
-                return <SaelgereTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'raadgivere':
-                return <RaadgivereTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'kommune':
-                return <KommuneTab sag={sag} />;
-            case 'forsyning':
-                return <ForsyningTab sag={sag} onUpdate={handleUpdateSag} />;
-            case 'koebere':
-            case 'forening':
-                return (
-                    <div className="p-12 text-center bg-white rounded-lg border border-dashed border-gray-300">
-                        <p className="text-xl text-gray-400 font-semibold mb-2">Under udvikling</p>
-                        <p className="text-gray-500">Fanen "{activeTab}" er ikke implementeret endnu.</p>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
 
     return (
         <>
             <SagsdetaljerLayout
                 sag={sag}
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
                 onBack={() => navigateTo('sagsoversigt', null)}
                 onNavigateToSag={handleNavigateToSag}
             >
-                {renderContent()}
+                {/* Lazy mount: En tab renderes første gang den aktiveres og forbliver monteret.
+                    display:none skjuler inaktive tabs uden at unmounte dem. */}
+                <div style={{ display: activeTab === 'overblik' ? undefined : 'none' }}>
+                    <OverblikTab
+                        sag={sag}
+                        statusser={statusser}
+                        onNavigateToTab={handleTabChange}
+                        onEditStamdata={() => setVisRedigerStamdata(true)}
+                        onStatusChange={handleStatusChange}
+                        onUpdate={handleUpdateSag}
+                    />
+                </div>
+                {mountedTabs.has('processer') && (
+                    <div style={{ display: activeTab === 'processer' ? undefined : 'none' }}>
+                        <ProcesserTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('faktura') && (
+                    <div style={{ display: activeTab === 'faktura' ? undefined : 'none' }}>
+                        <FakturaTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('maegler') && (
+                    <div style={{ display: activeTab === 'maegler' ? undefined : 'none' }}>
+                        <MaeglerTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('bank') && (
+                    <div style={{ display: activeTab === 'bank' ? undefined : 'none' }}>
+                        <BankTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('saelgere') && (
+                    <div style={{ display: activeTab === 'saelgere' ? undefined : 'none' }}>
+                        <SaelgereTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('raadgivere') && (
+                    <div style={{ display: activeTab === 'raadgivere' ? undefined : 'none' }}>
+                        <RaadgivereTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('kommune') && (
+                    <div style={{ display: activeTab === 'kommune' ? undefined : 'none' }}>
+                        <KommuneTab sag={sag} />
+                    </div>
+                )}
+                {mountedTabs.has('forsyning') && (
+                    <div style={{ display: activeTab === 'forsyning' ? undefined : 'none' }}>
+                        <ForsyningTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {(activeTab === 'koebere' || activeTab === 'forening') && (
+                    <div className="p-12 text-center bg-white rounded-lg border border-dashed border-gray-300">
+                        <p className="text-xl text-gray-400 font-semibold mb-2">Under udvikling</p>
+                        <p className="text-gray-500">Fanen "{activeTab}" er ikke implementeret endnu.</p>
+                    </div>
+                )}
             </SagsdetaljerLayout>
 
-            {visRedigerStamdata && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4">
-                        <SagsForm
-                            onSave={handleSaveStamdata}
-                            onCancel={() => setVisRedigerStamdata(false)}
-                            sagTilRedigering={sag}
-                        />
-                    </div>
-                </div>
-            )}
+            <Modal
+                isOpen={visRedigerStamdata}
+                onClose={() => setVisRedigerStamdata(false)}
+                title={`Rediger Sag: ${sag.sags_nr}`}
+                wide
+            >
+                <SagsForm
+                    onSave={handleSaveStamdata}
+                    onCancel={() => setVisRedigerStamdata(false)}
+                    sagTilRedigering={sag}
+                />
+            </Modal>
         </>
     );
 }

@@ -711,14 +711,29 @@ const StifinderTab: React.FC<StifinderTabProps> = ({ sag }) => {
         if (item.is_dir) {
             setCurrentPath(item.path);
         } else {
-            // Use the standard API_BASE_URL (which is /api in production)
-            // AND ensure we use a trailing slash before the query parameters to avoid 301 redirects
-            const url = `${API_BASE_URL}/sager/filer/download/?sag_id=${sag.id}&path=${encodeURIComponent(item.path)}&view=1`;
-
-            // We open directly. Browser will handle the session/cookies since it's same origin/domain.
-            const win = window.open(url, '_blank');
-            if (!win) {
-                showToast('Pop-up blokeret. Tillad venligst pop-ups.', 'error');
+            // Use fetch() + blob URL instead of direct browser navigation.
+            // This ensures session cookies are sent reliably (credentials: 'include'),
+            // matching how move/rename/delete work in production.
+            try {
+                const response = await FilService.downloadFil(sag.id, item.path, true);
+                if (!response.ok) {
+                    const text = await response.text().catch(() => '');
+                    showToast(text || 'Kunne ikke åbne filen. Prøv igen eller kontakt administrator.', 'error');
+                    return;
+                }
+                const blob = await response.blob();
+                const contentType = response.headers.get('content-type') || 'application/octet-stream';
+                const typedBlob = new Blob([blob], { type: contentType });
+                const blobUrl = URL.createObjectURL(typedBlob);
+                const win = window.open(blobUrl, '_blank');
+                if (!win) {
+                    showToast('Pop-up blokeret. Tillad venligst pop-ups.', 'error');
+                }
+                // Clean up blob URL after 1 minute
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            } catch (e: any) {
+                console.error('File open error:', e);
+                showToast('Filen kunne ikke åbnes. Kontroller at filen findes på serveren.', 'error');
             }
         }
     };
