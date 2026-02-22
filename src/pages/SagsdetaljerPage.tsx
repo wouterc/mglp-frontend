@@ -214,7 +214,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
             >
                 {/* Lazy mount: En tab renderes første gang den aktiveres og forbliver monteret.
                     display:none skjuler inaktive tabs uden at unmounte dem. */}
-                <div style={{ display: activeTab === 'overblik' ? undefined : 'none' }}>
+                <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'overblik' ? undefined : 'none' }}>
                     <OverblikTab
                         sag={sag}
                         statusser={statusser}
@@ -225,42 +225,42 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                     />
                 </div>
                 {mountedTabs.has('processer') && (
-                    <div style={{ display: activeTab === 'processer' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'processer' ? undefined : 'none' }}>
                         <ProcesserTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('faktura') && (
-                    <div style={{ display: activeTab === 'faktura' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'faktura' ? undefined : 'none' }}>
                         <FakturaTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('maegler') && (
-                    <div style={{ display: activeTab === 'maegler' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'maegler' ? undefined : 'none' }}>
                         <MaeglerTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('bank') && (
-                    <div style={{ display: activeTab === 'bank' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'bank' ? undefined : 'none' }}>
                         <BankTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('saelgere') && (
-                    <div style={{ display: activeTab === 'saelgere' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'saelgere' ? undefined : 'none' }}>
                         <SaelgereTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('raadgivere') && (
-                    <div style={{ display: activeTab === 'raadgivere' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'raadgivere' ? undefined : 'none' }}>
                         <RaadgivereTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('kommune') && (
-                    <div style={{ display: activeTab === 'kommune' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'kommune' ? undefined : 'none' }}>
                         <KommuneTab sag={sag} />
                     </div>
                 )}
                 {mountedTabs.has('forsyning') && (
-                    <div style={{ display: activeTab === 'forsyning' ? undefined : 'none' }}>
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'forsyning' ? undefined : 'none' }}>
                         <ForsyningTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}

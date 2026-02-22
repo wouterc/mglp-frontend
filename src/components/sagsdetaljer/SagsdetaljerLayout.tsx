@@ -217,8 +217,8 @@ function SagsdetaljerLayout({
             <div className="flex flex-1 overflow-hidden">
 
                 {/* Venstre Menu (Tabs) */}
-                <nav className="w-64 bg-white border-r border-gray-200 overflow-y-auto py-4 flex-shrink-0">
-                    <div className="space-y-1 px-2">
+                <nav className="w-40 bg-white border-r border-gray-200 overflow-y-auto py-4 flex-shrink-0">
+                    <div className="space-y-0.5 px-1.5">
                         {MENU_ITEMS.map(item => {
                             const isActive = activeTab === item.id;
                             const Icon = item.icon;
@@ -227,7 +227,7 @@ function SagsdetaljerLayout({
                                     key={item.id}
                                     onClick={() => onTabChange(item.id)}
                                     className={`
-                                        w-full flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded-md transition-colors
+                                        w-full flex items-center space-x-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors
                                         ${isActive
                                             ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600'
                                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'

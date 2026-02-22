@@ -303,3 +303,20 @@ main::-webkit-scrollbar-thumb:hover {
     /* gray-500 with higher opacity */
     background-clip: padding-box;
 }
+
+/* Continuous highlight line for active rows */
+.active-row-highlight td {
+    position: relative !important;
+}
+
+.active-row-highlight td::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background-color: #ef4444;
+    z-index: 10;
+    pointer-events: none;
+}

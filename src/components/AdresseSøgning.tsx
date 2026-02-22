@@ -91,7 +91,7 @@ function AdresseSøgning({ onAdresseValgt }: AdresseSøgningProps): ReactElement
       />
       {isLoading && <div className="p-2 text-sm text-gray-500">Søger...</div>}
       {resultater.length > 0 && (
-        <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-auto shadow-lg">
+        <ul className="absolute z-50 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-auto shadow-lg">
           {resultater.map((res, index) => (
             <li
               key={res.adresse.id}

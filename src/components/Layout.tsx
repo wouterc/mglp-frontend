@@ -4,7 +4,7 @@
 import React, { useState, ReactNode, useEffect } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, ChevronLeft, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal, ReceiptText, Database } from 'lucide-react';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
@@ -23,6 +23,21 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
   const location = useLocation(); // Ensure useLocation is imported/used if needed for re-fetching on nav, or just interval
   const [erMenuAaben, setErMenuAaben] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Collapsible sections – only sections with sektionIkon are collapsible
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('menu_collapsed_sections');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const toggleSection = (titel: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [titel]: !prev[titel] };
+      localStorage.setItem('menu_collapsed_sections', JSON.stringify(next));
+      return next;
+    });
+  };
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -89,6 +104,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       titel: 'SAGSBEHANDLING',
       items: [
         { id: 'sagsoversigt', navn: 'Sagsoversigt', ikon: LayoutGrid },
+        { id: 'fakturaoversigt', navn: 'Fakturaoversigt', ikon: ReceiptText },
         { id: 'sagsdetaljer', navn: 'Sagsdetaljer', ikon: FileText },
         { id: 'aktiviteter', navn: 'Aktiviteter', ikon: ListChecks },
         { id: 'dokumenter', navn: 'Dokumenter', ikon: Folder },
@@ -98,6 +114,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     },
     {
       titel: 'REGISTER',
+      sektionIkon: Database,
       items: [
         { id: 'virksomheder', navn: 'Virksomheder', ikon: Building2 },
         { id: 'kontakter', navn: 'Kontakter', ikon: Users },
@@ -159,35 +176,75 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
         <nav className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
           {menuSektioner.map((sektion, index) => (
             <div key={sektion.titel} className={erMenuAaben ? 'mt-4' : 'mt-2'}>
-              {erMenuAaben ? (
-                <h2 className="px-4 text-xs font-bold uppercase text-gray-400">{sektion.titel}</h2>
-              ) : (
-                /* Vis en tydelig streg mellem grupperne når menuen er lukket */
-                index > 0 && <div className="border-t-2 border-gray-500 mx-2 my-1 opacity-75"></div>
-              )}
-              <ul>
-                {sektion.items.map(punkt => (
-                  <li key={punkt.id}>
-                    <Link
-                      to={`/${punkt.id}`}
-                      className={`flex items-center justify-center sm:justify-start w-full p-3 text-left hover:bg-gray-700 relative ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
-                      title={punkt.navn}
+              {(() => {
+                const isCollapsible = 'sektionIkon' in sektion && !!sektion.sektionIkon;
+                if (erMenuAaben) {
+                  // Expanded sidebar
+                  if (!isCollapsible) {
+                    return <h2 className="px-4 text-xs font-bold uppercase text-gray-400">{sektion.titel}</h2>;
+                  }
+                  return (
+                    <button
+                      onClick={() => toggleSection(sektion.titel)}
+                      className="flex items-center justify-between w-full px-4 text-xs font-bold uppercase text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
                     >
-                      <punkt.ikon size={20} />
-                      {erMenuAaben && <span className="ml-4 flex-1">{punkt.navn}</span>}
-                      {punkt.id === 'kommunikation' && unreadCount > 0 && (
-                        erMenuAaben ? (
-                          <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                            {unreadCount}
-                          </span>
-                        ) : (
-                          <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-800"></span>
-                        )
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                      <span>{sektion.titel}</span>
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform duration-200 ${collapsedSections[sektion.titel] ? '-rotate-90' : ''}`}
+                      />
+                    </button>
+                  );
+                } else {
+                  // Collapsed sidebar
+                  if (!isCollapsible) {
+                    return index > 0 ? <div className="border-t-2 border-gray-500 mx-2 my-1 opacity-75"></div> : null;
+                  }
+                  return (
+                    <>
+                      {index > 0 && <div className="border-t-2 border-gray-500 mx-2 my-1 opacity-75"></div>}
+                      <button
+                        onClick={() => toggleSection(sektion.titel)}
+                        className={`flex items-center justify-center w-full p-3 transition-colors ${collapsedSections[sektion.titel] ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-200'
+                          }`}
+                        title={`${collapsedSections[sektion.titel] ? 'Vis' : 'Skjul'} ${sektion.titel.toLowerCase()}`}
+                      >
+                        <sektion.sektionIkon size={20} />
+                      </button>
+                    </>
+                  );
+                }
+              })()}
+              <div
+                className={`overflow-hidden transition-all duration-200 ease-in-out ${'sektionIkon' in sektion && sektion.sektionIkon && collapsedSections[sektion.titel]
+                  ? 'max-h-0 opacity-0'
+                  : 'max-h-[500px] opacity-100'
+                  }`}
+              >
+                <ul>
+                  {sektion.items.map(punkt => (
+                    <li key={punkt.id}>
+                      <Link
+                        to={`/${punkt.id}`}
+                        className={`flex items-center justify-center sm:justify-start w-full p-3 text-left hover:bg-gray-700 relative ${aktivSide === punkt.id ? 'bg-gray-900' : ''}`}
+                        title={punkt.navn}
+                      >
+                        <punkt.ikon size={20} />
+                        {erMenuAaben && <span className="ml-4 flex-1">{punkt.navn}</span>}
+                        {punkt.id === 'kommunikation' && unreadCount > 0 && (
+                          erMenuAaben ? (
+                            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              {unreadCount}
+                            </span>
+                          ) : (
+                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-800"></span>
+                          )
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ))}
         </nav>
@@ -224,8 +281,8 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
 
       <main
         className={`flex-1 min-h-0 h-full relative ${aktivSide.includes('kommunikation') || aktivSide === 'sagsdetaljer'
-            ? 'overflow-hidden flex flex-col'
-            : 'overflow-y-auto overflow-x-hidden'
+          ? 'overflow-hidden flex flex-col'
+          : 'overflow-y-auto overflow-x-hidden'
           }`}
       >
         {children}

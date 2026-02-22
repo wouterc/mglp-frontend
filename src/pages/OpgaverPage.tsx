@@ -148,7 +148,7 @@ const OpgaverBoardContent: React.FC<{
 
             {/* Board Area */}
             <div className="flex-1 overflow-x-auto overflow-y-hidden p-2">
-                <div className="flex h-full gap-2 min-w-max">
+                <div className={`flex h-full gap-2 pr-4 ${props.showOnHold ? 'min-w-max' : ''}`}>
                     {/* Backlog Column with Toggle Button */}
                     <TaskColumn
                         key={OpgaveStatus.BACKLOG}

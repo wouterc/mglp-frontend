@@ -232,7 +232,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
 
     return (
         <div className="flex-1 flex flex-col min-h-0 h-full">
-            <div className="bg-white flex flex-col flex-1 rounded-lg shadow-md border border-gray-300 overflow-hidden">
+            <div className="bg-white flex flex-col flex-1 rounded-lg shadow-md border border-gray-300">
                 {/* Header med Titel og Filtre */}
                 <div className="p-4 border-b border-gray-200">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -273,7 +273,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                     </div>
                 </div>
 
-                <div className="p-4 flex-1 flex flex-col overflow-hidden space-y-4">
+                <div className="p-4 flex-1 flex flex-col space-y-4">
                     {/* Nye Faktura Section - Filter Box Style */}
                     <div className="p-3 bg-gray-300 rounded-lg border border-gray-400">
                         <h3 className="text-xs font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
@@ -305,7 +305,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                                 />
 
                                 {showItemSuggestions && itemSuggestions.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
                                         {itemSuggestions.map((item) => (
                                             <div
                                                 key={item.id}
@@ -329,7 +329,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                                 {/* Overlay til at lukke listen hvis man klikker udenfor */}
                                 {showItemSuggestions && (
                                     <div
-                                        className="fixed inset-0 z-0"
+                                        className="fixed inset-0 z-40"
                                         onClick={() => setShowItemSuggestions(false)}
                                     />
                                 )}

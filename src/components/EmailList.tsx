@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { API_BASE_URL } from '../config';
 import { Mail, Search, Paperclip, Calendar, User, FileText, ChevronRight, X, Filter, ListFilter, Check, Sparkles } from 'lucide-react';
+import { MailService } from '../services/MailService';
 
 interface IncomingEmail {
     id: number;
@@ -291,14 +292,16 @@ export default function EmailList({ accountId, hideReadingPane, onUnlink, select
                                             !att.is_inline && (
                                                 <div key={att.id} className="flex items-center bg-white border border-gray-200 rounded px-2 py-1 text-xs group hover:border-blue-300 transition-colors shadow-sm">
                                                     <Paperclip size={12} className="text-gray-400 mr-2" />
-                                                    <a
-                                                        href={`${API_BASE_URL}/emails/attachment/${att.id}/`}
-                                                        target="_blank" rel="noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 hover:underline mr-2 truncate max-w-[200px]"
+                                                    <div
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            MailService.downloadAttachment(att.id);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-800 hover:underline mr-2 truncate max-w-[200px] cursor-pointer"
                                                         title={att.filename}
                                                     >
                                                         {att.filename}
-                                                    </a>
+                                                    </div>
                                                     <span className="text-gray-400 mr-2 text-[10px]">
                                                         {Math.round(att.file_size / 1024)} KB
                                                     </span>

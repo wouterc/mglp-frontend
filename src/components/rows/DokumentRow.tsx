@@ -238,12 +238,7 @@ const DokumentRow = React.memo(function DokumentRow({
                 handleNativeDrop(e);
                 if (rootProps.onDrop) rootProps.onDrop(e);
             }}
-            className={`group transition-colors relative ${isDragActive || isInternalDragOver ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
-
-
-
-
-            style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
+            className={`group transition-colors relative ${isDragActive || isInternalDragOver ? 'bg-white ring-2 ring-blue-400 z-10' : ''} ${isActive ? 'bg-red-50/30 active-row-highlight' : 'hover:bg-gray-50'}`}
             onClick={onFocus}
             onFocus={onFocus}
             onBlur={(e) => {
@@ -428,7 +423,7 @@ const DokumentRow = React.memo(function DokumentRow({
                         value={doc.status?.id || ''}
                         onChange={(e) => onInlineSave(doc.id, 'status_id', e.target.value === '' ? null : parseInt(e.target.value))}
                         onKeyDown={(e) => handleKeyDown(e, `d-${doc.id}-f4`)}
-                        className={`flex-grow h-7 py-0 px-1 border rounded text-[12px] bg-transparent focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-slate-400'}`}
+                        className={`flex-grow py-0.5 px-1 border rounded text-[12px] bg-transparent focus:border-black focus:ring-0 ${doc.status?.status_nummer === 80 ? 'border-green-200 text-green-800 font-medium' : 'border-slate-400'}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <option value="">Vælg...</option>
@@ -438,7 +433,7 @@ const DokumentRow = React.memo(function DokumentRow({
             </td>
             <td className="px-2 py-1.5 w-auto relative align-middle overflow-hidden">
                 {/* Fil Column */}
-                <div className={`flex items-center gap-2 border rounded px-1 py-1 transition-all shadow-sm min-h-[32px] overflow-hidden
+                <div className={`flex items-center gap-2 border rounded px-1 py-0.5 transition-all shadow-sm overflow-hidden
                     ${isDragActive ? 'border-blue-600 ring-2 ring-green-200 bg-green-100' : 'border-slate-400 hover:border-blue-400 bg-white'}
                 `}>
                     <div className="flex-1 flex items-center min-w-0">

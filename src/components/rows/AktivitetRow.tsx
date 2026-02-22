@@ -142,8 +142,7 @@ function AktivitetRow({
 
     return (
         <tr
-            className={`border-b border-gray-200 transition-colors ${isActive ? 'bg-red-50/30' : 'hover:bg-gray-50'}`}
-            style={isActive ? { boxShadow: 'inset 0 -2px 0 0 #ef4444' } : {}}
+            className={`border-b border-gray-200 transition-colors ${isActive ? 'bg-red-50/30 active-row-highlight' : 'hover:bg-gray-50'}`}
             onClick={onFocus}
             onFocus={onFocus}
             onBlur={(e) => {

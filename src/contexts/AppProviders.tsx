@@ -7,6 +7,8 @@ import { AktivitetDokumentProvider } from './AktivitetDokumentContext';
 import { PartnerProvider } from './PartnerContext';
 import { TemplateProvider } from './TemplateContext';
 
+import { FakturaProvider } from './FakturaContext';
+
 interface AppProvidersProps {
     children: ReactNode;
 }
@@ -18,11 +20,13 @@ export const AppProviders = ({ children }: AppProvidersProps) => {
                 <PartnerProvider>
                     <TemplateProvider>
                         <SagProvider>
-                            <AktivitetDokumentProvider>
-                                <ChatProvider>
-                                    {children}
-                                </ChatProvider>
-                            </AktivitetDokumentProvider>
+                            <FakturaProvider>
+                                <AktivitetDokumentProvider>
+                                    <ChatProvider>
+                                        {children}
+                                    </ChatProvider>
+                                </AktivitetDokumentProvider>
+                            </FakturaProvider>
                         </SagProvider>
                     </TemplateProvider>
                 </PartnerProvider>

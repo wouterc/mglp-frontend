@@ -39,6 +39,7 @@ import type { Sag } from './types';
 import KommunikationPage from './pages/KommunikationPage';
 import VidensbankPage from './pages/VidensbankPage';
 import OpgaverPage from './pages/OpgaverPage';
+import FakturaoversigPage from './pages/FakturaoversigPage';
 import { useAppState, StateContext } from './StateContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -139,6 +140,7 @@ function App() {
           <Routes key={location.pathname}>
             <Route path="/" element={<SagsoversigtPage navigateTo={navigateTo} />} />
             <Route path="/sagsoversigt" element={<SagsoversigtPage navigateTo={navigateTo} />} />
+            <Route path="/fakturaoversigt" element={<FakturaoversigPage />} />
             <Route path="/aktiviteter" element={<AktiviteterPage sagId={valgtSag?.id ?? null} />} />
             <Route path="/sagsdetaljer" element={<SagsdetaljerPage sagId={valgtSag?.id ?? null} navigateTo={navigateTo} />} />
             <Route path="/dokumenter" element={<DokumenterPage sagId={valgtSag?.id ?? null} />} />

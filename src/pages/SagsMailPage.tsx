@@ -445,11 +445,12 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                                         selectedEmail.attachments.filter(a => !a.is_inline || !/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(a.filename)).map(att => {
                                             const linkedInfo = att.saved_document_id ? getLinkedDocInfo(att.saved_document_id) : null;
                                             return (
-                                                <a
+                                                <div
                                                     key={att.id}
-                                                    href={`${API_BASE_URL}/emails/attachment/${att.id}/`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        MailService.downloadAttachment(att.id);
+                                                    }}
                                                     draggable={true}
                                                     onDragStart={(e) => handleDragStart(e, att)}
                                                     className={`group flex items-center border rounded px-3 py-1.5 text-xs transition-all cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md ${att.saved_document_id ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' : 'bg-white border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'}`}
@@ -461,7 +462,7 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                                                         {linkedInfo && <span className="text-[9px] opacity-75 truncate">{linkedInfo}</span>}
                                                     </div>
                                                     <span className="opacity-60 ml-1.5 group-hover:opacity-100 flex-shrink-0">({Math.round(att.file_size / 1024)} KB)</span>
-                                                </a>
+                                                </div>
                                             );
                                         })
                                     ) : (
@@ -569,9 +570,16 @@ export default function SagsMailPage({ sagId }: SagsMailPageProps) {
                                                                 </td>
                                                                 <td className="px-2 py-1.5 align-middle">
                                                                     {doc.fil ? (
-                                                                        <a href={doc.fil} target="_blank" rel="noreferrer" className="text-blue-600" title={doc.filnavn || 'Fil'}>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                DokumentService.openDokument(doc.id);
+                                                                            }}
+                                                                            className="text-blue-600 hover:text-blue-800"
+                                                                            title={doc.filnavn || 'Fil'}
+                                                                        >
                                                                             <FileText size={14} />
-                                                                        </a>
+                                                                        </button>
                                                                     ) : (
                                                                         <div className="w-4 h-4 border border-dashed border-gray-300 rounded flex items-center justify-center text-gray-300" title="Træk fil her">
                                                                             <div className="w-1.5 h-1.5 bg-gray-200 rounded-full"></div>

@@ -587,6 +587,10 @@ export interface Vareliste {
 export interface FakturaLine {
   id: number;
   sag: number;
+  sag_sags_nr?: string;
+  sag_alias?: string;
+  sag_maegler_sagsnr?: string | null;
+  sag_maegler_navn?: string | null;
   vare: Vareliste | null;
   vare_id?: number | null;
   varenummer: number | null;
@@ -599,4 +603,14 @@ export interface FakturaLine {
   kommentar: string | null;
   oprettet_dato: string;
   sidst_opdateret: string;
+}
+
+export interface FakturaoversigtFilterState {
+  search: string;
+  status: string;
+}
+
+export interface FakturaoversigtSortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
 }

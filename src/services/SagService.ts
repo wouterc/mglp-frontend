@@ -1,5 +1,5 @@
 import { api } from '../api';
-import { Sag } from '../types';
+import { Sag, FakturaLine } from '../types';
 
 export const SagService = {
     /**
@@ -70,8 +70,30 @@ export const SagService = {
     /**
      * Henter fakturalinjer for en sag.
      */
-    async getFakturaLines(id: number): Promise<any[]> {
-        return await api.get<any[]>(`/sager/sagsfaktura/?sag_id=${id}`);
+    async getFakturaLines(id: number): Promise<FakturaLine[]> {
+        const resp = await api.get<any>(`/sager/sagsfaktura/?sag_id=${id}`);
+        return Array.isArray(resp.results) ? resp.results : Array.isArray(resp) ? resp : [];
+    },
+
+    /**
+     * Henter ALLE fakturalinjer på tværs af alle sager.
+     */
+    async getAllFakturaLines(params?: {
+        page?: number;
+        search?: string;
+        status?: string;
+        ordering?: string;
+        page_size?: number;
+    }): Promise<{ count: number; next: string | null; previous: string | null; results: FakturaLine[] }> {
+        const query = new URLSearchParams();
+        if (params?.page) query.append('page', params.page.toString());
+        if (params?.search) query.append('search', params.search);
+        if (params?.status && params.status !== 'all') query.append('status', params.status);
+        if (params?.ordering) query.append('ordering', params.ordering);
+        if (params?.page_size) query.append('page_size', params.page_size.toString());
+
+        const queryString = query.toString();
+        return await api.get(`/sager/sagsfaktura/${queryString ? `?${queryString}` : ''}`);
     },
 
     /**
