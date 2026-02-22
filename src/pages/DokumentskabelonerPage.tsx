@@ -919,7 +919,7 @@ function DokumentskabelonerPage(): ReactElement {
 
       {visForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[80vw] max-h-[95vh] overflow-y-auto">
             <DokumentSkabelonForm
               dokument={dokumentTilRedigering}
               onSave={() => { setVisForm(false); hentData(filters); }}

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { SkabDokument, Blokinfo, InformationsKilde } from '../types';
 import { Save, X, Loader2 } from 'lucide-react';
+import AktiveReglerEditor from './AktiveReglerEditor';
 
 interface DokumentSkabelonFormProps {
     dokument?: SkabDokument | null;
@@ -35,7 +36,8 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
         udgaaet: false,
         informations_kilde_id: '',
         default_undermappe_id: '',
-        mail_titel: ''
+        mail_titel: '',
+        aktive_regler: {} as Record<string, any[]>
     });
 
     useEffect(() => {
@@ -75,7 +77,8 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                 udgaaet: dokument.udgaaet ?? false,
                 informations_kilde_id: dokument.informations_kilde?.id?.toString() || '',
                 default_undermappe_id: dokument.default_undermappe?.id?.toString() || '',
-                mail_titel: dokument.mail_titel || ''
+                mail_titel: dokument.mail_titel || '',
+                aktive_regler: dokument.aktive_regler || {}
             });
         } else if (initialFilters?.gruppe_nr) {
             // Find ID baseret på nummer
@@ -186,8 +189,8 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-1">
+                <div className="flex items-start space-x-4">
+                    <div className="w-[20%]">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Gruppe *</label>
                         <select
                             name="gruppe_id"
@@ -200,8 +203,8 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                             {blokinfo.map(g => <option key={g.id} value={g.id}>{g.nr} - {g.titel_kort}</option>)}
                         </select>
                     </div>
-                    <div className="col-span-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Dokument Nr. *</label>
+                    <div className="w-[10%]">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Dok. Nr. *</label>
                         <input
                             type="text"
                             name="dokument_nr_display"
@@ -214,64 +217,64 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                             title="Nummeret tildeles automatisk baseret på gruppe og næste ledige nr."
                         />
                     </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Dokument Navn *</label>
-                    <input
-                        type="text"
-                        name="dokument"
-                        value={formData.dokument}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Link</label>
-                    <input
-                        type="text"
-                        name="link"
-                        value={formData.link}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Filnavn</label>
-                    <input
-                        type="text"
-                        name="filnavn"
-                        value={formData.filnavn}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
-                    />
-                </div>
-
-                <div className="flex items-start space-x-6 pt-2">
-                    <label className={`flex items-center space-x-2 ${formData.udgaaet ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                    <div className="w-[30%]">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Dokument Navn *</label>
                         <input
-                            type="checkbox"
-                            name="aktiv"
-                            checked={formData.aktiv}
+                            type="text"
+                            name="dokument"
+                            value={formData.dokument}
                             onChange={handleChange}
-                            disabled={!!formData.udgaaet}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
+                            required
                         />
-                        <span className="text-sm font-medium text-gray-700">Aktiv skabelon</span>
-                    </label>
+                    </div>
+                    <div className="flex items-center space-x-4 pt-6 pl-2">
+                        <label className={`flex items-center space-x-1.5 ${formData.udgaaet ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                            <input
+                                type="checkbox"
+                                name="aktiv"
+                                checked={formData.aktiv}
+                                onChange={handleChange}
+                                disabled={!!formData.udgaaet}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-xs font-medium text-gray-700">Aktiv skabelon</span>
+                        </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                        <label className="flex items-center space-x-1.5 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="udgaaet"
+                                checked={formData.udgaaet}
+                                onChange={handleChange}
+                                className="rounded border-gray-300 text-red-600 focus:ring-red-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-xs font-medium text-gray-700">Udgået skabelon</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                    <div className="w-[30%]">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Filnavn</label>
                         <input
-                            type="checkbox"
-                            name="udgaaet"
-                            checked={formData.udgaaet}
+                            type="text"
+                            name="filnavn"
+                            value={formData.filnavn}
                             onChange={handleChange}
-                            className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
                         />
-                        <span className="text-sm font-medium text-gray-700">Udgået skabelon</span>
-                    </label>
+                    </div>
+                    <div className="flex-grow">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Link</label>
+                        <input
+                            type="text"
+                            name="link"
+                            value={formData.link}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none text-[12px]"
+                        />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-100">
@@ -320,6 +323,13 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         onChange={handleChange}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none resize-none text-[11px] placeholder-gray-400"
+                    />
+                </div>
+
+                <div className="pt-2">
+                    <AktiveReglerEditor
+                        value={formData.aktive_regler}
+                        onChange={(newRules) => setFormData(prev => ({ ...prev, aktive_regler: newRules }))}
                     />
                 </div>
             </form>

@@ -11,6 +11,12 @@ export interface BoligType {
   aktiv: boolean;
 }
 
+export interface Region {
+  id: number;
+  navn: string;
+  nummer: number;
+}
+
 export interface Blokinfo {
   id: number;
   formaal: number;
@@ -50,6 +56,7 @@ export interface SkabAktivitet {
   mail_titel?: string | null;
   er_ny?: boolean;
   dokumenter?: number[]; // IDs of linked SkabDokumenter
+  aktive_regler?: Record<string, any[]>; // For dynamically determining activation
 }
 
 export interface Status {
@@ -327,6 +334,7 @@ export interface SkabDokument {
   dokumenter?: number[]; // IDs of linked SkabDokumenter
   default_undermappe?: StandardMappe | null;
   default_undermappe_id?: number | null;
+  aktive_regler?: Record<string, any[]>;
 }
 
 

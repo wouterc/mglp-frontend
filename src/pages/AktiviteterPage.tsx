@@ -141,8 +141,8 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
 
         // 1. Check user preference from currentUser (global state)
-        // Note: We need to access currentUser from state.currentUser (useAppState)
-        const userPref = state.currentUser?.preferred_link_open_mode;
+        // Note: We need to access currentUser from authState.currentUser (useAuth)
+        const userPref = authState.currentUser?.preferred_link_open_mode;
 
         if (userPref) {
             openLinkApp(aktivitet, userPref);

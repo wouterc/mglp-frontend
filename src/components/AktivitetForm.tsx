@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent, ReactEleme
 import { Save, X, Loader2 } from 'lucide-react';
 import type { Blokinfo, SkabAktivitet, InformationsKilde, User } from '../types.ts';
 import { api } from '../api';
+import AktiveReglerEditor from './AktiveReglerEditor';
 
 type AktivitetTilRedigering = SkabAktivitet;
 
@@ -29,6 +30,7 @@ interface FormDataState {
   frist: string;
   informations_kilde_id: string;
   mail_titel: string;
+  aktive_regler: Record<string, any[]>;
 }
 
 function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList, initialFilters }: AktivitetFormProps): ReactElement {
@@ -43,6 +45,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
     frist: '',
     informations_kilde_id: '',
     mail_titel: '',
+    aktive_regler: {},
   });
 
   const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
@@ -76,6 +79,7 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
         frist: aktivitetTilRedigering.frist?.toString() || '',
         informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id?.toString() || '',
         mail_titel: aktivitetTilRedigering.mail_titel || '',
+        aktive_regler: aktivitetTilRedigering.aktive_regler || {},
       });
     } else if (!erRedigering && initialFilters) {
       // Forudfyld fra filtre hvis muligt
@@ -263,8 +267,9 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-[80vw] max-h-[95vh] overflow-y-auto flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
         <form onSubmit={handleSubmit} className="space-y-4">
 
           <div className="flex justify-between items-center mb-6">
@@ -287,50 +292,57 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
           </div>
 
           <div className="flex items-start space-x-4">
-            <div className="w-1/4">
+            <div className="w-[10%]">
               <label htmlFor="aktivitet_nr" className="block text-sm font-medium">Aktivitet Nr.</label>
               <input
                 type="number"
                 name="aktivitet_nr"
                 value={formData.aktivitet_nr}
                 onChange={handleChange}
-                className={`mt-1 w-full p-2 border rounded-md text-[12px] ${!erRedigering ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                className={`mt-1 w-full p-2 border rounded-md text-[12px] flex-shrink-0 ${!erRedigering ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                 readOnly={!erRedigering}
                 title={!erRedigering ? "Nummeret tildeles automatisk" : ""}
               />
             </div>
-            <div className="flex-grow">
+            <div className="w-[30%]">
               <label htmlFor="aktivitet" className="block text-sm font-medium">Aktivitet</label>
               <input type="text" name="aktivitet" value={formData.aktivitet} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />
             </div>
-          </div>
 
-          <div className="flex items-center space-x-6 pt-2">
-            <label className={`flex items-center space-x-2 ${formData.udgaaet ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-              <input
-                type="checkbox"
-                name="aktiv"
-                checked={formData.aktiv}
-                onChange={handleChange}
-                disabled={!!formData.udgaaet}
-              />
-              <span>Standard aktiveret</span>
-            </label>
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input type="checkbox" name="udgaaet" checked={formData.udgaaet} onChange={handleChange} />
-              <span>Udgået</span>
-            </label>
+            <div className="flex items-center space-x-4 pt-6 pl-2">
+              <label className={`flex items-center space-x-1.5 ${formData.udgaaet ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  name="aktiv"
+                  checked={formData.aktiv}
+                  onChange={handleChange}
+                  disabled={!!formData.udgaaet}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                />
+                <span className="text-xs font-medium text-gray-700">Standard aktivitet</span>
+              </label>
+              <label className="flex items-center space-x-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="udgaaet"
+                  checked={formData.udgaaet}
+                  onChange={handleChange}
+                  className="rounded border-gray-300 text-red-600 focus:ring-red-500 w-3.5 h-3.5"
+                />
+                <span className="text-xs font-medium text-gray-700">Udgået</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex items-start space-x-4">
-            <div className="w-1/2">
+            <div className="w-[40%]">
               <label htmlFor="proces" className="block text-sm font-medium">Proces <span className="text-red-500">*</span></label>
               <select name="proces" value={formData.proces} onChange={handleChange} required className="mt-1 w-full p-2 border rounded-md bg-white border-blue-200 text-[12px]">
                 <option value="">Vælg proces...</option>
                 {procesList.map(p => <option key={p.id} value={p.id}>{p.nr} - {p.titel_kort}</option>)}
               </select>
             </div>
-            <div className="w-1/2">
+            <div className="w-[40%]">
               <label htmlFor="gruppe" className="block text-sm font-medium">Gruppe <span className="text-red-500">*</span></label>
               <select
                 name="gruppe"
@@ -353,12 +365,16 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
           </div>
 
           <div className="flex items-start space-x-4 pt-4 border-t border-gray-100">
-            <div className="w-1/4">
+            <div className="w-[20%]">
               <label htmlFor="informations_kilde_id" className="block text-sm font-medium">Informationskilde</label>
               <select name="informations_kilde_id" value={formData.informations_kilde_id} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md bg-white text-[12px]">
                 <option value="">Ingen</option>
                 {informationsKilder.map(k => <option key={k.id} value={k.id}>{k.navn}</option>)}
               </select>
+            </div>
+            <div className="w-[10%]">
+              <label htmlFor="frist" className="block text-sm font-medium">Frist (dage)</label>
+              <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />
             </div>
             <div className="flex-grow">
               <label htmlFor="mail_titel" className="block text-sm font-medium">Mail Titel</label>
@@ -368,16 +384,16 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
                 onChange={handleChange}
                 className="mt-1 w-full p-2 border rounded-md text-[12px] resize-y min-h-[38px]"
                 placeholder="Titel til eksterne mails"
-                rows={2}
+                rows={1}
               />
             </div>
           </div>
 
-          <div className="flex items-start space-x-4">
-            <div className="w-1/2">
-              <label htmlFor="frist" className="block text-sm font-medium">Frist (dage)</label>
-              <input type="number" name="frist" value={formData.frist} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md text-[12px]" />
-            </div>
+          <div className="pt-2">
+            <AktiveReglerEditor
+              value={formData.aktive_regler}
+              onChange={(newRules) => setFormData(prev => ({ ...prev, aktive_regler: newRules }))}
+            />
           </div>
 
         </form>
