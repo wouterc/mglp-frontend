@@ -8,6 +8,7 @@ import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListCheck
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
+import { APP_VERSION } from '../version';
 
 interface LayoutProps {
   children: ReactNode;
@@ -56,6 +57,43 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     let isActive = true;
 
     const startPolling = async () => {
+      // 0. Tjek Version (Tvunget refresh hvis ny version)
+      try {
+        const vRes = await api.get<any>('/kerne/global-variables/APP_VERSION/');
+        if (vRes && vRes.vaerdi && vRes.vaerdi !== APP_VERSION) {
+          console.log(`Ny version fundet! Server: ${vRes.vaerdi}, Lokal: ${APP_VERSION}. Genindlæser...`);
+
+          // Forsøg at rydde caches før reload
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+          }
+
+          // Afregistrer Service Workers
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+              await registration.unregister();
+            }
+          }
+
+          // Ryd local storage for at være helt sikker (valgfrit, men godt for "nuking")
+          // localStorage.clear(); 
+
+          window.location.reload();
+          return; // Stop her
+        }
+      } catch (e) {
+        // Hvis variablen ikke findes, opret den (så vi har et sted at styre det fra)
+        try {
+          await api.post('/kerne/global-variables/', {
+            noegle: 'APP_VERSION',
+            vaerdi: APP_VERSION,
+            beskrivelse: 'Nuværende påkrævede version af appen'
+          });
+        } catch (err) { /* silent fail */ }
+      }
+
       // 1. Hent med det samme
       await fetchUnread();
       if (!isActive) return;
@@ -276,6 +314,11 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
             <LogOut size={20} />
             {erMenuAaben && <span className="ml-4">Log ud</span>}
           </button>
+
+          {/* Version Info */}
+          <div className={`mt-2 ${erMenuAaben ? 'px-2' : 'text-center'} text-[10px] text-gray-500 font-mono opacity-50`}>
+            {erMenuAaben ? `v.${APP_VERSION}` : APP_VERSION.split('.').pop()}
+          </div>
         </div>
       </aside>
 

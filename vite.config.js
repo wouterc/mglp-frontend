@@ -21,6 +21,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'service-worker.ts',
       injectRegister: 'auto',
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+      },
       manifest: {
         name: 'MGLP Flow',
         display: 'standalone',
@@ -54,22 +57,22 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: 'http://127.0.0.1:8010',
         changeOrigin: true,
         secure: false,
       },
       '/admin': {
-        target: 'http://127.0.0.1:8000',
+        target: 'http://127.0.0.1:8010',
         changeOrigin: true,
         secure: false,
       },
       '/static': {
-        target: 'http://127.0.0.1:8000',
+        target: 'http://127.0.0.1:8010',
         changeOrigin: true,
         secure: false,
       },
       '/media': {
-        target: 'http://127.0.0.1:8000',
+        target: 'http://127.0.0.1:8010',
         changeOrigin: true,
         secure: false,
       }

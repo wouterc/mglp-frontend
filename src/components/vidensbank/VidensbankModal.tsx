@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import * as mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 import { useDropzone } from 'react-dropzone';
 import { Viden, VidensKategori, HjaelpPunkt } from '../../types';
 import { api } from '../../api';
@@ -320,10 +322,65 @@ const VidensbankModal: React.FC<VidensbankModalProps> = ({ isOpen, onClose, onSa
                             </button>
                         </div>
                     </div>
-                    <div className="border border-gray-300 rounded-lg flex flex-col min-h-[400px]">
+                    <div
+                        className="border border-gray-300 rounded-lg flex flex-col min-h-[400px]"
+                        onDrop={async (e) => {
+                            const file = Array.from(e.dataTransfer.files).find(f =>
+                                f.name.toLowerCase().match(/\.(docx|txt|md|csv|xlsx|xls)$/)
+                            );
+                            if (file) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try {
+                                    const ext = file.name.slice((file.name.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
+                                    let htmlToInsert = '';
+                                    let textToInsert = '';
+
+                                    if (ext === 'docx') {
+                                        const arrayBuffer = await file.arrayBuffer();
+                                        const result = await mammoth.convertToHtml({ arrayBuffer });
+                                        if (result.messages && result.messages.length > 0) {
+                                            console.warn("Word-dokument advarsler:", result.messages);
+                                        }
+                                        htmlToInsert = result.value;
+                                    } else if (ext === 'txt' || ext === 'md') {
+                                        textToInsert = await file.text();
+                                    } else if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
+                                        const arrayBuffer = await file.arrayBuffer();
+                                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                                        const firstSheetName = workbook.SheetNames[0];
+                                        const worksheet = workbook.Sheets[firstSheetName];
+                                        htmlToInsert = XLSX.utils.sheet_to_html(worksheet);
+                                    }
+
+                                    const editor = quillRef.current?.getEditor();
+                                    if (editor) {
+                                        const range = editor.getSelection();
+                                        const position = range ? range.index : editor.getLength();
+
+                                        if (htmlToInsert) {
+                                            editor.clipboard.dangerouslyPasteHTML(position, htmlToInsert);
+                                        } else if (textToInsert) {
+                                            editor.insertText(position, textToInsert);
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error("Fejl ved indlæsning af fil:", err);
+                                    alert("Kunne ikke indlæse filen. Sørg for at det er et gyldigt format.");
+                                }
+                            }
+                        }}
+                        onDragOver={(e) => {
+                            if (e.dataTransfer.types.includes('Files')) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'copy';
+                            }
+                        }}
+                    >
                         <ReactQuill
                             ref={quillRef}
                             theme="snow"
+                            placeholder="Skriv din tekst her eller træk filer (.docx, .txt, .md, .csv, excel) hertil..."
                             value={indhold}
                             onChange={(content) => setIndhold(content)}
                             modules={quillModules}
