@@ -224,6 +224,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   };
 
   const handleAdresseValgt = async (adresse: DawaAdresse) => {
+    console.log("🔍 handleAdresseValgt trigget for:", adresse.adressebetegnelse);
     const calculatedAlias = [
       adresse.vejnavn,
       adresse.husnr,
@@ -267,16 +268,38 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       const kommunekodeRaw = adgangsAdresseData?.kommune?.kode ? String(adgangsAdresseData.kommune.kode) : '';
       const regionskodeRaw = adgangsAdresseData?.region?.kode ? String(adgangsAdresseData.region.kode) : '';
 
-      const bygningHref = adgangsAdresseData?.bygninger?.[0]?.href;
+      // NYT: Forsøg at hente dybe BBR-data fra vores egen backend (Datafordeleren)
       let bbrKode = '';
       let byggeaar = '';
       let boligareal = '';
 
-      if (bygningHref) {
-        const bygningDetaljer = await api.get<any>(bygningHref);
-        bbrKode = bygningDetaljer.byg_anvendelse?.kode || '';
-        byggeaar = bygningDetaljer.opfoerelsesaar || '';
-        boligareal = bygningDetaljer.samlet_bolig_areal || '';
+      try {
+        const bbrResponse = await api.get<any>(`/sager/bbr_opslag/?dawa_id=${adresse.id}`);
+        if (bbrResponse && bbrResponse.id_lokalId) {
+          // Vi fik data fra Datafordeleren!
+          bbrKode = bbrResponse.byg_anvendelse?.kode || '';
+          byggeaar = bbrResponse.opfoerelsesaar || '';
+          boligareal = bbrResponse.samlet_bolig_areal || '';
+          console.log("BBR data hentet fra Datafordeleren via backend", bbrResponse);
+        } else {
+          // Fallback til DAWA hvis Datafordeleren ikke giver noget (eller ikke er opsat endnu)
+          const bygningHref = adgangsAdresseData?.bygninger?.[0]?.href;
+          if (bygningHref) {
+            const bygningDetaljer = await api.get<any>(bygningHref);
+            bbrKode = bygningDetaljer.byg_anvendelse?.kode || '';
+            byggeaar = bygningDetaljer.opfoerelsesaar || '';
+            boligareal = bygningDetaljer.samlet_bolig_areal || '';
+          }
+        }
+      } catch (bbrErr) {
+        console.error("Fejl ved backend BBR opslag, prøver DAWA fallback", bbrErr);
+        const bygningHref = adgangsAdresseData?.bygninger?.[0]?.href;
+        if (bygningHref) {
+          const bygningDetaljer = await api.get<any>(bygningHref);
+          bbrKode = bygningDetaljer.byg_anvendelse?.kode || '';
+          byggeaar = bygningDetaljer.opfoerelsesaar || '';
+          boligareal = bygningDetaljer.samlet_bolig_areal || '';
+        }
       }
 
       const matchendeAnvendelse = bbrAnvendelser.find(a => String(a.kode) === String(bbrKode));
@@ -504,11 +527,6 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             </div>
 
             <div>
-              <label htmlFor="bolig_bfe" className="block text-xs font-medium text-gray-500">BFE Nummer</label>
-              <input type="text" id="bolig_bfe" name="bolig_bfe" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
               <label htmlFor="bolig_type" className="block text-xs font-medium text-gray-500 mb-0.5">Bolig Type</label>
               <SearchableSelect
                 id="bolig_type"
@@ -527,21 +545,42 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
             </div>
 
             <div>
-              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
-              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            </div>
-
-            <div>
               <label htmlFor="bolig_anpart" className="block text-xs font-medium text-gray-500">Ejerlejligheds Anpart</label>
               <input type="text" id="bolig_anpart" name="bolig_anpart" value={sagsData.bolig_anpart || ''} onChange={handleChange} placeholder="0.00" className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
+          </div>
+        </div>
 
-            <div className="md:col-span-2">
-              <label htmlFor="bolig_link" className="block text-xs font-medium text-gray-500">Bolig system</label>
-              <input type="text" id="bolig_link" name="bolig_link" value={sagsData.bolig_link || ''} onChange={handleChange} placeholder="https://..." className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+        {/* BBR / Bolig Detaljer */}
+        <div className="p-3 border rounded-md bg-blue-50/20 border-blue-100">
+          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider mb-3">BBR & Bolig Detaljer</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-3">
+            <div>
+              <label htmlFor="byggeaar" className="block text-xs font-medium text-gray-500">Byggeår</label>
+              <input
+                type="text"
+                id="byggeaar"
+                name="byggeaar"
+                value={sagsData.byggeaar || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              />
             </div>
 
             <div>
+              <label htmlFor="boligareal" className="block text-xs font-medium text-gray-500">Boligareal (m²)</label>
+              <input
+                type="text"
+                id="boligareal"
+                name="boligareal"
+                value={sagsData.boligareal || ''}
+                onChange={handleChange}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              />
+            </div>
+
+            <div className="md:col-span-2">
               <label htmlFor="bolig_anvendelse_id" className="block text-xs font-medium text-gray-500">Anvendelse (BBR)</label>
               <select
                 id="bolig_anvendelse_id"
@@ -557,6 +596,21 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="bolig_bfe" className="block text-xs font-medium text-gray-500">BFE Nummer</label>
+              <input type="text" id="bolig_bfe" name="bolig_bfe" value={sagsData.bolig_bfe || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_matrikel" className="block text-xs font-medium text-gray-500">Matrikel</label>
+              <input type="text" id="bolig_matrikel" name="bolig_matrikel" value={sagsData.bolig_matrikel || ''} onChange={handleChange} className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="bolig_link" className="block text-xs font-medium text-gray-500">Bolig system (Link)</label>
+              <input type="text" id="bolig_link" name="bolig_link" value={sagsData.bolig_link || ''} onChange={handleChange} placeholder="https://..." className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" />
             </div>
           </div>
         </div>

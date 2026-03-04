@@ -622,3 +622,34 @@ export interface FakturaoversigtSortConfig {
   key: string;
   direction: 'asc' | 'desc';
 }
+
+export interface SagsPunktafgift {
+  id: number;
+  sag: number;
+  sag_sags_nr?: string;
+  sag_alias?: string;
+  sag_maegler_sagsnr?: string | null;
+  sag_maegler_navn?: string | null;
+  sagsidentification: string | null;
+  beloeb: string | null;
+  anmeldt: string | null;
+  kontaktperson: number | null;
+  kontaktperson_navn?: string | null;
+  dato_opkraevet: string | null;
+  dato_modtaget: string | null;
+  dato_dokument_anmeldt: string | null;
+  afregnet_skat: boolean;
+  dato_afregnet_skat: string | null;
+  oprettet_dato: string;
+  sidst_opdateret: string;
+}
+
+export interface PunktafgiftFilterState {
+  search: string;
+  afregnet: string; // 'all' | 'ja' | 'nej'
+}
+
+export interface PunktafgiftSortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
+}

@@ -1,5 +1,5 @@
 import { api } from '../api';
-import { Sag, FakturaLine } from '../types';
+import { Sag, FakturaLine, SagsPunktafgift } from '../types';
 
 export const SagService = {
     /**
@@ -115,5 +115,57 @@ export const SagService = {
      */
     async deleteFakturaLine(id: number): Promise<void> {
         await api.delete(`/sager/sagsfaktura/${id}/`);
+    },
+
+    /**
+     * Henter punktafgifter for en sag.
+     */
+    async getPunktafgifter(id: number): Promise<SagsPunktafgift[]> {
+        const resp = await api.get<any>(`/sager/sagspunktafgift/?sag_id=${id}`);
+        return Array.isArray(resp.results) ? resp.results : Array.isArray(resp) ? resp : [];
+    },
+
+    /**
+     * Henter ALLE punktafgifter på tværs af alle sager.
+     */
+    async getAllPunktafgifter(params?: {
+        page?: number;
+        search?: string;
+        afregnet?: string;
+        ordering?: string;
+        page_size?: number;
+    }): Promise<{ count: number; next: string | null; previous: string | null; results: SagsPunktafgift[] }> {
+        const query = new URLSearchParams();
+        if (params?.page) query.append('page', params.page.toString());
+        if (params?.search) query.append('search', params.search);
+        if (params?.afregnet && params.afregnet !== 'all') {
+            query.append('afregnet_skat', params.afregnet === 'ja' ? 'true' : 'false');
+        }
+        if (params?.ordering) query.append('ordering', params.ordering);
+        if (params?.page_size) query.append('page_size', params.page_size.toString());
+
+        const queryString = query.toString();
+        return await api.get(`/sager/sagspunktafgift/${queryString ? `?${queryString}` : ''}`);
+    },
+
+    /**
+     * Opretter en punktafgift.
+     */
+    async createPunktafgift(data: any): Promise<SagsPunktafgift> {
+        return await api.post<SagsPunktafgift>('/sager/sagspunktafgift/', data);
+    },
+
+    /**
+     * Opdaterer en punktafgift.
+     */
+    async updatePunktafgift(id: number, data: any): Promise<SagsPunktafgift> {
+        return await api.patch<SagsPunktafgift>(`/sager/sagspunktafgift/${id}/`, data);
+    },
+
+    /**
+     * Sletter en punktafgift.
+     */
+    async deletePunktafgift(id: number): Promise<void> {
+        await api.delete(`/sager/sagspunktafgift/${id}/`);
     }
 };

@@ -15,6 +15,7 @@ import useDebounce from '../hooks/useDebounce';
 import { useFaktura } from '../contexts/FakturaContext';
 import dayjs from 'dayjs';
 import 'dayjs/locale/da';
+import PunktafgiftOversigt from '../components/punktafgift/PunktafgiftOversigt';
 
 dayjs.locale('da');
 
@@ -43,6 +44,7 @@ function FakturaoversigPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [activeTab, setActiveTab] = useState<'faktura' | 'punktafgift'>('faktura');
 
     // Track om det er første mount – bruges til at undgå dobbelt-fetch
     const isFirstMount = useRef(true);
@@ -261,13 +263,26 @@ function FakturaoversigPage() {
 
     return (
         <div className="p-4 flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                        <ReceiptText className="text-blue-600" />
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200">
+                <div className="flex items-center gap-8">
+                    <button
+                        onClick={() => setActiveTab('faktura')}
+                        className={`pb-2 text-2xl font-bold transition-colors border-b-4 flex items-center gap-2 ${activeTab === 'faktura' ? 'border-blue-600 text-gray-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <ReceiptText className={activeTab === 'faktura' ? 'text-blue-600' : 'text-gray-300'} />
                         Fakturaoversigt
-                    </h2>
-                    {(isSaving || isLoading) && (
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('punktafgift')}
+                        className={`pb-2 text-2xl font-bold transition-colors border-b-4 flex items-center gap-2 ${activeTab === 'punktafgift' ? 'border-purple-600 text-gray-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <ReceiptText className={activeTab === 'punktafgift' ? 'text-purple-600' : 'text-gray-300'} />
+                        Oversigt over Punktafgifter
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-4 mb-2">
+                    {activeTab === 'faktura' && (isSaving || isLoading) && (
                         <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100 animate-pulse">
                             <Loader2 size={14} className="animate-spin" />
                             <span className="text-[10px] uppercase font-bold tracking-wider">
@@ -275,149 +290,160 @@ function FakturaoversigPage() {
                             </span>
                         </div>
                     )}
+
+                    {activeTab === 'faktura' && (
+                        <button
+                            onClick={handleExport}
+                            disabled={totalCount === 0 || isExporting}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 transition-colors text-xs font-semibold uppercase shadow-sm"
+                        >
+                            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                            {isExporting ? 'Eksporterer...' : 'Eksportér CSV'}
+                        </button>
+                    )}
                 </div>
-                <button
-                    onClick={handleExport}
-                    disabled={totalCount === 0 || isExporting}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 transition-colors text-xs font-semibold uppercase shadow-sm"
-                >
-                    {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                    {isExporting ? 'Eksporterer...' : 'Eksportér CSV'}
-                </button>
             </div>
 
-            <div className="mb-4 p-2 bg-gray-300 rounded-lg border border-gray-400 flex flex-wrap gap-3 items-center">
-                <div className="relative flex-grow max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Søg..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 pr-4 h-[30px] w-full border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    />
-                </div>
-                <select
-                    value={filters.status}
-                    onChange={(e) => handleStatusFilterChange(e.target.value)}
-                    style={{
-                        color: filters.status !== 'all' ? (statuses.find(s => s.id.toString() === filters.status)?.farve || '#1F2937') : '#1F2937',
-                        fontWeight: filters.status !== 'all' ? 'bold' : 'normal'
-                    }}
-                    className="px-3 h-[30px] border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                >
-                    <option value="all">Alle statusser (excl. annulleret)</option>
-                    {statuses.map(s => (
-                        <option key={s.id} value={s.id} style={{ color: s.farve }}>{s.beskrivelse}</option>
-                    ))}
-                </select>
 
-                <div className="flex items-center gap-2 ml-auto">
-                    <button
-                        disabled={page === 1 || isLoading}
-                        onClick={() => fakturaDispatch({ type: 'SET_FAKTURA_STATE', payload: { page: page - 1 } })}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-opacity"
-                    >
-                        <ChevronLeft size={20} />
-                    </button>
-                    <span className="text-xs font-medium text-gray-700">
-                        Side {page} af {totalPages || 1}
-                    </span>
-                    <button
-                        disabled={page >= totalPages || isLoading}
-                        onClick={() => fakturaDispatch({ type: 'SET_FAKTURA_STATE', payload: { page: page + 1 } })}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-opacity"
-                    >
-                        <ChevronRight size={20} />
-                    </button>
-                    <div className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter ml-2 p-1 bg-white/50 rounded">
-                        {totalCount} linjer totalt
+            {activeTab === 'faktura' ? (
+                <>
+
+                    <div className="mb-4 p-2 bg-gray-300 rounded-lg border border-gray-400 flex flex-wrap gap-3 items-center">
+                        <div className="relative flex-grow max-w-sm">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Søg..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-4 h-[30px] w-full border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            />
+                        </div>
+                        <select
+                            value={filters.status}
+                            onChange={(e) => handleStatusFilterChange(e.target.value)}
+                            style={{
+                                color: filters.status !== 'all' ? (statuses.find(s => s.id.toString() === filters.status)?.farve || '#1F2937') : '#1F2937',
+                                fontWeight: filters.status !== 'all' ? 'bold' : 'normal'
+                            }}
+                            className="px-3 h-[30px] border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                            <option value="all">Alle statusser (excl. annulleret)</option>
+                            {statuses.map(s => (
+                                <option key={s.id} value={s.id} style={{ color: s.farve }}>{s.beskrivelse}</option>
+                            ))}
+                        </select>
+
+                        <div className="flex items-center gap-2 ml-auto">
+                            <button
+                                disabled={page === 1 || isLoading}
+                                onClick={() => fakturaDispatch({ type: 'SET_FAKTURA_STATE', payload: { page: page - 1 } })}
+                                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-opacity"
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <span className="text-xs font-medium text-gray-700">
+                                Side {page} af {totalPages || 1}
+                            </span>
+                            <button
+                                disabled={page >= totalPages || isLoading}
+                                onClick={() => fakturaDispatch({ type: 'SET_FAKTURA_STATE', payload: { page: page + 1 } })}
+                                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-opacity"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                            <div className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter ml-2 p-1 bg-white/50 rounded">
+                                {totalCount} linjer totalt
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div className={`flex-1 overflow-auto rounded-lg border border-gray-200 shadow-md ${isLoading ? 'opacity-50' : ''}`}>
-                <table className="w-full text-left border-collapse min-w-[1200px]">
-                    <thead className="sticky top-0 z-10 shadow-sm">
-                        <tr className="bg-gray-800 text-white">
-                            <SortableHeader label="Sagsnr" sortField="sag_sags_nr" className="w-24" />
-                            <SortableHeader label="Mgl. sagsnr" sortField="sag_maegler_sagsnr" className="w-28" />
-                            <SortableHeader label="Alias" sortField="sag_alias" className="w-32" />
-                            <SortableHeader label="Mægler" sortField="sag_maegler_navn" className="w-36" />
-                            <SortableHeader label="Varenr" sortField="varenummer" className="w-20" />
-                            <SortableHeader label="Beskrivelse" sortField="beskrivelse" />
-                            <SortableHeader label="Pris" sortField="pris" className="w-28 text-right" />
-                            <SortableHeader label="Dato" sortField="dato" className="w-28" />
-                            <SortableHeader label="Faktura nr." sortField="faktura_nummer" className="w-28" />
-                            <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-44 text-right">Status</th>
-                            <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-16 text-center">💬</th>
-                            <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-12 text-center">🔗</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {lines.map(line => (
-                            <tr key={line.id} className="border-b border-gray-200 hover:bg-gray-100 transition-colors text-xs">
-                                <td className="px-3 py-2 text-gray-700 font-semibold">{line.sag_sags_nr || '-'}</td>
-                                <td className="px-3 py-2 text-gray-500">{line.sag_maegler_sagsnr || '-'}</td>
-                                <td className="px-3 py-2 text-gray-700">{line.sag_alias || '-'}</td>
-                                <td className="px-3 py-2 text-gray-500">{line.sag_maegler_navn || '-'}</td>
-                                <td className="px-3 py-2 text-gray-700">{line.varenummer || line.vare?.varenummer || '-'}</td>
-                                <td className="px-3 py-2 text-gray-900 font-medium">{line.beskrivelse}</td>
-                                <td className="px-3 py-2 text-gray-900 text-right font-bold">
-                                    {new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK' }).format(parseFloat(line.pris))}
-                                </td>
-                                <td className="px-3 py-2 text-gray-700 font-mono">
-                                    {line.dato ? dayjs(line.dato).format('DD-MM-YYYY') : '-'}
-                                </td>
-                                <td className="px-3 py-2 text-gray-700 text-center">{line.faktura_nummer || '-'}</td>
-                                <td className="px-3 py-2 text-right">
-                                    <select
-                                        disabled={isSaving}
-                                        value={line.status?.id || ''}
-                                        onChange={(e) => handleUpdateLine(line.id, { status_id: parseInt(e.target.value) })}
-                                        style={{
-                                            color: line.status?.farve || '#4B5563',
-                                            borderColor: line.status?.farve || '#D1D5DB',
-                                            backgroundColor: (line.status?.farve ? `${line.status.farve}20` : '#F9FAFB'),
-                                            borderWidth: '2px'
-                                        }}
-                                        className="w-full h-[26px] px-1 text-[10px] font-extrabold uppercase rounded border outline-none transition-all focus:ring-1 focus:ring-offset-1"
-                                    >
-                                        {statuses.map(s => (
-                                            <option key={s.id} value={s.id}>{s.beskrivelse}</option>
-                                        ))}
-                                    </select>
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                    <button
-                                        onClick={() => setCommentModal({ isOpen: true, lineId: line.id, kommentar: line.kommentar || '' })}
-                                        className={`p-1 rounded transition-colors ${line.kommentar ? 'text-red-500 hover:bg-red-50' : 'text-gray-300 hover:bg-gray-50 hover:text-gray-500'}`}
-                                        title={line.kommentar || 'Tilføj kommentar'}
-                                    >
-                                        <MessageSquare size={16} fill={line.kommentar ? 'currentColor' : 'none'} />
-                                    </button>
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                    <button
-                                        onClick={() => handleGoToSag(line)}
-                                        className="p-1 rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                    >
-                                        <ExternalLink size={16} />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                    <div className={`flex-1 overflow-auto rounded-lg border border-gray-200 shadow-md ${isLoading ? 'opacity-50' : ''}`}>
+                        <table className="w-full text-left border-collapse min-w-[1200px]">
+                            <thead className="sticky top-0 z-10 shadow-sm">
+                                <tr className="bg-gray-800 text-white">
+                                    <SortableHeader label="Sagsnr" sortField="sag_sags_nr" className="w-24" />
+                                    <SortableHeader label="Mgl. sagsnr" sortField="sag_maegler_sagsnr" className="w-28" />
+                                    <SortableHeader label="Alias" sortField="sag_alias" className="w-32" />
+                                    <SortableHeader label="Mægler" sortField="sag_maegler_navn" className="w-36" />
+                                    <SortableHeader label="Varenr" sortField="varenummer" className="w-20" />
+                                    <SortableHeader label="Beskrivelse" sortField="beskrivelse" />
+                                    <SortableHeader label="Pris" sortField="pris" className="w-28 text-right" />
+                                    <SortableHeader label="Dato" sortField="dato" className="w-28" />
+                                    <SortableHeader label="Faktura nr." sortField="faktura_nummer" className="w-28" />
+                                    <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-44 text-right">Status</th>
+                                    <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-16 text-center">💬</th>
+                                    <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wider w-12 text-center">🔗</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {lines.map(line => (
+                                    <tr key={line.id} className="border-b border-gray-200 hover:bg-gray-100 transition-colors text-xs">
+                                        <td className="px-3 py-2 text-gray-700 font-semibold">{line.sag_sags_nr || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-500">{line.sag_maegler_sagsnr || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-700">{line.sag_alias || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-500">{line.sag_maegler_navn || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-700">{line.varenummer || line.vare?.varenummer || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-900 font-medium">{line.beskrivelse}</td>
+                                        <td className="px-3 py-2 text-gray-900 text-right font-bold">
+                                            {new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK' }).format(parseFloat(line.pris))}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 font-mono">
+                                            {line.dato ? dayjs(line.dato).format('DD-MM-YYYY') : '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 text-center">{line.faktura_nummer || '-'}</td>
+                                        <td className="px-3 py-2 text-right">
+                                            <select
+                                                disabled={isSaving}
+                                                value={line.status?.id || ''}
+                                                onChange={(e) => handleUpdateLine(line.id, { status_id: parseInt(e.target.value) })}
+                                                style={{
+                                                    color: line.status?.farve || '#4B5563',
+                                                    borderColor: line.status?.farve || '#D1D5DB',
+                                                    backgroundColor: (line.status?.farve ? `${line.status.farve}20` : '#F9FAFB'),
+                                                    borderWidth: '2px'
+                                                }}
+                                                className="w-full h-[26px] px-1 text-[10px] font-extrabold uppercase rounded border outline-none transition-all focus:ring-1 focus:ring-offset-1"
+                                            >
+                                                {statuses.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.beskrivelse}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                            <button
+                                                onClick={() => setCommentModal({ isOpen: true, lineId: line.id, kommentar: line.kommentar || '' })}
+                                                className={`p-1 rounded transition-colors ${line.kommentar ? 'text-red-500 hover:bg-red-50' : 'text-gray-300 hover:bg-gray-50 hover:text-gray-500'}`}
+                                                title={line.kommentar || 'Tilføj kommentar'}
+                                            >
+                                                <MessageSquare size={16} fill={line.kommentar ? 'currentColor' : 'none'} />
+                                            </button>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                            <button
+                                                onClick={() => handleGoToSag(line)}
+                                                className="p-1 rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                            >
+                                                <ExternalLink size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
 
-                        {!isLoading && lines.length === 0 && (
-                            <tr>
-                                <td colSpan={12} className="px-4 py-12 text-center text-gray-400 italic">
-                                    Ingen fakturalinjer fundet.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                {!isLoading && lines.length === 0 && (
+                                    <tr>
+                                        <td colSpan={12} className="px-4 py-12 text-center text-gray-400 italic">
+                                            Ingen fakturalinjer fundet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            ) : (
+                <PunktafgiftOversigt />
+            )}
 
             {/* Comment Modal */}
             {commentModal.isOpen && (

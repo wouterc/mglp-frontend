@@ -21,6 +21,7 @@ import KommuneTab from '../components/sagsdetaljer/tabs/KommuneTab';
 import ForsyningTab from '../components/sagsdetaljer/tabs/ForsyningTab';
 import ProcesserTab from '../components/sagsdetaljer/tabs/ProcesserTab';
 import FakturaTab from '../components/sagsdetaljer/tabs/FakturaTab';
+import PunktafgiftTab from '../components/sagsdetaljer/tabs/PunktafgiftTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
@@ -232,6 +233,11 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 {mountedTabs.has('faktura') && (
                     <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'faktura' ? undefined : 'none' }}>
                         <FakturaTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('punktafgift') && (
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'punktafgift' ? undefined : 'none' }}>
+                        <PunktafgiftTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {mountedTabs.has('maegler') && (

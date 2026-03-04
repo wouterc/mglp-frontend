@@ -15,7 +15,7 @@ import useDebounce from '../../hooks/useDebounce';
 import { SagService } from '../../services/SagService';
 import SagsHeader from './SagsHeader';
 
-export type TabType = 'overblik' | 'processer' | 'faktura' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
+export type TabType = 'overblik' | 'processer' | 'faktura' | 'punktafgift' | 'maegler' | 'saelgere' | 'koebere' | 'bank' | 'raadgivere' | 'forening' | 'kommune' | 'forsyning';
 
 interface SagsdetaljerLayoutProps {
     children: ReactNode;
@@ -30,6 +30,7 @@ const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'overblik', label: 'Overblik', icon: LayoutDashboard },
     { id: 'processer', label: 'Processer', icon: ListChecks },
     { id: 'faktura', label: 'Faktura', icon: ReceiptText },
+    { id: 'punktafgift', label: 'Punktafgift', icon: ReceiptText },
     { id: 'maegler', label: 'Mægler', icon: Building2 },
     { id: 'saelgere', label: 'Sælgere', icon: User },
     { id: 'koebere', label: 'Købere', icon: User },

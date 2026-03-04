@@ -36,8 +36,21 @@ function AdresseSøgning({ onAdresseValgt }: AdresseSøgningProps): ReactElement
       setIsLoading(true);
       try {
         const response = await fetch(`https://api.dataforsyningen.dk/adresser/autocomplete?q=${debouncedSøgning}`);
-        const data: DawaAutocompleteResult[] = await response.json();
-        setResultater(Array.isArray(data) ? data : []);
+        const data = await response.json();
+
+        // DAWA kan returnere et array eller et objekt med en 'value' property
+        const results: DawaAutocompleteResult[] = Array.isArray(data) ? data : (data.value || []);
+
+        // Sikr os at adressebetegnelse findes (DAWA autocomplete lægger den ofte kun i tekst-feltet)
+        const mappedResults = results.map(res => ({
+          ...res,
+          adresse: {
+            ...res.adresse,
+            adressebetegnelse: res.adresse.adressebetegnelse || res.tekst
+          }
+        }));
+
+        setResultater(mappedResults);
         setActiveIndex(-1);
       } catch (error) {
         console.error("Fejl ved hentning af adresser fra DAWA:", error);
