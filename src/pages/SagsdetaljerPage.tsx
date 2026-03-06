@@ -139,8 +139,8 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
     };
 
     // 3. Gen-hent data hvis noget ændres i en fane (Callback)
-    const handleUpdateSag = (silent = true) => {
-        if (sagId) fetchSag(sagId, silent);
+    const handleUpdateSag = async (silent = true) => {
+        if (sagId) await fetchSag(sagId, silent);
     };
 
     // 4. Håndter redigering af stamdata (Modal)

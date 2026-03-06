@@ -3,16 +3,22 @@ import { Sag, BbrKodeliste } from '../../../types';
 import { RefreshCw, Building2, Calendar, LayoutGrid, CheckCircle2, FileText, Settings, ShieldAlert } from 'lucide-react';
 import { useLookups } from '../../../contexts/LookupContext';
 import { SagService } from '../../../services/SagService';
+import Toast, { ToastType } from '../../ui/Toast';
 
 interface BbrTabProps {
     sag: Sag;
-    onUpdate: () => void;
+    onUpdate: () => Promise<void> | void;
 }
 
 const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
     const { state: lookupState } = useLookups();
     const { bbrKodelister } = lookupState;
     const [isUpdating, setIsUpdating] = useState(false);
+    const [toast, setToast] = useState<{ isVisible: boolean; message: string; type: ToastType }>({
+        isVisible: false,
+        message: '',
+        type: 'info'
+    });
 
     const bbrInfo = sag.bbr_info;
 
@@ -28,12 +34,15 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
         setIsUpdating(true);
         try {
             await SagService.opdaterBbr(sag.id);
-            onUpdate(); // Trickle refresh up
+            await onUpdate(); // Trickle refresh up og vent til fetch er færdig
         } catch (e: any) {
             console.error('Kunne ikke opdatere BBR data:', e);
-            const status = e.status || '';
-            const dataMsg = e.data?.error || e.data?.detail || JSON.stringify(e.data) || '';
-            alert(`Kunne ikke hente BBR data (Status: ${status}).\nBackend svar: ${dataMsg}`);
+            const dataMsg = e.data?.error || e.data?.detail || JSON.stringify(e.data) || 'Der blev ikke returneret nogen fejlbesked.';
+            setToast({
+                isVisible: true,
+                message: `Kunne ikke hente BBR data.\nSystembesked: ${dataMsg}`,
+                type: 'error'
+            });
         } finally {
             setIsUpdating(false);
         }
@@ -145,6 +154,13 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                     </div>
                 )}
             </div>
+
+            <Toast
+                isVisible={toast.isVisible}
+                message={toast.message}
+                type={toast.type}
+                onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+            />
         </div>
     );
 };
