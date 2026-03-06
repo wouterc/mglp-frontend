@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { api } from '../api';
 import { LookupService } from '../services/LookupService';
-import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BoligType } from '../types';
+import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BoligType, BbrKodeliste } from '../types';
 import { useAuth } from './AuthContext';
 
 interface LookupState {
@@ -14,6 +14,7 @@ interface LookupState {
     standardMapper: StandardMappe[];
     blokinfoSkabeloner: Blokinfo[];
     boligTyper: BoligType[];
+    bbrKodelister: BbrKodeliste[];
     isLoading: boolean;
 }
 
@@ -33,6 +34,7 @@ const initialState: LookupState = {
     standardMapper: [],
     blokinfoSkabeloner: [],
     boligTyper: [],
+    bbrKodelister: [],
     isLoading: false,
 };
 
@@ -71,7 +73,7 @@ export const LookupProvider = ({ children }: { children: ReactNode }) => {
         isFetching.current = true;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const [users, actStatuses, sagStatuses, docStatuses, sources, groups, mappers, bTyper] = await Promise.all([
+            const [users, actStatuses, sagStatuses, docStatuses, sources, groups, mappers, bTyper, bbrKoder] = await Promise.all([
                 LookupService.getUsers(),
                 LookupService.getStatusser(2),
                 LookupService.getStatusser(1),
@@ -79,7 +81,8 @@ export const LookupProvider = ({ children }: { children: ReactNode }) => {
                 LookupService.getInformationsKilder(),
                 LookupService.getBlokinfoSkabeloner(),
                 LookupService.getStandardMapper(),
-                LookupService.getBoligTyper()
+                LookupService.getBoligTyper(),
+                LookupService.getBbrKodelister()
             ]);
 
             dispatch({
@@ -93,7 +96,8 @@ export const LookupProvider = ({ children }: { children: ReactNode }) => {
                     informationsKilder: sources,
                     blokinfoSkabeloner: groups,
                     standardMapper: mappers || [],
-                    boligTyper: bTyper
+                    boligTyper: bTyper,
+                    bbrKodelister: bbrKoder || []
                 }
             });
         } catch (e) {

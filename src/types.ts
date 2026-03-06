@@ -11,6 +11,13 @@ export interface BoligType {
   aktiv: boolean;
 }
 
+export interface BbrKodeliste {
+  id: number;
+  kategori: string;
+  kode: string;
+  tekst: string;
+}
+
 export interface Region {
   id: number;
   navn: string;
@@ -174,6 +181,9 @@ export interface Sag {
   bolig_bfe: string | null;
   bolig_anpart: string | null; // Django DecimalField serialiseres som string
   bolig_link: string | null;
+
+  bbr_info?: any; // Nested BBR info object
+  bbr_info_loaded?: boolean;
 
   opgaver_oprettet: boolean;
   mappen_oprettet: boolean;

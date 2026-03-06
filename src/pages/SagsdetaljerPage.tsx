@@ -22,6 +22,7 @@ import ForsyningTab from '../components/sagsdetaljer/tabs/ForsyningTab';
 import ProcesserTab from '../components/sagsdetaljer/tabs/ProcesserTab';
 import FakturaTab from '../components/sagsdetaljer/tabs/FakturaTab';
 import PunktafgiftTab from '../components/sagsdetaljer/tabs/PunktafgiftTab';
+import BbrTab from '../components/sagsdetaljer/tabs/BbrTab';
 
 // Komponenter til redigering
 import SagsForm from '../components/SagsForm';
@@ -268,6 +269,11 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 {mountedTabs.has('forsyning') && (
                     <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'forsyning' ? undefined : 'none' }}>
                         <ForsyningTab sag={sag} onUpdate={handleUpdateSag} />
+                    </div>
+                )}
+                {mountedTabs.has('bbr') && (
+                    <div className="flex-1 flex flex-col h-full" style={{ display: activeTab === 'bbr' ? undefined : 'none' }}>
+                        <BbrTab sag={sag} onUpdate={handleUpdateSag} />
                     </div>
                 )}
                 {(activeTab === 'koebere' || activeTab === 'forening') && (

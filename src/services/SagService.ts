@@ -61,6 +61,13 @@ export const SagService = {
     },
 
     /**
+     * Henter de seneste BBR oplysninger fra Datafordeleren og gemmer dem på sagen.
+     */
+    async opdaterBbr(id: number): Promise<Sag> {
+        return await api.post(`/sager/${id}/opdater_bbr/`, {});
+    },
+
+    /**
      * Henter rådgivertilknytninger for en sag.
      */
     async getRaadgiverTilknytninger(id: number): Promise<any[]> {

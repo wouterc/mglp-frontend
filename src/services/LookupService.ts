@@ -1,5 +1,5 @@
 import { api } from '../api';
-import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BbrAnvendelse, BoligType } from '../types';
+import { User, Status, InformationsKilde, StandardMappe, Blokinfo, BbrAnvendelse, BoligType, BbrKodeliste } from '../types';
 
 export const LookupService = {
     async getUsers(): Promise<User[]> {
@@ -31,6 +31,11 @@ export const LookupService = {
 
     async getBoligTyper(): Promise<BoligType[]> {
         const resp = await api.get<any>('/kerne/boligtyper/');
+        return Array.isArray(resp) ? resp : resp.results || [];
+    },
+
+    async getBbrKodelister(): Promise<BbrKodeliste[]> {
+        const resp = await api.get<any>('/kerne/bbr-kodelister/');
         return Array.isArray(resp) ? resp : resp.results || [];
     },
 

@@ -64,12 +64,13 @@ interface SagsDataState {
   bank_sagsnr: string;
   raadgiver_sagsnr: string;
   raadgiver_kontakt_id: string;
+  bbr_info: any;
   [key: string]: any;
 }
 
 function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
   const { state: lookupState } = useLookups();
-  const { sagsStatusser: statusser, boligTyper } = lookupState;
+  const { sagsStatusser: statusser, boligTyper, bbrKodelister } = lookupState;
   const [sagsData, setSagsData] = useState<SagsDataState>({
     id: sagTilRedigering?.id,
     sags_nr: sagTilRedigering?.sags_nr || '',
@@ -98,6 +99,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
     bolig_link: sagTilRedigering?.bolig_link || '',
     byggeaar: sagTilRedigering?.byggeaar || '',
     boligareal: sagTilRedigering?.boligareal || '',
+    bbr_info: sagTilRedigering?.bbr_info || null,
 
     kommentar: sagTilRedigering?.kommentar || '',
     maegler_sagsnr: sagTilRedigering?.maegler_sagsnr || '',
@@ -153,6 +155,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         bolig_link: sagTilRedigering.bolig_link || '',
         byggeaar: sagTilRedigering.byggeaar || '',
         boligareal: sagTilRedigering.boligareal || '',
+        bbr_info: sagTilRedigering.bbr_info || null,
 
         // Øvrigt
         kommentar: sagTilRedigering.kommentar || '',
@@ -272,14 +275,27 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
       let bbrKode = '';
       let byggeaar = '';
       let boligareal = '';
+      let bbr_info_loaded = null;
+
+      const lookupId = adgangsAdresseData?.id || adresse.id;
+      console.log("🔍 Kalder BBR opslag på backend med ID:", lookupId);
 
       try {
-        const bbrResponse = await api.get<any>(`/sager/bbr_opslag/?dawa_id=${adresse.id}`);
+        const bbrResponse = await api.get<any>(`/sager/bbr_opslag/?dawa_id=${lookupId}`);
         if (bbrResponse && bbrResponse.id_lokalId) {
           // Vi fik data fra Datafordeleren!
           bbrKode = bbrResponse.byg_anvendelse?.kode || '';
           byggeaar = bbrResponse.opfoerelsesaar || '';
           boligareal = bbrResponse.samlet_bolig_areal || '';
+
+          const filteredBbrInfo = { ...bbrResponse };
+          delete filteredBbrInfo.id_lokalId;
+          delete filteredBbrInfo.byg_anvendelse;
+          // Fjern også de ting vi allerede håndterer via standard Sag-felter
+          delete filteredBbrInfo.opfoerelsesaar;
+          delete filteredBbrInfo.samlet_bolig_areal;
+          bbr_info_loaded = filteredBbrInfo;
+
           console.log("BBR data hentet fra Datafordeleren via backend", bbrResponse);
         } else {
           // Fallback til DAWA hvis Datafordeleren ikke giver noget (eller ikke er opsat endnu)
@@ -314,6 +330,7 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
         regionsnr: regionskodeRaw,
         byggeaar: byggeaar,
         boligareal: boligareal,
+        ...(bbr_info_loaded ? { bbr_info: bbr_info_loaded } : {})
       }));
     } catch (error) {
       console.error("Error fetching additional address details:", error);
@@ -596,6 +613,93 @@ function SagsForm({ onSave, onCancel, sagTilRedigering }: SagsFormProps) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Udvidede BBR Informationer fra sub-objekt */}
+            <div>
+              <label htmlFor="varme_installation" className="block text-xs font-medium text-gray-500">Varmeinstallation</label>
+              {(bbrKodelister && bbrKodelister.some(k => k.kategori === 'varme_installation')) ? (
+                <select
+                  id="varme_installation"
+                  value={sagsData.bbr_info?.varme_installation || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, varme_installation: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                >
+                  <option value="">Vælg...</option>
+                  {bbrKodelister.filter(k => k.kategori === 'varme_installation').map(k => (
+                    <option key={k.id} value={k.kode}>{k.tekst}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  id="varme_installation"
+                  value={sagsData.bbr_info?.varme_installation || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, varme_installation: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                />
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="opvarmningsmiddel" className="block text-xs font-medium text-gray-500">Opvarmningsmiddel</label>
+              {(bbrKodelister && bbrKodelister.some(k => k.kategori === 'opvarmningsmiddel')) ? (
+                <select
+                  id="opvarmningsmiddel"
+                  value={sagsData.bbr_info?.opvarmningsmiddel || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, opvarmningsmiddel: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                >
+                  <option value="">Vælg...</option>
+                  {bbrKodelister.filter(k => k.kategori === 'opvarmningsmiddel').map(k => (
+                    <option key={k.id} value={k.kode}>{k.tekst}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  id="opvarmningsmiddel"
+                  value={sagsData.bbr_info?.opvarmningsmiddel || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, opvarmningsmiddel: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                />
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="vand_forsyning" className="block text-xs font-medium text-gray-500">Antal værelser</label>
+              <input
+                type="text"
+                id="antal_vaerelser"
+                value={sagsData.bbr_info?.antal_vaerelser || ''}
+                onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, antal_vaerelser: e.target.value } })}
+                className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="bolig_type_bbr" className="block text-xs font-medium text-gray-500">BBR Boligtype kode</label>
+              {(bbrKodelister && bbrKodelister.some(k => k.kategori === 'bolig_type')) ? (
+                <select
+                  id="bolig_type_bbr"
+                  value={sagsData.bbr_info?.bolig_type || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, bolig_type: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                >
+                  <option value="">Vælg...</option>
+                  {bbrKodelister.filter(k => k.kategori === 'bolig_type').map(k => (
+                    <option key={k.id} value={k.kode}>{k.tekst}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  id="bolig_type_bbr"
+                  value={sagsData.bbr_info?.bolig_type || ''}
+                  onChange={(e) => setSagsData({ ...sagsData, bbr_info: { ...sagsData.bbr_info, bolig_type: e.target.value } })}
+                  className="mt-0.5 block w-full px-2 py-1 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                />
+              )}
             </div>
 
             <div>
