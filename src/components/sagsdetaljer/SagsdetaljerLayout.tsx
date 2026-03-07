@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
     ArrowLeft, Search, Loader2, MailPlus, ListChecks,
-    List, Info, ListTodo, Files, Mail, Inbox, ReceiptText
+    List, Info, ListTodo, Files, Mail, Inbox, ReceiptText, TableProperties
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
@@ -39,7 +39,7 @@ const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'forening', label: 'Forening', icon: Building },
     { id: 'kommune', label: 'Kommune', icon: MapPin },
     { id: 'forsyning', label: 'Forsyning', icon: Waves },
-    { id: 'bbr', label: 'BBR', icon: Building2 }, // Gengivelse / midlertidig Ikon f.eks. Building2 eller tilsvarende
+    { id: 'bbr', label: 'BBR', icon: TableProperties },
 ];
 
 function SagsdetaljerLayout({
