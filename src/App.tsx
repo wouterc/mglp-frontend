@@ -23,6 +23,7 @@ import KontakterPage from './pages/KontakterPage';
 import BlokInfoSkabelonerPage from './pages/BlokInfoSkabelonerPage';
 import AktivitetsskabelonerPage from './pages/AktivitetsskabelonerPage';
 import DokumentskabelonerPage from './pages/DokumentskabelonerPage';
+import FlowReglerPage from './pages/FlowReglerPage';
 import { VarelistePage } from './pages/VarelistePage';
 import MinKontoPage from './pages/MinKontoPage';
 import LoginPage from './pages/LoginPage';
@@ -153,6 +154,7 @@ function App() {
               <Route path="blokinfo" element={<BlokInfoSkabelonerPage />} />
               <Route path="aktiviteter" element={<AktivitetsskabelonerPage />} />
               <Route path="dokumenter" element={<DokumentskabelonerPage />} />
+              <Route path="flow-regler" element={<FlowReglerPage />} />
               <Route path="vareliste" element={<VarelistePage />} />
             </Route>
             {/* Redirects for legacy routes */}

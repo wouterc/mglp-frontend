@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { SkabDokument, Blokinfo, InformationsKilde } from '../types';
 import { Save, X, Loader2 } from 'lucide-react';
-import AktiveReglerEditor from './AktiveReglerEditor';
 
 interface DokumentSkabelonFormProps {
     dokument?: SkabDokument | null;
@@ -37,7 +36,6 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
         informations_kilde_id: '',
         default_undermappe_id: '',
         mail_titel: '',
-        aktive_regler: {} as Record<string, any[]>
     });
 
     useEffect(() => {
@@ -78,7 +76,6 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                 informations_kilde_id: dokument.informations_kilde?.id?.toString() || '',
                 default_undermappe_id: dokument.default_undermappe?.id?.toString() || '',
                 mail_titel: dokument.mail_titel || '',
-                aktive_regler: dokument.aktive_regler || {}
             });
         } else if (initialFilters?.gruppe_nr) {
             // Find ID baseret på nummer
@@ -323,13 +320,6 @@ const DokumentSkabelonForm: React.FC<DokumentSkabelonFormProps> = ({ dokument, o
                         onChange={handleChange}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-black outline-none resize-none text-[11px] placeholder-gray-400"
-                    />
-                </div>
-
-                <div className="pt-2">
-                    <AktiveReglerEditor
-                        value={formData.aktive_regler}
-                        onChange={(newRules) => setFormData(prev => ({ ...prev, aktive_regler: newRules }))}
                     />
                 </div>
             </form>

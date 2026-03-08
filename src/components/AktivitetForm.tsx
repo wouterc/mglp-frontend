@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent, ReactEleme
 import { Save, X, Loader2 } from 'lucide-react';
 import type { Blokinfo, SkabAktivitet, InformationsKilde, User } from '../types.ts';
 import { api } from '../api';
-import AktiveReglerEditor from './AktiveReglerEditor';
 
 type AktivitetTilRedigering = SkabAktivitet;
 
@@ -30,7 +29,6 @@ interface FormDataState {
   frist: string;
   informations_kilde_id: string;
   mail_titel: string;
-  aktive_regler: Record<string, any[]>;
 }
 
 function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList, initialFilters }: AktivitetFormProps): ReactElement {
@@ -45,7 +43,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
     frist: '',
     informations_kilde_id: '',
     mail_titel: '',
-    aktive_regler: {},
   });
 
   const [informationsKilder, setInformationsKilder] = useState<InformationsKilde[]>([]);
@@ -79,7 +76,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
         frist: aktivitetTilRedigering.frist?.toString() || '',
         informations_kilde_id: aktivitetTilRedigering.informations_kilde?.id?.toString() || '',
         mail_titel: aktivitetTilRedigering.mail_titel || '',
-        aktive_regler: aktivitetTilRedigering.aktive_regler || {},
       });
     } else if (!erRedigering && initialFilters) {
       // Forudfyld fra filtre hvis muligt
@@ -387,13 +383,6 @@ function AktivitetForm({ onSave, onCancel, aktivitetTilRedigering, blokinfoList,
                 rows={1}
               />
             </div>
-          </div>
-
-          <div className="pt-2">
-            <AktiveReglerEditor
-              value={formData.aktive_regler}
-              onChange={(newRules) => setFormData(prev => ({ ...prev, aktive_regler: newRules }))}
-            />
           </div>
 
         </form>

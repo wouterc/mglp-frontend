@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeE
 import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
 import LinkingTab from '../components/skabeloner/LinkingTab';
-import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2, UploadCloud, Download } from 'lucide-react';
+import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2, UploadCloud, Download, Workflow } from 'lucide-react';
+import WorkflowLinkModal from '../components/WorkflowLinkModal.tsx';
 import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState, StandardMappe } from '../types.ts';
 import { useAppState } from '../StateContext.js';
 import Button from '../components/ui/Button.tsx';
@@ -135,6 +136,8 @@ function DokumentskabelonerPage(): ReactElement {
     message: '',
     onConfirm: () => { },
   });
+
+  const [workflowModalItem, setWorkflowModalItem] = useState<{ id: number, navn: string } | null>(null);
 
   const showAlert = (title: string, message: string) => {
     setConfirmDialog({
@@ -579,6 +582,7 @@ function DokumentskabelonerPage(): ReactElement {
                     <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
                     <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
                     <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Default Submappe</th>
+                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Flow</th>
                     <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
                     <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
                   </tr>
@@ -595,7 +599,7 @@ function DokumentskabelonerPage(): ReactElement {
                     </tr>
                   ) : dokumenter.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-gray-500">
+                      <td colSpan={10} className="py-12 text-center text-gray-500">
                         Ingen dokument skabeloner fundet.
                       </td>
                     </tr>
@@ -813,6 +817,18 @@ function DokumentskabelonerPage(): ReactElement {
                               )}
                             </td>
                             <td className="py-1 px-3 text-center">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWorkflowModalItem({ id: dok.id, navn: dok.dokument || '' });
+                                }}
+                                className="p-1.5 rounded-full hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Administrer Workflow for dette dokument"
+                              >
+                                <Workflow size={16} />
+                              </button>
+                            </td>
+                            <td className="py-1 px-3 text-center">
                               <Tooltip content={dok.kommentar || 'Ingen kommentar'}>
                                 <div
                                   className="cursor-pointer p-1 hover:bg-gray-100 rounded inline-block"
@@ -891,7 +907,7 @@ function DokumentskabelonerPage(): ReactElement {
                           </td>
                           <td className="py-1 px-2"></td> {/* Filnavn kolonne tom */}
                           <td className="py-1 px-2"></td> {/* Kilde kolonne tom */}
-                          <td className="py-1 px-2 text-center" colSpan={2}></td>
+                          <td className="py-1 px-2 text-center" colSpan={4}></td>
                         </tr>
                       )}
                     </>
@@ -914,7 +930,41 @@ function DokumentskabelonerPage(): ReactElement {
         </div>
       </div>
       <div className={`flex-1 overflow-hidden ${activeTab === 'linking' ? 'flex' : 'hidden'}`}>
-        <LinkingTab blokinfo={blokinfo} />
+        {/* 
+          AGENT INSTRUKS (2026-03-08):
+          =============================
+          Denne fane ("Link Aktiviteter") er midlertidigt deaktiveret.
+          Funktionaliteten er delvist erstattet af:
+          1. ActivityDocLinkerPanel i Aktivitetsskabeloner-siden (kæde-ikon per aktivitet)
+          2. Workflow-regler (workflow-ikon per aktivitet/dokument)
+          
+          FOR AT GENAKTIVERE:
+          - Fjern denne div og erstat med:
+            <LinkingTab blokinfo={blokinfo} />
+          - Sørg for at importet af LinkingTab stadig findes øverst i filen
+          
+          FOR AT FJERNE HELT:
+          - Fjern hele denne <div> blok (linking tab rendering)
+          - Fjern "Link Aktiviteter" tab-overskriften (linje ~446)
+          - Fjern activeTab state (linje ~105) 
+          - Fjern `import LinkingTab from ...` (linje 5)
+          - Slet filen: src/components/skabeloner/LinkingTab.tsx
+        */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50">
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 max-w-lg shadow-sm">
+            <h3 className="text-lg font-bold text-yellow-800 mb-2">⚠️ Denne fane er udgået</h3>
+            <p className="text-sm text-yellow-700 mb-3">
+              "Link Aktiviteter" er midlertidigt deaktiveret. Linking af dokumenter til aktiviteter sker nu via:
+            </p>
+            <ul className="text-sm text-yellow-700 text-left space-y-1 mb-3">
+              <li>• <strong>Aktivitetsskabeloner</strong> – Klik på kæde-ikonet ved en aktivitet</li>
+              <li>• <strong>Workflow Regler</strong> – Klik på workflow-ikonet ved en aktivitet/dokument</li>
+            </ul>
+            <p className="text-xs text-yellow-600 italic">
+              Kontakt administrator hvis denne side skal genaktiveres.
+            </p>
+          </div>
+        </div>
       </div>
 
       {visForm && (
@@ -938,6 +988,14 @@ function DokumentskabelonerPage(): ReactElement {
           cancelText={confirmDialog.cancelText}
           onConfirm={confirmDialog.onConfirm}
           onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        />
+      )}
+      {workflowModalItem && (
+        <WorkflowLinkModal
+          targetId={workflowModalItem.id}
+          targetName={workflowModalItem.navn}
+          targetType="dokument"
+          onClose={() => setWorkflowModalItem(null)}
         />
       )}
     </div>

@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { SquareStack, CheckSquare, FileStack, ListChecks } from 'lucide-react';
+import { Workflow, CheckSquare, FileStack, ListChecks, Group } from 'lucide-react';
 
 const SkabelonerTabs: React.FC = () => {
     const tabs = [
         {
             path: '/skabeloner/blokinfo',
             label: 'BlokInfo Skabeloner',
-            icon: SquareStack
+            icon: Group
         },
         {
             path: '/skabeloner/aktiviteter',
@@ -23,6 +23,11 @@ const SkabelonerTabs: React.FC = () => {
             path: '/skabeloner/vareliste',
             label: 'Vareliste',
             icon: ListChecks
+        },
+        {
+            path: '/skabeloner/flow-regler',
+            label: 'Workflow Regler',
+            icon: Workflow
         },
     ];
 

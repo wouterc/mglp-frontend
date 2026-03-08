@@ -4,7 +4,7 @@
 import React, { useState, ReactNode, useEffect } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal, ReceiptText, Database } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal, ReceiptText, Database, LayoutPanelTop } from 'lucide-react';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
@@ -165,7 +165,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
     {
       titel: 'SKABELONER',
       items: [
-        { id: 'skabeloner', navn: 'Skabeloner', ikon: SquareStack },
+        { id: 'skabeloner', navn: 'Skabeloner', ikon: LayoutPanelTop },
       ],
     },
     {

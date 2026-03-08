@@ -14,7 +14,8 @@ import * as XLSX from 'xlsx';
 import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
 import ActivityDocLinkerPanel from '../components/panels/ActivityDocLinkerPanel.tsx';
-import { Link as LinkIcon, Columns } from 'lucide-react';
+import { Link as LinkIcon, Columns, Workflow } from 'lucide-react';
+import WorkflowLinkModal from '../components/WorkflowLinkModal.tsx';
 
 interface InlineEditorProps {
   value: string | null | undefined;
@@ -149,6 +150,7 @@ function AktivitetsskabelonerPage(): ReactElement {
   const [selectedLinkerActivityId, setSelectedLinkerActivityId] = useState<number | null>(null);
   const [dokumentskabeloner, setDokumentskabeloner] = useState<SkabDokument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [workflowModalItem, setWorkflowModalItem] = useState<{ id: number, navn: string } | null>(null);
 
   // Load documents once when panel is opened first time
   useEffect(() => {
@@ -426,7 +428,6 @@ function AktivitetsskabelonerPage(): ReactElement {
         gruppe_titel: a.gruppe?.titel_kort,
         aktivitet_nr: a.aktivitet_nr,
         aktivitet: a.aktivitet,
-        ansvarlig: a.ansvarlig,
         frist: a.frist,
         udgaaet: a.udgaaet,
         aktiv: a.aktiv,
@@ -725,6 +726,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                     <th className="text-left py-3 px-4 w-[25%]">Aktivitet</th>
                     <th className="text-left py-3 px-4 w-[25%]">Kommentar</th>
                     <th className="text-center py-3 px-2 w-[4%]">Link</th>
+                    <th className="text-center py-3 px-2 w-[4%]">Flow</th>
                     <th className="text-left py-3 px-2 w-[10%]">Kilde</th>
                     <th className="text-left py-3 px-4 w-[25%]">Mail Titel</th>
                     <th className="text-center py-3 px-2 w-[10%]">Status</th>
@@ -853,6 +855,18 @@ function AktivitetsskabelonerPage(): ReactElement {
                               <LinkIcon size={16} />
                             </button>
                           </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWorkflowModalItem({ id: a.id, navn: a.aktivitet || '' });
+                              }}
+                              className="p-1.5 rounded-full hover:bg-yellow-50 text-gray-400 hover:text-yellow-600 transition-colors"
+                              title="Administrer Workflow for denne aktivitet"
+                            >
+                              <Workflow size={16} />
+                            </button>
+                          </td>
 
                           {/* KILDE FELT */}
                           <td className="py-2 px-2 text-xs text-gray-500">
@@ -945,7 +959,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                       );
                     })
                   )}  {!isLoading && aktiviteter.length === 0 && (
-                    <tr><td colSpan={6} className="text-center py-12 text-gray-400 italic">Vælg en gruppe eller juster filtrene</td></tr>
+                    <tr><td colSpan={8} className="text-center py-12 text-gray-400 italic">Vælg en gruppe eller juster filtrene</td></tr>
                   )}
 
                   {/* HURTIG OPRET RÆKKE (Vises kun hvis en gruppe er valgt) */}
@@ -954,7 +968,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                       <td colSpan={1} className="py-2 px-1 text-center">
                         <PlusCircle size={14} className="mx-auto text-blue-400" />
                       </td>
-                      <td colSpan={5} className="py-2 px-4">
+                      <td colSpan={7} className="py-2 px-4">
                         <form onSubmit={handleQuickAdd} className="flex gap-2 items-center">
                           <input
                             id="ny-aktivitet-navn"
@@ -1023,6 +1037,15 @@ function AktivitetsskabelonerPage(): ReactElement {
           />
         )
       }
+
+      {workflowModalItem && (
+        <WorkflowLinkModal
+          targetId={workflowModalItem.id}
+          targetName={workflowModalItem.navn}
+          targetType="aktivitet"
+          onClose={() => setWorkflowModalItem(null)}
+        />
+      )}
     </div >
   );
 }

@@ -63,7 +63,6 @@ export interface SkabAktivitet {
   mail_titel?: string | null;
   er_ny?: boolean;
   dokumenter?: number[]; // IDs of linked SkabDokumenter
-  aktive_regler?: Record<string, any[]>; // For dynamically determining activation
 }
 
 export interface Status {
@@ -344,7 +343,6 @@ export interface SkabDokument {
   dokumenter?: number[]; // IDs of linked SkabDokumenter
   default_undermappe?: StandardMappe | null;
   default_undermappe_id?: number | null;
-  aktive_regler?: Record<string, any[]>;
 }
 
 
@@ -662,4 +660,19 @@ export interface PunktafgiftFilterState {
 export interface PunktafgiftSortConfig {
   key: string;
   direction: 'asc' | 'desc';
+}
+
+export interface FlowRegel {
+  id: number;
+  navn: string;
+  trigger_aktivitet: number | null;
+  trigger_aktivitet_navn: string | null;
+  trigger_status: number | null;
+  betingelser: Record<string, any[]>;
+  maal_aktivitet: number | null;
+  maal_aktivitet_navn: string | null;
+  maal_dokument: number | null;
+  maal_dokument_navn: string | null;
+  handling: 'ACTIVATE' | 'DEACTIVATE' | 'SET_STATUS';
+  handling_status: number | null;
 }
