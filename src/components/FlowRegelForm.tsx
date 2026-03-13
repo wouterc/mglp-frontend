@@ -319,7 +319,13 @@ function FlowRegelForm({ regel, onSave, onCancel }: FlowRegelFormProps): ReactEl
                                         <option value="ACTIVATE">Aktiver mål</option>
                                         <option value="DEACTIVATE">Deaktiver mål</option>
                                         <option value="SET_STATUS">Sæt status på mål</option>
+                                        <option value="REQUIRE">Kræv mål (Dokument skal være færdigt)</option>
                                     </select>
+                                    {formData.handling === 'REQUIRE' && (
+                                        <p className="mt-1 text-[10px] text-blue-600 font-medium italic">
+                                            * Trigger (aktivitet) blokeres i status 80, indtil Mål (dokument) er status 80.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="z-40">
@@ -433,9 +439,7 @@ function FlowRegelForm({ regel, onSave, onCancel }: FlowRegelFormProps): ReactEl
                         )}
                     </div>
                 </form>
-
             </div>
-
         </div>
     );
 }

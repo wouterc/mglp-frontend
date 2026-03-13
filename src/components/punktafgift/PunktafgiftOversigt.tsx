@@ -169,7 +169,7 @@ const PunktafgiftOversigt = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `punktafgifter_${dayjs().format('YYYY-MM-DD')}.csv`;
+            a.download = `tinglysningsafgifter_${dayjs().format('YYYY-MM-DD')}.csv`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -325,7 +325,7 @@ const PunktafgiftOversigt = () => {
                         {!isLoading && lines.length === 0 && (
                             <tr>
                                 <td colSpan={12} className="px-4 py-12 text-center text-gray-400 italic">
-                                    Ingen punktafgifter fundet.
+                                    Ingen tinglysningsafgifter fundet.
                                 </td>
                             </tr>
                         )}

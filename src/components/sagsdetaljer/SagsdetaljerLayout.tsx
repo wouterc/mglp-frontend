@@ -30,7 +30,7 @@ const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'overblik', label: 'Overblik', icon: LayoutDashboard },
     { id: 'processer', label: 'Processer', icon: ListChecks },
     { id: 'faktura', label: 'Faktura', icon: ReceiptText },
-    { id: 'punktafgift', label: 'Punktafgift', icon: ReceiptText },
+    { id: 'punktafgift', label: 'Tinglysningsafgift', icon: ReceiptText },
     { id: 'maegler', label: 'Mægler', icon: Building2 },
     { id: 'saelgere', label: 'Sælgere', icon: User },
     { id: 'koebere', label: 'Købere', icon: User },

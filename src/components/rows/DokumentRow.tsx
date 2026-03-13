@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink, Link as LinkIcon, Copy, MoreVertical, Edit3 } from 'lucide-react';
+import { Loader2, FileText, UploadCloud, CheckCircle2, Trash2, Info, MessageSquare, Pencil, Upload, ExternalLink, Workflow, Copy, MoreVertical, Edit3 } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -302,23 +302,35 @@ const DokumentRow = React.memo(function DokumentRow({
 
                     {/* Slot 2: Link */}
                     <div className="flex justify-center">
-                        {doc.har_links && (
-                            <Tooltip content="Vis linkede aktiviteter">
+                        {doc.har_links ? (
+                            <div className="relative group/link inline-block">
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onLinkClick?.(doc); }}
-                                    className="text-blue-600 hover:text-blue-800"
+                                    className={`p-0.5 rounded transition-colors ${doc.links_status === 'red' ? 'text-red-500 hover:bg-red-50 font-bold' : 'text-green-600 hover:bg-green-50 font-bold'
+                                        }`}
+                                    title="Klik for at se relaterede aktiviteter"
                                 >
-                                    <LinkIcon size={14} />
+                                    <Workflow size={14} fill="currentColor" />
                                 </button>
-                            </Tooltip>
-                        )}
-                        {!doc.har_links && processedLink ? (
+                                {doc.linked_acts_summary && doc.linked_acts_summary.length > 0 && (
+                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover/link:opacity-100 group-hover/link:visible z-50 transition-all pointer-events-none">
+                                        <div className="font-semibold mb-1 text-gray-300">Kræves af aktiviteter:</div>
+                                        {doc.linked_acts_summary.map((act: any, i: number) => (
+                                            <div key={i} className="flex items-center gap-1.5 py-0.5">
+                                                <span className={act.done ? 'text-green-400' : 'text-red-400'}>{act.done ? '✓' : '○'}</span>
+                                                <span className="truncate">{act.titel}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : processedLink ? (
                             <div className="relative group/extlink inline-block">
                                 <a href={processedLink} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700" onClick={(e) => e.stopPropagation()}>
                                     <ExternalLink size={14} />
                                 </a>
                             </div>
-                        ) : !doc.har_links && <div className="w-4 h-4" />}
+                        ) : <div className="w-4 h-4" />}
                     </div>
 
                     {/* Slot 3: User Comment */}

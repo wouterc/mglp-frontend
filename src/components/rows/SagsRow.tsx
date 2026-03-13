@@ -95,7 +95,7 @@ export default function SagsRow({
     } else if (deadlineStatus === 'orange') {
         rowClass += " border-l-orange-500 bg-orange-50";
     } else {
-        rowClass += " border-l-transparent hover:bg-gray-100";
+        rowClass += " border-l-transparent border-gray-100 hover:bg-blue-50/50 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]";
     }
 
     return (
@@ -104,8 +104,8 @@ export default function SagsRow({
                 <td className="py-1 px-2">
                     <div className="flex items-center gap-1">
                         {sag.sags_nr}
-                        {deadlineStatus === 'red' && <Clock size={20} className="text-red-600" title={`Frist overskredet! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`} />}
-                        {deadlineStatus === 'orange' && <Clock size={20} className="text-orange-500" title={`Frist tæt på! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`} />}
+                        {deadlineStatus === 'red' && <span title={`Frist overskredet! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`}><Clock size={20} className="text-red-600" /></span>}
+                        {deadlineStatus === 'orange' && <span title={`Frist tæt på! Intern: ${sag.dato_intern || '-'}, Ekstern: ${sag.dato_ekstern || '-'}`}><Clock size={20} className="text-orange-500" /></span>}
                     </div>
                 </td>
                 <td className="py-1 px-2">{sag.alias}</td>

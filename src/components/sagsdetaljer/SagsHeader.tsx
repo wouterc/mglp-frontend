@@ -35,7 +35,7 @@ export default function SagsHeader({ sag, activePage, rightContent, bottomConten
 
 
     return (
-        <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50 flex flex-col">
+        <div className="bg-gray-300 border-b border-gray-400 shadow-sm sticky top-0 z-50 flex flex-col">
             <div className="flex justify-between items-center px-6 py-3 gap-4">
 
                 {/* Venstre side: Tilbage + Titel */}

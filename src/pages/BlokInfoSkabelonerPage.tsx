@@ -2,6 +2,7 @@
 // @# 2025-11-23 19:15 - Tilføjet Import/Export funktionalitet (Excel).
 import React, { useState, useEffect, useMemo, Fragment, ChangeEvent, ReactElement, useCallback } from 'react';
 import { api } from '../api';
+import { SkabelonService } from '../services/SkabelonService';
 import { PlusCircle, AlertCircle, Edit, Save, XCircle, UploadCloud, Download, Loader2, Maximize2 } from 'lucide-react';
 import type { Blokinfo } from '../types.ts';
 import { useAppState } from '../StateContext.js';
@@ -110,7 +111,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
     }
 
     try {
-      const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
+      const data = await SkabelonService.getBlokinfo();
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabeloner: data, erBlokinfoSkabelonerHentet: true } });
     } catch (e) {
       dispatch({ type: 'SET_BLOKINFO_SKABELONER_STATE', payload: { blokinfoSkabelonerError: 'Kunne ikke hente data.' } });
@@ -178,7 +179,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   const handleQuickUpdate = async (skabelon: Blokinfo, updates: Partial<Blokinfo>) => {
     try {
-      const updatedSkabelon = await api.put<Blokinfo>(`/skabeloner/blokinfo/${skabelon.id}/`, { ...skabelon, ...updates });
+      const updatedSkabelon = await SkabelonService.updateBlokinfo(skabelon.id, { ...skabelon, ...updates });
 
       // Opdater lokal state med det samme
       const nyeSkabeloner = skabeloner.map(s => s.id === skabelon.id ? updatedSkabelon : s);
@@ -191,7 +192,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
   const handleQuickSaveProces = async (skabelon: Blokinfo, newProcesId: string) => {
     try {
       const proces_id = newProcesId === '' ? null : Number(newProcesId);
-      const updatedSkabelon = await api.put<Blokinfo>(`/skabeloner/blokinfo/${skabelon.id}/`, { ...skabelon, proces_id });
+      const updatedSkabelon = await SkabelonService.updateBlokinfo(skabelon.id, { ...skabelon, proces_id });
 
       // Opdater lokal state med det samme
       const nyeSkabeloner = skabeloner.map(s => s.id === skabelon.id ? updatedSkabelon : s);
@@ -214,7 +215,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
 
   const handleGemNy = async () => {
     try {
-      const nySkabelon = await api.post<Blokinfo>(`/skabeloner/blokinfo/`, nySkabelonData);
+      const nySkabelon = await SkabelonService.createBlokinfo(nySkabelonData as any);
 
       // Tilføj den nye til den lokale liste
       const nyeSkabeloner = [...skabeloner, nySkabelon];
@@ -237,7 +238,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gray-300 min-h-screen">
 
       {/* IMPORT MODAL */}
       <CsvImportModal
@@ -252,7 +253,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
         type="blokinfo"
       />
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 bg-gray-300 p-2 rounded-lg">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           BlokInfo Skabeloner
           <HelpButton helpPointCode="SKABELONER_BLOK_HELP" />
@@ -341,7 +342,7 @@ function BlokInfoSkabelonerPage(): ReactElement {
                       </td>
                     </tr>
                   )}
-                  <tr className={`border-b transition-all group ${activeCell?.id === skabelon.id ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'}`}>
+                  <tr className={`border-b transition-all group border-l-4 ${activeCell?.id === skabelon.id ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-l-transparent border-gray-100 hover:bg-blue-50/50 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]'}`}>
                     {/* NR FELT */}
                     <td className="py-1 px-2 text-center">
                       {isCellActive('nr') ? (

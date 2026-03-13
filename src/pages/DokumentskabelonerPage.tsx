@@ -1,15 +1,16 @@
 // --- Fil: src/pages/DokumentskabelonerPage.tsx ---
-import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeEvent } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, ReactElement, ChangeEvent, useRef } from 'react';
+import { useLookups } from '../contexts/LookupContext';
 import useDebounce from '../hooks/useDebounce.ts';
 import DokumentSkabelonForm from '../components/DokumentSkabelonForm.tsx';
-import LinkingTab from '../components/skabeloner/LinkingTab';
 import { RefreshCw, PlusCircle, AlertCircle, Edit, FunnelX, Loader2, ChevronLeft, ChevronRight, Info, ExternalLink, FileText, Eye, EyeOff, PlusCircle as PlusCircleIcon, Maximize2, UploadCloud, Download, Workflow } from 'lucide-react';
 import WorkflowLinkModal from '../components/WorkflowLinkModal.tsx';
 import type { Blokinfo, SkabDokument, DokumentskabelonerFilterState, StandardMappe } from '../types.ts';
-import { useAppState } from '../StateContext.js';
+import { useAppState } from '../StateContext';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
 import { api } from '../api';
+import { SkabelonService } from '../services/SkabelonService';
 import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
 import CsvImportModal from '../components/CsvImportModal';
@@ -98,11 +99,12 @@ function DokumentskabelonerPage(): ReactElement {
     standardMapper,
   } = state;
 
-  const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
+  const { state: lookupState } = useLookups();
+  const { blokinfoSkabeloner: blokinfo } = lookupState;
+  const isFirstMount = useRef(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
   const [visForm, setVisForm] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'oversigt' | 'linking'>('oversigt');
   const [dokumentTilRedigering, setDokumentTilRedigering] = useState<SkabDokument | null>(null);
 
   // State til den celle der lige nu redigeres
@@ -169,7 +171,12 @@ function DokumentskabelonerPage(): ReactElement {
     const queryString = buildQueryString(filterObj);
 
     try {
-      const data = await api.get<PaginatedDokumenterResponse>(`/skabeloner/dokumenter/?${queryString}`);
+      // Parallelize calls (Rule 1: Performance)
+      const [data, syncRes] = await Promise.all([
+        SkabelonService.getDokumentskabeloner(queryString),
+        SkabelonService.checkDokumentSync(queryString)
+      ]);
+
       dispatch({
         type: 'SET_DOKUMENTSSKABELONER_STATE',
         payload: {
@@ -179,8 +186,6 @@ function DokumentskabelonerPage(): ReactElement {
       });
       setNextPageUrl(data.next);
 
-      // Efter vi har hentet data, tjekker vi for synkroniserings-mangler
-      const syncRes = await api.get<any>(`/skabeloner/dokumenter/sync_check/?${queryString}`);
       setManglerSync(syncRes.mangler_per_skabelon || {});
       setNyeDokumenterFindes(syncRes.nye_dokumenter_findes || false);
 
@@ -191,22 +196,27 @@ function DokumentskabelonerPage(): ReactElement {
     }
   }, [buildQueryString, dispatch]);
 
-  // Hent blokinfo (grupper) ved start
+  // Hent grundlæggende data (synkroniserings-mangler) ved start
   useEffect(() => {
-    const hentBasisData = async () => {
-      try {
-        const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
-        setBlokinfo(data || []);
-      } catch (e) {
-        console.error("Fejl ved hentning af blokinfo:", e);
-      }
-    };
-    hentBasisData();
-  }, []);
+    if (erDokumentskabelonerHentet) {
+      // Tjek kun for sync hvis vi har data
+      const queryString = buildQueryString(filters);
+      SkabelonService.checkDokumentSync(queryString).then(syncRes => {
+        setManglerSync(syncRes.mangler_per_skabelon || {});
+        setNyeDokumenterFindes(syncRes.nye_dokumenter_findes || false);
+      });
+    }
+  }, [erDokumentskabelonerHentet, buildQueryString, filters]);
 
   useEffect(() => {
+    // Frontend Persistence: Spring over hvis vi allerede har data på første mount
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      if (erDokumentskabelonerHentet) return;
+    }
+
     hentData(debouncedFilters);
-  }, [debouncedFilters, hentData]);
+  }, [debouncedFilters, visUdgaaede, hentData]); // Fjernet erDokumentskabelonerHentet for at undgå dobbelt-kald ved load
 
   // Beregn næste dokument_nr ved valg af gruppe
   useEffect(() => {
@@ -425,7 +435,7 @@ function DokumentskabelonerPage(): ReactElement {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-100">
+    <div className="flex flex-col h-full bg-gray-300">
       <CsvImportModal
         isOpen={visImportModal}
         onClose={() => setVisImportModal(false)}
@@ -437,13 +447,12 @@ function DokumentskabelonerPage(): ReactElement {
         type="dokumentskabelon"
       />
       {/* Header */}
-      <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="flex justify-between items-center p-4 bg-gray-300 border-b border-gray-300 flex-shrink-0">
         <div className="flex items-baseline gap-6">
-          <h2 onClick={() => setActiveTab('oversigt')} className={`text-2xl font-bold cursor-pointer transition-colors flex items-center gap-2 ${activeTab === 'oversigt' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             Dokumentskabeloner
             <HelpButton helpPointCode="SKABELONER_DOK_HELP" />
           </h2>
-          <h2 onClick={() => setActiveTab('linking')} className={`text-2xl font-bold cursor-pointer transition-colors ${activeTab === 'linking' ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>Link Aktiviteter</h2>
         </div>
         <div className="flex space-x-2">
           {/* EKSPORT / IMPORT KNAPPER */}
@@ -477,13 +486,13 @@ function DokumentskabelonerPage(): ReactElement {
         </div>
       </div>
 
-      <div className={`flex flex-1 overflow-hidden relative ${activeTab === 'oversigt' ? '' : 'hidden'}`}>
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar - Grupper */}
         <div
-          className="bg-white border-r border-gray-200 flex flex-col flex-shrink-0 relative transition-all duration-75"
+          className="bg-gray-300 border-r border-gray-300 flex flex-col flex-shrink-0 relative transition-all duration-75"
           style={{ width: `${sidebarWidth}px`, maxWidth: isExpanded ? 'none' : '20%' }}
         >
-          <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center h-12">
+          <div className="p-4 border-b border-gray-300 bg-gray-400/20 flex justify-between items-center h-12">
             <h2 className={`text-xs font-semibold text-gray-400 uppercase truncate ${!isExpanded && sidebarWidth < 100 ? 'hidden' : ''}`}>
               Dokumentgrupper
             </h2>
@@ -493,23 +502,31 @@ function DokumentskabelonerPage(): ReactElement {
           </div>
 
           <div className="flex-grow overflow-y-auto">
-            <div
-              className={`p-3 cursor-pointer border-l-4 transition-colors ${!filters.gruppe_nr ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' : 'border-transparent hover:bg-gray-50'}`}
+            <button
+              className={`w-full text-left px-3 py-1 cursor-pointer border-l-4 transition-all text-sm rounded-md
+                ${!filters.gruppe_nr
+                  ? 'bg-blue-100 text-blue-700 font-medium border-l-blue-600 shadow-[inset_0_-1px_0_0_#2563eb]'
+                  : 'text-gray-600 border-l-transparent hover:bg-blue-50/50 hover:text-gray-900 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]'}`}
               onClick={() => handleFilterChange({ target: { name: 'gruppe_nr', value: '' } } as any)}
             >
               {sidebarWidth > 100 ? 'Alle grupper' : 'Alle'}
-            </div>
-            {dokumentGrupper.map(g => (
-              <div
-                key={g.id}
-                className={`p-3 cursor-pointer border-l-4 transition-colors text-sm ${filters.gruppe_nr === g.nr.toString() ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' : 'border-transparent hover:bg-gray-50'}`}
-                onClick={() => handleFilterChange({ target: { name: 'gruppe_nr', value: g.nr.toString() } } as any)}
-              >
-                <div className="flex justify-between items-center truncate">
+            </button>
+            {dokumentGrupper.map(g => {
+              const isActive = filters.gruppe_nr === g.nr.toString();
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => handleFilterChange({ target: { name: 'gruppe_nr', value: g.nr.toString() } } as any)}
+                  className={`w-full text-left px-3 py-0.5 text-sm rounded-md transition-all group relative border-l-4
+                    ${isActive
+                      ? 'bg-blue-100 text-blue-700 font-medium border-l-blue-600 shadow-[inset_0_-1px_0_0_#2563eb]'
+                      : 'text-gray-600 border-l-transparent hover:bg-blue-50/50 hover:text-gray-900 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]'
+                    }`}
+                >
                   <span className="truncate">{g.nr} - {g.titel_kort}</span>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {/* Resize Handle */}
@@ -520,8 +537,8 @@ function DokumentskabelonerPage(): ReactElement {
         </div>
 
         {/* Main Content */}
-        <div className="flex-grow flex flex-col min-w-0">
-          <div className="p-4 bg-white border-b border-gray-200 flex flex-wrap items-center gap-4">
+        <div className="flex-grow flex flex-col min-w-0 bg-gray-300">
+          <div className="p-4 bg-gray-300 border-b border-gray-300 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <input
                 id="filter-dokument-navn"
@@ -573,21 +590,21 @@ function DokumentskabelonerPage(): ReactElement {
 
             <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
               <table className="w-full text-left border-collapse table-fixed">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Aktiv</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-20 text-left border-b">Nr</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[25%] border-b text-left">Dokument</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Link</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[34%] border-b text-left">Filnavn</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Kilde</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-[15%] border-b text-left">Default Submappe</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Flow</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-10 text-center border-b">Info</th>
-                    <th className="py-1 px-3 font-semibold text-gray-700 text-sm w-12 text-center border-b">Ret</th>
+                <thead className="bg-gray-800 text-white font-semibold text-[10px] uppercase">
+                  <tr className="">
+                    <th className="py-1 px-3 w-12 text-center">Aktiv</th>
+                    <th className="py-1 px-3 w-20 text-left">Nr</th>
+                    <th className="py-1 px-3 w-[25%] text-left">Dokument</th>
+                    <th className="py-1 px-3 w-[34%] text-left">Link</th>
+                    <th className="py-1 px-3 w-[34%] text-left">Filnavn</th>
+                    <th className="py-1 px-3 w-[15%] text-left">Kilde</th>
+                    <th className="py-1 px-3 w-[15%] text-left">Default Submappe</th>
+                    <th className="py-1 px-3 w-10 text-center">Flow</th>
+                    <th className="py-1 px-3 w-10 text-center">Info</th>
+                    <th className="py-1 px-3 w-12 text-center">Ret</th>
                   </tr>
                 </thead>
-                <tbody className="">
+                <tbody className="divide-y divide-gray-300">
                   {isLoading && dokumenter.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center">
@@ -612,9 +629,11 @@ function DokumentskabelonerPage(): ReactElement {
                         return (
                           <tr
                             key={dok.id}
-                            className={`border-b transition-all group ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : 'border-gray-100 hover:bg-gray-50'} ${dok.udgaaet ? 'opacity-60' : ''}`}
+                            className={`transition-all group relative ${isRowActive ? 'bg-red-50/30' : 'hover:bg-blue-50/50'} ${dok.udgaaet ? 'opacity-60' : ''}`}
                           >
-                            <td className="py-1 px-3 text-center">
+                            <td className="py-1 px-3 text-center relative">
+                              {/* Hover marker */}
+                              <div className={`absolute inset-y-0 left-0 w-1 transition-opacity ${isRowActive ? 'bg-red-500 opacity-100' : 'bg-blue-600 opacity-0 group-hover:opacity-100'}`} />
                               <input
                                 id={`aktiv-checkbox-${dok.id}`}
                                 name={`aktiv-${dok.id}`}
@@ -653,7 +672,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-1 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
+                            <td className="py-0.5 px-3 text-sm font-medium text-gray-900 truncate" title={dok.dokument || ''}>
                               <div className="flex items-center gap-2 overflow-hidden">
                                 {isCellActive('dokument') ? (
                                   <input
@@ -696,7 +715,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 )}
                               </div>
                             </td>
-                            <td className="py-1 px-3 text-sm text-blue-600 max-w-0">
+                            <td className="py-0.5 px-3 text-sm text-blue-600 max-w-0">
                               <InlineTextEditor
                                 value={dok.link}
                                 placeholder="Tilføj link..."
@@ -724,7 +743,7 @@ function DokumentskabelonerPage(): ReactElement {
                                 </div>
                               )}
                             </td>
-                            <td className="py-1 px-3 text-sm text-gray-600 max-w-0">
+                            <td className="py-0.5 px-3 text-sm text-gray-600 max-w-0">
                               <InlineTextEditor
                                 value={dok.filnavn}
                                 placeholder="Navne-mønster..."
@@ -822,8 +841,11 @@ function DokumentskabelonerPage(): ReactElement {
                                   e.stopPropagation();
                                   setWorkflowModalItem({ id: dok.id, navn: dok.dokument || '' });
                                 }}
-                                className="p-1.5 rounded-full hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
-                                title="Administrer Workflow for dette dokument"
+                                className={`p-1.5 rounded-full transition-colors ${dok.has_rules
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'hover:bg-blue-50 text-gray-400 hover:text-blue-600'
+                                  }`}
+                                title={dok.has_rules ? "Dette dokument har workflow regler tilknyttet" : "Administrer Workflow for dette dokument"}
                               >
                                 <Workflow size={16} />
                               </button>
@@ -857,7 +879,7 @@ function DokumentskabelonerPage(): ReactElement {
                               )}
                             </td>
                             <td className="py-1 px-3 text-center">
-                              <button onClick={() => handleRediger(dok)} className="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100">
+                              <button onClick={() => handleRediger(dok)} className="text-gray-500 hover:text-blue-600 transition-colors">
                                 <Edit size={18} />
                               </button>
                             </td>
@@ -929,44 +951,6 @@ function DokumentskabelonerPage(): ReactElement {
           </div>
         </div>
       </div>
-      <div className={`flex-1 overflow-hidden ${activeTab === 'linking' ? 'flex' : 'hidden'}`}>
-        {/* 
-          AGENT INSTRUKS (2026-03-08):
-          =============================
-          Denne fane ("Link Aktiviteter") er midlertidigt deaktiveret.
-          Funktionaliteten er delvist erstattet af:
-          1. ActivityDocLinkerPanel i Aktivitetsskabeloner-siden (kæde-ikon per aktivitet)
-          2. Workflow-regler (workflow-ikon per aktivitet/dokument)
-          
-          FOR AT GENAKTIVERE:
-          - Fjern denne div og erstat med:
-            <LinkingTab blokinfo={blokinfo} />
-          - Sørg for at importet af LinkingTab stadig findes øverst i filen
-          
-          FOR AT FJERNE HELT:
-          - Fjern hele denne <div> blok (linking tab rendering)
-          - Fjern "Link Aktiviteter" tab-overskriften (linje ~446)
-          - Fjern activeTab state (linje ~105) 
-          - Fjern `import LinkingTab from ...` (linje 5)
-          - Slet filen: src/components/skabeloner/LinkingTab.tsx
-        */}
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50">
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 max-w-lg shadow-sm">
-            <h3 className="text-lg font-bold text-yellow-800 mb-2">⚠️ Denne fane er udgået</h3>
-            <p className="text-sm text-yellow-700 mb-3">
-              "Link Aktiviteter" er midlertidigt deaktiveret. Linking af dokumenter til aktiviteter sker nu via:
-            </p>
-            <ul className="text-sm text-yellow-700 text-left space-y-1 mb-3">
-              <li>• <strong>Aktivitetsskabeloner</strong> – Klik på kæde-ikonet ved en aktivitet</li>
-              <li>• <strong>Workflow Regler</strong> – Klik på workflow-ikonet ved en aktivitet/dokument</li>
-            </ul>
-            <p className="text-xs text-yellow-600 italic">
-              Kontakt administrator hvis denne side skal genaktiveres.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {visForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[80vw] max-h-[95vh] overflow-y-auto">

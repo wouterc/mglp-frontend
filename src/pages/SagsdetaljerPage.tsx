@@ -30,7 +30,7 @@ import Modal from '../components/Modal';
 
 interface SagsdetaljerPageProps {
     sagId: number | null;
-    navigateTo: (side: string, sag: Sag | null) => void;
+    navigateTo: (side: string, sag: Sag | null, navState?: any) => void;
 }
 
 
@@ -126,11 +126,10 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
         try {
             // Hent den nye sag
             const nySag = await SagService.getSag(targetId);
-            // Naviger via parent, send hele objektet med
-            navigateTo('sagsdetaljer', nySag);
+            // Naviger via parent, send hele objektet med OG bevar den nuværende fane
+            navigateTo('sagsdetaljer', nySag, { initialTab: activeTab });
             // Hvis komponenten ikke unmounter, skal vi manuelt opdatere state:
             setSag(nySag);
-            setActiveTab('overblik'); // Reset tab eller bevar? Ofte vil man starte forfra på ny sag.
         } catch (e) {
             console.error("Fejl ved sags-navigation:", e);
         } finally {

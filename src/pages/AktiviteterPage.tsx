@@ -20,7 +20,6 @@ import AktiviteterFilter from '../components/AktiviteterFilter';
 import AktivitetRow from '../components/rows/AktivitetRow';
 import CaseSelector from '../components/ui/CaseSelector';
 import ConfirmModal from '../components/ui/ConfirmModal';
-import ActivityDocumentLinkerModal from '../components/modals/ActivityDocumentLinkerModal'; // @# New Import
 import { SagsDokument } from '../types'; // @# New Import
 import { AktivitetService } from '../services/AktivitetService';
 import { DokumentService } from '../services/DokumentService';
@@ -97,10 +96,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     // State for Link Preference Modal
     const [showLinkPreferenceModal, setShowLinkPreferenceModal] = useState<{ aktivitet: Aktivitet } | null>(null);
 
-    // State for Link/Document Modal
-    const [linkModalAktivitet, setLinkModalAktivitet] = useState<Aktivitet | null>(null);
-    const [sagsDokumenter, setSagsDokumenter] = useState<SagsDokument[]>([]);
-    const [isFetchingDocs, setIsFetchingDocs] = useState(false);
 
     const openLinkApp = useCallback((aktivitet: Aktivitet, mode: 'window' | 'tab') => {
         if (!valgtSag) return;
@@ -121,22 +116,10 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
     const handleLinkAppClick = async (aktivitet: Aktivitet) => {
         if (!valgtSag) return;
 
-        // If NO documents are linked, open the Linker Modal instead of trying to open them
+        // If NO documents are linked, do nothing or show a message?
+        // Task 10 says remove Link column, but keeping the summary tooltip is nice.
+        // For now, we just skip opening if empty.
         if (!aktivitet.dokumenter || aktivitet.dokumenter.length === 0) {
-            setLinkModalAktivitet(aktivitet);
-
-            // Fetch documents for the case if not already fetching/fetched
-            if (sagsDokumenter.length === 0 && !isFetchingDocs) {
-                setIsFetchingDocs(true);
-                try {
-                    const docs = await DokumentService.getDokumenter(valgtSag.id);
-                    setSagsDokumenter(docs);
-                } catch (e) {
-                    console.error("Fejl ved hentning af dokumenter til linking:", e);
-                } finally {
-                    setIsFetchingDocs(false);
-                }
-            }
             return;
         }
 
@@ -365,26 +348,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
         }
     };
 
-    const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
-        if (!valgtSag) return;
-        try {
-            const updatedAktivitet = await AktivitetService.updateAktivitet(aktivitetId, { dokumenter: documentIds });
-
-            const gId = updatedAktivitet.gruppe?.id;
-            if (gId) {
-                fetchAktiviteterData(valgtSag.id);
-            }
-
-            // Update the modal's active aktivitet if it's the one we just saved
-            if (linkModalAktivitet?.id === aktivitetId) {
-                setLinkModalAktivitet(updatedAktivitet);
-            }
-        } catch (e) {
-            console.error("Fejl ved lagring af dokument-links:", e);
-            alert("Kunne ikke gemme dokument-links.");
-        }
-    };
-
     const handleSaveAktivitetRename = async () => {
         if (!renamingAktivitet || !valgtSag) return;
         setIsRenamingAktivitet(true);
@@ -479,6 +442,14 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
 
                 for (const a of groupActivities) {
                     // Apply Filters
+                    // @# Linked Data ID Filter
+                    const searchParams = new URLSearchParams(location.search);
+                    const idsParam = searchParams.get('ids');
+                    if (idsParam) {
+                        const ids = idsParam.split(',').map(Number);
+                        if (!ids.includes(a.id)) continue;
+                    }
+
                     if (lowerAkt && !a.aktivitet?.toLowerCase().includes(lowerAkt)) continue;
                     if (filters.status) {
                         if (filters.status === 'ikke-faerdigmeldt') {
@@ -583,8 +554,28 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
             if (gruppeId) {
                 fetchAktiviteterData(valgtSag.id);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Fejl ved inline save:", e);
+            if (e.data && e.data.require_blocked) {
+                const docList = e.data.dokumenter.map((d: any) => `• ${d.titel}`).join('\n');
+                setFeedbackModal({
+                    isOpen: true,
+                    title: 'Aktivitet låst af workflow',
+                    message: `${e.data.message}\n\n${docList}`,
+                    type: 'error'
+                });
+
+                // Opdater listen alligevel for at 'rulle tilbage' den visuelle optimisme
+                fetchAktiviteterData(valgtSag.id);
+            } else {
+                setFeedbackModal({
+                    isOpen: true,
+                    title: 'Gem fejl',
+                    message: 'Der opstod en fejl ved gemning af feltet: ' + (e.message || "Ukendt fejl"),
+                    type: 'error'
+                });
+                fetchAktiviteterData(valgtSag.id);
+            }
         }
     }, [valgtSag]);
 
@@ -934,15 +925,6 @@ function AktiviteterPage({ sagId }: AktiviteterPageProps): ReactElement {
                         />
                     )}
 
-                    <ActivityDocumentLinkerModal
-                        isOpen={!!linkModalAktivitet}
-                        onClose={() => setLinkModalAktivitet(null)}
-                        sagId={valgtSag?.id || 0}
-                        initialAktivitetId={linkModalAktivitet?.id}
-                        aktiviteter={valgtSag ? state.cachedAktiviteter[valgtSag.id] || [] : []}
-                        dokumenter={sagsDokumenter}
-                        onLinkChanges={handleLinkChanges}
-                    />
                 </div>
 
                 {/* Filter Sidebar - outside the table's scroll container */}

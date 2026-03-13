@@ -125,7 +125,7 @@ export const SagService = {
     },
 
     /**
-     * Henter punktafgifter for en sag.
+     * Henter tinglysningsafgifter for en sag.
      */
     async getPunktafgifter(id: number): Promise<SagsPunktafgift[]> {
         const resp = await api.get<any>(`/sager/sagspunktafgift/?sag_id=${id}`);
@@ -133,7 +133,7 @@ export const SagService = {
     },
 
     /**
-     * Henter ALLE punktafgifter på tværs af alle sager.
+     * Henter ALLE tinglysningsafgifter på tværs af alle sager.
      */
     async getAllPunktafgifter(params?: {
         page?: number;
@@ -156,21 +156,21 @@ export const SagService = {
     },
 
     /**
-     * Opretter en punktafgift.
+     * Opretter en tinglysningsafgift.
      */
     async createPunktafgift(data: any): Promise<SagsPunktafgift> {
         return await api.post<SagsPunktafgift>('/sager/sagspunktafgift/', data);
     },
 
     /**
-     * Opdaterer en punktafgift.
+     * Opdaterer en tinglysningsafgift.
      */
     async updatePunktafgift(id: number, data: any): Promise<SagsPunktafgift> {
         return await api.patch<SagsPunktafgift>(`/sager/sagspunktafgift/${id}/`, data);
     },
 
     /**
-     * Sletter en punktafgift.
+     * Sletter en tinglysningsafgift.
      */
     async deletePunktafgift(id: number): Promise<void> {
         await api.delete(`/sager/sagspunktafgift/${id}/`);

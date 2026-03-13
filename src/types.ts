@@ -63,6 +63,7 @@ export interface SkabAktivitet {
   mail_titel?: string | null;
   er_ny?: boolean;
   dokumenter?: number[]; // IDs of linked SkabDokumenter
+  has_rules?: boolean;
 }
 
 export interface Status {
@@ -243,6 +244,7 @@ export interface Aktivitet {
   dokumenter?: number[]; // IDs of linked SagsDokumenter
   har_links?: boolean;
   links_status?: 'red' | 'green' | null;
+  linked_docs_summary?: Array<{ id: number; titel: string; status: string; done: boolean }>;
 }
 
 export interface AktiviteterFilterState {
@@ -343,6 +345,7 @@ export interface SkabDokument {
   dokumenter?: number[]; // IDs of linked SkabDokumenter
   default_undermappe?: StandardMappe | null;
   default_undermappe_id?: number | null;
+  has_rules?: boolean;
 }
 
 
@@ -405,6 +408,8 @@ export interface SagsDokument {
   skal_mailes?: boolean;
   aktiviteter?: number[]; // IDs of linked Aktiviteter (reverse relation)
   har_links?: boolean;
+  links_status?: 'red' | 'green' | null;
+  linked_acts_summary?: Array<{ id: number; titel: string; status: string; done: boolean }>;
   undermappe?: StandardMappe | null;
   undermappe_id?: number | null;
 }
@@ -673,6 +678,6 @@ export interface FlowRegel {
   maal_aktivitet_navn: string | null;
   maal_dokument: number | null;
   maal_dokument_navn: string | null;
-  handling: 'ACTIVATE' | 'DEACTIVATE' | 'SET_STATUS';
+  handling: 'ACTIVATE' | 'DEACTIVATE' | 'SET_STATUS' | 'REQUIRE';
   handling_status: number | null;
 }

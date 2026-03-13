@@ -51,7 +51,7 @@ export default function DokumenterTab({ sag, onUpdate, onToolbarUpdate }: Dokume
 
         const ids = doc.aktiviteter.join(',');
         window.open(
-            `/sager/${sag.id}/aktiviteter?ids=${ids}`,
+            `/aktiviteter?sag_id=${sag.id}&ids=${ids}`,
             `LinkedActivities_Window`,
             `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
         );

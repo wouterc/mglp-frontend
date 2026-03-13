@@ -277,7 +277,7 @@ function FakturaoversigPage() {
                         className={`pb-2 text-2xl font-bold transition-colors border-b-4 flex items-center gap-2 ${activeTab === 'punktafgift' ? 'border-purple-600 text-gray-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                     >
                         <ReceiptText className={activeTab === 'punktafgift' ? 'text-purple-600' : 'text-gray-300'} />
-                        Oversigt over Punktafgifter
+                        Oversigt over Tinglysningsafgifter
                     </button>
                 </div>
 

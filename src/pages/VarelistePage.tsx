@@ -16,11 +16,16 @@ import Modal from '../components/Modal';
 import { useAppState } from '../StateContext';
 
 export const VarelistePage: React.FC = () => {
-    const { state } = useAppState(); // For consistent styling access if needed
-    const [varer, setVarer] = useState<Vareliste[]>([]);
-    const [varetyper, setVaretyper] = useState<Varetype[]>([]);
-    const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { state, dispatch } = useAppState();
+    const {
+        vareliste: varer,
+        varetyper,
+        varelisteIsLoading: loading,
+        erVarelisteHentet,
+        blokinfoSkabeloner: blokinfoRaw
+    } = state;
+
+    const blokinfo = React.useMemo(() => blokinfoRaw.filter(b => b.formaal === 1), [blokinfoRaw]);
 
     // Filters
     const [filterVarenummer, setFilterVarenummer] = useState('');
@@ -36,25 +41,30 @@ export const VarelistePage: React.FC = () => {
     const [editingVare, setEditingVare] = useState<Partial<Vareliste>>({});
 
     useEffect(() => {
-        loadData();
-    }, []);
+        if (!erVarelisteHentet) {
+            loadData();
+        }
+    }, []); // Fjernet erVarelisteHentet for at undgå dobbelt-kald ved load. persistence respekteres.
 
     const loadData = async () => {
-        setLoading(true);
+        dispatch({ type: 'SET_VARELISTE_STATE', payload: { varelisteIsLoading: true } });
         try {
-            const [varerData, varetyperData, blokinfoData] = await Promise.all([
+            const [varerData, varetyperData] = await Promise.all([
                 VarelisteService.getAll(),
-                VarelisteService.getVaretyper(),
-                LookupService.getBlokinfoSkabeloner()
+                VarelisteService.getVaretyper()
             ]);
-            setVarer(varerData);
-            setVaretyper(varetyperData);
-            // Filter BlokInfo to only show proper item groups (formaal=1) if API doesn't already
-            setBlokinfo(blokinfoData.filter(b => b.formaal === 1));
+            dispatch({
+                type: 'SET_VARELISTE_STATE',
+                payload: {
+                    vareliste: varerData,
+                    varetyper: varetyperData,
+                    erVarelisteHentet: true,
+                    varelisteIsLoading: false
+                }
+            });
         } catch (error) {
             console.error("Error loading data:", error);
-        } finally {
-            setLoading(false);
+            dispatch({ type: 'SET_VARELISTE_STATE', payload: { varelisteIsLoading: false } });
         }
     };
 
@@ -140,8 +150,8 @@ export const VarelistePage: React.FC = () => {
     });
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 sm:p-6 lg:p-8 bg-gray-300 min-h-screen">
+            <div className="flex justify-between items-center mb-6 bg-gray-300 p-2 rounded-lg">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                     Vareliste
                 </h2>
@@ -254,7 +264,7 @@ export const VarelistePage: React.FC = () => {
                         </thead>
                         <tbody className="text-gray-700 text-sm">
                             {filteredVarer.map(vare => (
-                                <tr key={vare.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <tr key={vare.id} className="border-b transition-all group border-l-4 border-l-transparent border-gray-100 hover:bg-blue-50/50 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]">
                                     <td className="py-1 px-2 whitespace-nowrap">{vare.varenummer || '-'}</td>
                                     <td className="py-1 px-2 whitespace-nowrap font-medium text-gray-900">{vare.titel}</td>
                                     <td className="py-1 px-2 whitespace-nowrap text-gray-500">{vare.varetype?.navn || '-'}</td>

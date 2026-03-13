@@ -303,7 +303,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
 
   if (error) return <div className="p-8 flex flex-col items-center justify-center text-red-600"><AlertCircle size={48} className="mb-4" /><h2 className="text-xl font-bold mb-2">Fejl</h2><p>{error}</p></div>;
   return (
-    <div className="p-4">
+    <div className="p-4 bg-gray-300 min-h-screen">
       <Modal
         isOpen={modalInfo.isOpen}
         onClose={() => setModalInfo({ isOpen: false, title: '', message: null })}
@@ -333,7 +333,7 @@ function SagsoversigtPage({ navigateTo }: SagsoversigtPageProps) {
         />
       </Modal>
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 bg-gray-300 p-2 rounded-lg">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold text-gray-800">Sagsoversigt</h2>
           {isUpdating && (

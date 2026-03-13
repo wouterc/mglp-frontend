@@ -1,14 +1,20 @@
 // --- Fil: src/pages/FlowReglerPage.tsx ---
 import React, { useState, useEffect, useCallback, ReactElement } from 'react';
 import { api } from '../api';
+import { SkabelonService } from '../services/SkabelonService';
 import type { FlowRegel } from '../types';
 import { Plus, Pencil, Trash2, RefreshCw, Copy, Upload, Download } from 'lucide-react';
 import FlowRegelForm from '../components/FlowRegelForm';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import { useAppState } from '../StateContext';
 
 function FlowReglerPage(): ReactElement {
-    const [regler, setRegler] = useState<FlowRegel[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const { state, dispatch } = useAppState();
+    const {
+        flowRegler: regler,
+        flowReglerIsLoading: isLoading,
+        erFlowReglerHentet
+    } = state;
     const [error, setError] = useState<string | null>(null);
 
     // Form state
@@ -23,21 +29,29 @@ function FlowReglerPage(): ReactElement {
     const excelInputRef = React.useRef<HTMLInputElement>(null);
 
     const fetchRegler = useCallback(async () => {
-        setIsLoading(true);
+        dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: true } });
         setError(null);
         try {
-            const data = await api.get<FlowRegel[]>('/skabeloner/flow-regler/');
-            setRegler(data || []);
+            const data = await SkabelonService.getFlowRegler();
+            dispatch({
+                type: 'SET_FLOWREGLER_STATE',
+                payload: {
+                    flowRegler: data || [],
+                    erFlowReglerHentet: true,
+                    flowReglerIsLoading: false
+                }
+            });
         } catch (err: any) {
             console.error('Fejl ved hentning af flow-regler:', err);
             setError(err.message || 'Kunne ikke hente flow-regler');
-        } finally {
-            setIsLoading(false);
+            dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: false } });
         }
-    }, []);
+    }, [dispatch]);
 
     useEffect(() => {
-        fetchRegler();
+        if (!erFlowReglerHentet) {
+            fetchRegler();
+        }
     }, [fetchRegler]);
 
     const handleCreate = () => {
@@ -67,8 +81,13 @@ function FlowReglerPage(): ReactElement {
     const confirmDelete = async () => {
         if (!regelToDelete) return;
         try {
-            await api.delete(`/skabeloner/flow-regler/${regelToDelete.id}/`);
-            setRegler(prev => prev.filter(r => r.id !== regelToDelete.id));
+            await SkabelonService.deleteFlowRegel(regelToDelete.id);
+            dispatch({
+                type: 'SET_FLOWREGLER_STATE',
+                payload: {
+                    flowRegler: regler.filter(r => r.id !== regelToDelete.id)
+                }
+            });
         } catch (err: any) {
             console.error('Fejl ved sletning:', err);
             alert('Kunne ikke slette reglen: ' + (err.message || 'Ukendt fejl'));
@@ -79,7 +98,7 @@ function FlowReglerPage(): ReactElement {
 
     const handleExport = async () => {
         try {
-            const data = await api.get<any[]>('/skabeloner/flow-regler/export_json/');
+            const data = await SkabelonService.exportFlowReglerJson();
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -100,18 +119,18 @@ function FlowReglerPage(): ReactElement {
         if (!file) return;
 
         try {
-            setIsLoading(true);
+            dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: true } });
             const text = await file.text();
             const jsonData = JSON.parse(text);
 
-            const response = await api.post<any>('/skabeloner/flow-regler/import_json/', jsonData);
+            const response = await SkabelonService.importFlowReglerJson(jsonData);
             alert(response.message || 'Regler importeret succesfuldt!');
             fetchRegler();
         } catch (err: any) {
             console.error('Fejl ved import:', err);
             alert('Kunne ikke importere regler (tjek filformatet): ' + (err.message || 'Ukendt fejl'));
         } finally {
-            setIsLoading(false);
+            dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: false } });
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -120,8 +139,7 @@ function FlowReglerPage(): ReactElement {
 
     const handleExportExcel = async () => {
         try {
-            const response = await api.get<Response>('/skabeloner/flow-regler/export_excel/', { rawResponse: true } as any);
-            const blob = await response.blob();
+            const blob = await SkabelonService.exportFlowReglerExcel();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -144,15 +162,15 @@ function FlowReglerPage(): ReactElement {
         formData.append('file', file);
 
         try {
-            setIsLoading(true);
-            const response = await api.post<any>('/skabeloner/flow-regler/import_excel/', formData);
+            dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: true } });
+            const response = await SkabelonService.importFlowReglerExcel(formData);
             alert(response.message || 'Regler importeret succesfuldt fra Excel!');
             fetchRegler();
         } catch (err: any) {
             console.error('Fejl ved Excel import:', err);
             alert('Kunne ikke importere regler fra Excel: ' + (err.message || 'Ukendt fejl'));
         } finally {
-            setIsLoading(false);
+            dispatch({ type: 'SET_FLOWREGLER_STATE', payload: { flowReglerIsLoading: false } });
             if (excelInputRef.current) {
                 excelInputRef.current.value = '';
             }
@@ -194,9 +212,9 @@ function FlowReglerPage(): ReactElement {
     }, [regler, filterText]);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bg-gray-300">
             {/* Header */}
-            <div className="flex-none bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+            <div className="flex-none bg-gray-300 border-b border-gray-400 px-4 py-2 flex items-center justify-between">
                 <div>
                     <h1 className="text-sm font-bold text-gray-900">Workflow Regler</h1>
                     <p className="text-[11px] text-gray-500">Administrer automatiske handlinger baseret på statusændringer.</p>
@@ -285,7 +303,7 @@ function FlowReglerPage(): ReactElement {
             )}
 
             {/* Main Content (Table) */}
-            <div className="flex-1 overflow-auto bg-gray-50 p-4">
+            <div className="flex-1 overflow-auto bg-gray-300 p-4">
                 <div className="bg-white shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
                     <table className="min-w-full divide-y divide-gray-300 table-fixed">
                         <thead className="bg-gray-800">
@@ -297,7 +315,7 @@ function FlowReglerPage(): ReactElement {
                                 <th scope="col" className="px-3 py-2 text-right text-xs font-semibold text-white w-[10%]">Handlinger</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
+                        <tbody className="divide-y divide-gray-300 bg-white">
                             {isLoading && regler.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="py-4 text-center text-sm text-gray-500">
@@ -312,8 +330,10 @@ function FlowReglerPage(): ReactElement {
                                 </tr>
                             ) : (
                                 filteredRegler.map((regel) => (
-                                    <tr key={regel.id} className="hover:bg-gray-50">
-                                        <td className="whitespace-nowrap py-1.5 pl-4 pr-3 text-[11px] font-medium text-gray-900 sm:pl-6 truncate">
+                                    <tr key={regel.id} className="hover:bg-blue-50/50 group transition-all relative">
+                                        <td className="whitespace-nowrap py-1.5 pl-4 pr-3 text-[11px] font-medium text-gray-900 sm:pl-6 truncate relative">
+                                            {/* Hover marker */}
+                                            <div className="absolute inset-y-0 left-0 w-1 bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             {regel.navn}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-1.5 text-[11px] text-gray-500 truncate">
@@ -379,9 +399,19 @@ function FlowReglerPage(): ReactElement {
                         setIsFormOpen(false);
                         // Hvis vi redigerer en eksisterende regel, opdater den. Ellers tilføj den.
                         if (selectedRegel && selectedRegel.id) {
-                            setRegler(prev => prev.map(r => r.id === savedRegel.id ? savedRegel : r));
+                            dispatch({
+                                type: 'SET_FLOWREGLER_STATE',
+                                payload: {
+                                    flowRegler: regler.map(r => r.id === savedRegel.id ? savedRegel : r)
+                                }
+                            });
                         } else {
-                            setRegler(prev => [...prev, savedRegel]);
+                            dispatch({
+                                type: 'SET_FLOWREGLER_STATE',
+                                payload: {
+                                    flowRegler: [...regler, savedRegel]
+                                }
+                            });
                         }
                     }}
                     onCancel={() => setIsFormOpen(false)}

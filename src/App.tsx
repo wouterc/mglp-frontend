@@ -71,7 +71,7 @@ function App() {
     await logout(); // Kald den centrale logout
   };
 
-  const navigateTo = (side: string, context: any) => {
+  const navigateTo = (side: string, context: any, navState?: any) => {
     if (side === 'log_ud') {
       handleLogout();
       return;
@@ -100,7 +100,7 @@ function App() {
     }
 
     const path = side.startsWith('/') ? side : `/${side}`;
-    navigate(path);
+    navigate(path, { state: navState });
   };
 
   let filterSidebarComponent: ReactNode = null;

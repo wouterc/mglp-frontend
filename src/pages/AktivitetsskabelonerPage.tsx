@@ -1,19 +1,19 @@
 // --- Fil: src/pages/AktivitetsskabelonerPage.tsx ---
-// @# 2025-11-23 19:30 - Tilføjet Import/Export funktionalitet (Excel).
-import React, { useState, useEffect, useCallback, useMemo, Fragment, ReactElement, ChangeEvent } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Fragment, ReactElement, ChangeEvent, useRef } from 'react';
+import { useLookups } from '../contexts/LookupContext';
 import AktivitetForm from '../components/AktivitetForm.tsx';
 import useDebounce from '../hooks/useDebounce.ts';
 import { PlusCircle, AlertCircle, Edit, FunnelX, Loader2, UploadCloud, Download, ChevronLeft, ChevronRight, Info, RefreshCw, Maximize2 } from 'lucide-react';
 import type { Blokinfo, SkabAktivitet, AktivitetsskabelonerFilterState, SkabDokument } from '../types.ts';
-import { useAppState } from '../StateContext.js';
+import { useAppState } from '../StateContext';
 import Button from '../components/ui/Button.tsx';
 import Tooltip from '../components/Tooltip';
 import { api } from '../api';
+import { SkabelonService } from '../services/SkabelonService';
 import CsvImportModal from '../components/CsvImportModal';
 import * as XLSX from 'xlsx';
 import HelpButton from '../components/ui/HelpButton';
 import ConfirmModal from '../components/ui/ConfirmModal.tsx';
-import ActivityDocLinkerPanel from '../components/panels/ActivityDocLinkerPanel.tsx';
 import { Link as LinkIcon, Columns, Workflow } from 'lucide-react';
 import WorkflowLinkModal from '../components/WorkflowLinkModal.tsx';
 
@@ -97,10 +97,11 @@ function AktivitetsskabelonerPage(): ReactElement {
     aktivitetsskabelonerIsLoading: isLoading,
     aktivitetsskabelonerError: error,
     aktivitetsskabelonerNextPageUrl: nextPageUrl,
+    erAktivitetsskabelonerHentet: erAktiviteterHentet,
     informationsKilder,
   } = state;
 
-  const [blokinfo, setBlokinfo] = useState<Blokinfo[]>([]);
+
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [visForm, setVisForm] = useState<boolean>(false);
   const [aktivitetTilRedigering, setAktivitetTilRedigering] = useState<SkabAktivitet | null>(null);
@@ -112,6 +113,9 @@ function AktivitetsskabelonerPage(): ReactElement {
   const [sidebarWidth, setSidebarWidth] = useState<number>(200);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const isFirstMount = useRef(true);
+  const { state: lookupState } = useLookups();
+  const { blokinfoSkabeloner: blokinfo } = lookupState;
 
   // State til hurtig-opret i bunden
   const [nyAktivitetNr, setNyAktivitetNr] = useState('');
@@ -129,8 +133,7 @@ function AktivitetsskabelonerPage(): ReactElement {
   const [manglerSync, setManglerSync] = useState<Record<number, boolean>>({});
   const [nyeAktiviteterFindes, setNyeAktiviteterFindes] = useState(false);
   const [isSyncingAlle, setIsSyncingAlle] = useState(false);
-
-  // Dialog-state
+  const [workflowModalItem, setWorkflowModalItem] = useState<{ id: number, navn: string } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -145,69 +148,7 @@ function AktivitetsskabelonerPage(): ReactElement {
     onConfirm: () => { },
   });
 
-  // @# Linker State (Split View)
-  const [showLinkerPanel, setShowLinkerPanel] = useState(false);
-  const [selectedLinkerActivityId, setSelectedLinkerActivityId] = useState<number | null>(null);
-  const [dokumentskabeloner, setDokumentskabeloner] = useState<SkabDokument[]>([]);
-  const [loadingDocs, setLoadingDocs] = useState(false);
-  const [workflowModalItem, setWorkflowModalItem] = useState<{ id: number, navn: string } | null>(null);
 
-  // Load documents once when panel is opened first time
-  useEffect(() => {
-    if (showLinkerPanel && dokumentskabeloner.length === 0 && !loadingDocs) {
-      setLoadingDocs(true);
-      api.get<any>(`/skabeloner/dokumenter/?limit=1000&udgaaet=false`)
-        .then(data => {
-          const results = Array.isArray(data) ? data : (data.results || []);
-          setDokumentskabeloner(results);
-        })
-        .catch(e => {
-          console.error("Failed to fetch doc templates", e);
-          showAlert('Fejl', 'Kunne ikke hente dokumentskabeloner.');
-        })
-        .finally(() => setLoadingDocs(false));
-    }
-  }, [showLinkerPanel, dokumentskabeloner.length, loadingDocs]);
-
-
-  // Handle selection (row click or specific logic)
-  const handleRowClick = (aktivitet: SkabAktivitet) => {
-    // If panel is open, update selection
-    if (showLinkerPanel) {
-      setSelectedLinkerActivityId(aktivitet.id);
-    }
-    // Also set for editing? Or is inline edit enough? 
-    // Usually clicking row doesn't trigger edit mode in this table unless clicking specific cells.
-  };
-
-  const handleToggleLinkerPanel = () => {
-    setShowLinkerPanel(!showLinkerPanel);
-    if (!showLinkerPanel && !selectedLinkerActivityId && aktiviteter.length > 0) {
-      // Auto-select first if none selected
-      // setSelectedLinkerActivityId(aktiviteter[0].id);
-    }
-  };
-
-  const selectedLinkerActivity = useMemo(() =>
-    aktiviteter.find(a => a.id === selectedLinkerActivityId) || null,
-    [aktiviteter, selectedLinkerActivityId]
-  );
-
-  const handleLinkChanges = async (aktivitetId: number, documentIds: number[]) => {
-    try {
-      const updated = await api.patch<SkabAktivitet>(`/skabeloner/aktiviteter/${aktivitetId}/`, { dokumenter: documentIds });
-
-      dispatch({
-        type: 'SET_AKTIVITETSSKABELONER_STATE',
-        payload: {
-          aktivitetsskabeloner: aktiviteter.map(a => a.id === updated.id ? updated : a)
-        }
-      });
-    } catch (e: any) {
-      console.error("Link update failed:", e);
-      showAlert('Fejl', 'Kunne ikke opdatere links: ' + e.message);
-    }
-  };
 
   const showAlert = (title: string, message: string) => {
     setConfirmDialog({
@@ -236,13 +177,17 @@ function AktivitetsskabelonerPage(): ReactElement {
   }, [visUdgaaede]);
 
   const hentData = useCallback(async (filterObj: AktivitetsskabelonerFilterState) => {
-    if (visImportModal) return; // Undgå reload mens import modal er åben
+    if (visImportModal) return;
 
     dispatch({ type: 'SET_AKTIVITETSSKABELONER_STATE', payload: { aktivitetsskabelonerIsLoading: true, aktivitetsskabelonerError: null } });
     const queryString = buildQueryString(filterObj);
 
     try {
-      const data = await api.get<PaginatedAktiviteterResponse>(`/skabeloner/aktiviteter/?${queryString}`);
+      // Parallelize calls for performance (Rule 1: Performance)
+      const [data, syncRes] = await Promise.all([
+        SkabelonService.getAktivitetsskabeloner(queryString),
+        SkabelonService.checkAktivitetSync(queryString)
+      ]);
 
       dispatch({
         type: 'SET_AKTIVITETSSKABELONER_STATE',
@@ -253,8 +198,6 @@ function AktivitetsskabelonerPage(): ReactElement {
         }
       });
 
-      // Efter vi har hentet data, tjekker vi for synkroniserings-mangler
-      const syncRes = await api.get<any>(`/skabeloner/aktiviteter/sync_check/?${queryString}`);
       setManglerSync(syncRes.mangler_per_skabelon || {});
       setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
 
@@ -288,22 +231,27 @@ function AktivitetsskabelonerPage(): ReactElement {
     });
   };
 
-  // Hent grundlæggende data (processer/grupper) én gang ved start
+  // Hent grundlæggende data (synkroniserings-mangler) ved start
   useEffect(() => {
-    const hentBasisData = async () => {
-      try {
-        const data = await api.get<Blokinfo[]>('/skabeloner/blokinfo/');
-        setBlokinfo(data || []);
-      } catch (e) {
-        console.error("Fejl ved hentning af blokinfo:", e);
-      }
-    };
-    hentBasisData();
-  }, []);
+    if (erAktiviteterHentet) {
+      // Tjek kun for sync hvis vi har data
+      const queryString = buildQueryString(filters);
+      api.get<any>(`/skabeloner/aktiviteter/sync_check/?${queryString}`).then(syncRes => {
+        setManglerSync(syncRes.mangler_per_skabelon || {});
+        setNyeAktiviteterFindes(syncRes.nye_aktiviteter_findes || false);
+      });
+    }
+  }, [erAktiviteterHentet, buildQueryString, filters]);
 
   useEffect(() => {
+    // Frontend Persistence: Spring over hvis vi allerede har data på første mount
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      if (erAktiviteterHentet) return;
+    }
+
     hentData(debouncedFilters);
-  }, [debouncedFilters, visUdgaaede, hentData]);
+  }, [debouncedFilters, visUdgaaede, hentData]); // Fjernet erAktiviteterHentet for at undgå dobbelt-kald ved load
 
   useEffect(() => {
     const fetchGrupperForFilter = async () => {
@@ -312,7 +260,7 @@ function AktivitetsskabelonerPage(): ReactElement {
         if (selectedProces) {
           setIsFilterGrupperLoading(true);
           try {
-            const data = await api.get<Blokinfo[]>(`/skabeloner/blokinfo/${selectedProces.id}/grupper/`);
+            const data = await SkabelonService.getGrupperForProces(selectedProces.id);
             setTilgaengeligeFilterGrupper(data);
           } catch (error) {
             setTilgaengeligeFilterGrupper([]);
@@ -593,7 +541,7 @@ function AktivitetsskabelonerPage(): ReactElement {
         type="aktivitetsskabelon"
       />
 
-      <div className="flex justify-between items-center p-4 bg-white border-b border-gray-200 flex-shrink-0">
+      <div className="flex justify-between items-center p-4 bg-gray-300 border-b border-gray-300 flex-shrink-0">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           Aktivitetsskabeloner
           <HelpButton helpPointCode="SKABELONER_AKTIV_HELP" />
@@ -634,7 +582,7 @@ function AktivitetsskabelonerPage(): ReactElement {
       <div className="flex-1 flex overflow-hidden">
         {/* SIDEMENU (Grupper) */}
         <div
-          className="bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 relative transition-all duration-300"
+          className="bg-gray-300 border-r border-gray-300 overflow-y-auto flex-shrink-0 relative transition-all duration-300"
           style={{ width: `${sidebarWidth}px`, maxWidth: isExpanded ? 'none' : '18%' }}
         >
           <div className="p-4 space-y-4">
@@ -663,16 +611,17 @@ function AktivitetsskabelonerPage(): ReactElement {
 
             <div className="border-t border-gray-100 pt-4">
               <div className="block text-xs font-semibold text-gray-400 uppercase mb-2">Grupper</div>
-              <div className="space-y-1">
+              <div className="">
                 {tilgaengeligeFilterGrupper.map(g => {
                   const isActive = filters.gruppe_nr === g.nr.toString();
                   return (
                     <button
                       key={g.id}
                       onClick={() => handleSelectGroup(g.nr.toString())}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md transition-all group relative ${isActive
-                        ? 'bg-blue-50 text-blue-700 font-medium border-l-4 border-blue-600'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
+                      className={`w-full text-left px-3 py-0.5 text-sm rounded-md transition-all group relative border-l-4
+                        ${isActive
+                          ? 'bg-blue-100 text-blue-700 font-medium border-l-blue-600 shadow-[inset_0_-1px_0_0_#2563eb]'
+                          : 'text-gray-600 border-l-transparent hover:bg-blue-50/50 hover:text-gray-900 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]'
                         }`}
                     >
                       <span className="block truncate" title={`${g.nr} - ${g.titel_kort}`}>
@@ -696,9 +645,9 @@ function AktivitetsskabelonerPage(): ReactElement {
         </div>
 
         {/* HOVEDINDHOLD (Aktiviteter) */}
-        <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+        <div className="flex-1 flex flex-col bg-gray-300 overflow-hidden">
           {/* Top Filter Bar i Hovedindhold */}
-          <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between gap-4">
+          <div className="p-4 bg-gray-300 border-b border-gray-300 flex items-center justify-between gap-4">
             <div className="flex-1 flex items-center gap-4">
               <div className="w-24">
                 <input id="filter-aktivitet-nr" type="text" name="aktivitet_nr" placeholder="Nr..." value={filters.aktivitet_nr} onChange={handleFilterChange} className="w-full p-2 border rounded-md text-sm" aria-label="Filtrer på nummer" />
@@ -720,19 +669,18 @@ function AktivitetsskabelonerPage(): ReactElement {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <table className="min-w-full table-fixed">
-                <thead className="bg-gray-50 text-gray-600 text-[10px] uppercase font-semibold border-b border-gray-200">
+                <thead className="bg-gray-800 text-white text-[10px] uppercase font-semibold">
                   <tr>
                     <th className="text-center py-3 px-1 w-[5%]">Nr.</th>
                     <th className="text-left py-3 px-4 w-[25%]">Aktivitet</th>
                     <th className="text-left py-3 px-4 w-[25%]">Kommentar</th>
-                    <th className="text-center py-3 px-2 w-[4%]">Link</th>
                     <th className="text-center py-3 px-2 w-[4%]">Flow</th>
                     <th className="text-left py-3 px-2 w-[10%]">Kilde</th>
                     <th className="text-left py-3 px-4 w-[25%]">Mail Titel</th>
                     <th className="text-center py-3 px-2 w-[10%]">Status</th>
                   </tr>
                 </thead>
-                <tbody className="text-sm">
+                <tbody className="text-sm divide-y divide-gray-300">
                   {isLoading && aktiviteter.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-12 text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" size={24} /> Indlæser...</td></tr>
                   ) : (
@@ -744,18 +692,16 @@ function AktivitetsskabelonerPage(): ReactElement {
                       return (
                         <tr
                           key={a.id}
-                          onClick={(e) => {
-                            // Don't trigger if editing
-                            if (!activeCell) handleRowClick(a);
-                          }}
-                          className={`border-b transition-all group cursor-default
-                                ${isRowActive ? 'shadow-[inset_0_-2px_0_0_#ef4444] bg-red-50/30' : ''}
-                                ${selectedLinkerActivityId === a.id && showLinkerPanel ? 'bg-indigo-50 border-l-4 border-l-indigo-500' : 'border-gray-100 hover:bg-gray-50'}
-                            `}
+                          className={`transition-all group cursor-default relative
+                                         ${isRowActive ? 'bg-red-50/30' : 'hover:bg-blue-50/50'}
+                                     `}
                         >
                           {/* NR FELT */}
-                          {/* NR FELT */}
-                          <td className="py-2 px-1 text-center">
+                          <td className="py-2 px-1 text-center relative">
+                            {/* Hover/Selection marker */}
+                            <div className={`absolute inset-y-0 left-0 w-1 transition-opacity
+                                      ${isRowActive ? 'bg-red-500 opacity-100' : 'bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity'}
+                                    `} />
                             {isCellActive('aktivitet_nr') ? (
                               <input
                                 autoFocus
@@ -782,7 +728,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                           </td>
 
                           {/* AKTIVITET FELT */}
-                          <td className="py-2 px-2 max-w-0">
+                          <td className="py-1 px-2 max-w-0">
                             <InlineTextEditor
                               value={a.aktivitet}
                               onEdit={() => setActiveCell({ id: a.id, field: 'aktivitet', value: a.aktivitet })}
@@ -808,7 +754,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                           </td>
 
                           {/* KOMMENTAR (NOTE) FELT */}
-                          <td className="py-2 px-2 max-w-0">
+                          <td className="py-1 px-2 max-w-0">
                             <InlineTextEditor
                               value={a.note}
                               placeholder="Tilføj note/kommentar..."
@@ -834,35 +780,18 @@ function AktivitetsskabelonerPage(): ReactElement {
                             )}
                           </td>
 
-                          {/* LINK BUTTON */}
-                          <td className="py-2 px-2 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!showLinkerPanel) {
-                                  setShowLinkerPanel(true);
-                                }
-                                setSelectedLinkerActivityId(a.id);
-                              }}
-                              className={`p-1.5 rounded-full transition-colors ${a.dokumenter && a.dokumenter.length > 0
-                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                                : 'text-gray-300 hover:text-gray-500'
-                                }`}
-                              title={a.dokumenter && a.dokumenter.length > 0
-                                ? `${a.dokumenter.length} dokumenter linket`
-                                : "Link dokumenter"}
-                            >
-                              <LinkIcon size={16} />
-                            </button>
-                          </td>
-                          <td className="py-2 px-2 text-center">
+
+                          <td className="py-1 px-2 text-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setWorkflowModalItem({ id: a.id, navn: a.aktivitet || '' });
                               }}
-                              className="p-1.5 rounded-full hover:bg-yellow-50 text-gray-400 hover:text-yellow-600 transition-colors"
-                              title="Administrer Workflow for denne aktivitet"
+                              className={`p-1.5 rounded-full transition-colors ${a.has_rules
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'hover:bg-yellow-50 text-gray-400 hover:text-yellow-600'
+                                }`}
+                              title={a.has_rules ? "Denne aktivitet har workflow regler tilknyttet" : "Administrer Workflow for denne aktivitet"}
                             >
                               <Workflow size={16} />
                             </button>
@@ -925,7 +854,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                               </div>
                             )}
                           </td>
-                          <td className="py-2 px-2 text-center">
+                          <td className="py-1 px-2 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <input
                                 id={`aktiv-checkbox-${a.id}`}
@@ -947,7 +876,7 @@ function AktivitetsskabelonerPage(): ReactElement {
                                 )}
                                 <button
                                   onClick={() => handleRediger(a)}
-                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all shadow-sm"
                                   title="Rediger Avanceret"
                                 >
                                   <Edit size={16} />
@@ -1005,19 +934,6 @@ function AktivitetsskabelonerPage(): ReactElement {
               </div>
             )}
           </div>
-          {showLinkerPanel && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200" onClick={() => setShowLinkerPanel(false)}>
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                <ActivityDocLinkerPanel
-                  selectedAktivitet={selectedLinkerActivity}
-                  dokumenter={dokumentskabeloner}
-                  onLinkChanges={handleLinkChanges}
-                  onClose={() => setShowLinkerPanel(false)}
-                  isLoadingDocs={loadingDocs}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
 

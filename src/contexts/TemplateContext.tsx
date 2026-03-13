@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Blokinfo, BlokinfoSkabelonerFilterState } from '../types';
+import { Blokinfo, BlokinfoSkabelonerFilterState, Vareliste, Varetype, FlowRegel } from '../types';
 
 interface TemplateState {
     blokinfoSkabeloner: Blokinfo[];
@@ -7,10 +7,23 @@ interface TemplateState {
     blokinfoSkabelonerIsLoading: boolean;
     blokinfoSkabelonerError: string | null;
     erBlokinfoSkabelonerHentet: boolean;
+
+    // Vareliste
+    vareliste: Vareliste[];
+    varetyper: Varetype[];
+    varelisteIsLoading: boolean;
+    erVarelisteHentet: boolean;
+
+    // Flowregler
+    flowRegler: FlowRegel[];
+    flowReglerIsLoading: boolean;
+    erFlowReglerHentet: boolean;
 }
 
 type TemplateAction =
-    | { type: 'SET_BLOKINFO_SKABELONER_STATE'; payload: Partial<TemplateState> };
+    | { type: 'SET_BLOKINFO_SKABELONER_STATE'; payload: Partial<TemplateState> }
+    | { type: 'SET_VARELISTE_STATE'; payload: Partial<TemplateState> }
+    | { type: 'SET_FLOWREGLER_STATE'; payload: Partial<TemplateState> };
 
 const initialState: TemplateState = {
     blokinfoSkabeloner: [],
@@ -18,11 +31,22 @@ const initialState: TemplateState = {
     blokinfoSkabelonerIsLoading: true,
     blokinfoSkabelonerError: null,
     erBlokinfoSkabelonerHentet: false,
+
+    vareliste: [],
+    varetyper: [],
+    varelisteIsLoading: true,
+    erVarelisteHentet: false,
+
+    flowRegler: [],
+    flowReglerIsLoading: true,
+    erFlowReglerHentet: false,
 };
 
 const templateReducer = (state: TemplateState, action: TemplateAction): TemplateState => {
     switch (action.type) {
         case 'SET_BLOKINFO_SKABELONER_STATE':
+        case 'SET_VARELISTE_STATE':
+        case 'SET_FLOWREGLER_STATE':
             return { ...state, ...action.payload };
         default:
             return state;

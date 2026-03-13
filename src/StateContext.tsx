@@ -9,7 +9,8 @@ import type {
   SagsDokument,
   User,
   InformationsKilde,
-  StandardMappe
+  StandardMappe,
+  Vareliste, Varetype, FlowRegel
 } from './types';
 
 import { useAuth } from './contexts/AuthContext';
@@ -86,6 +87,13 @@ export interface AppState {
   chatActiveRecipient: any | undefined;
   chatActiveType: 'user' | 'team' | undefined;
   chatUnreadCounts: { [key: string]: number };
+  vareliste: Vareliste[];
+  varetyper: Varetype[];
+  varelisteIsLoading: boolean;
+  erVarelisteHentet: boolean;
+  flowRegler: FlowRegel[];
+  flowReglerIsLoading: boolean;
+  erFlowReglerHentet: boolean;
 }
 
 export type AppAction = any;
@@ -201,6 +209,15 @@ export const StateProvider = ({ children }: { children: ReactNode }) => {
     chatActiveType: chat.chatActiveType,
     chatUnreadCounts: chat.chatUnreadCounts,
 
+    // Vareliste & Flowregler
+    vareliste: templates.vareliste,
+    varetyper: templates.varetyper,
+    varelisteIsLoading: templates.varelisteIsLoading,
+    erVarelisteHentet: templates.erVarelisteHentet,
+    flowRegler: templates.flowRegler,
+    flowReglerIsLoading: templates.flowReglerIsLoading,
+    erFlowReglerHentet: templates.erFlowReglerHentet,
+
     // Lokal
     erFilterMenuAaben: localState.erFilterMenuAaben,
   }), [auth, lookups, sager, chat, aktdok, partners, templates, localState.erFilterMenuAaben]);
@@ -217,7 +234,7 @@ export const StateProvider = ({ children }: { children: ReactNode }) => {
       sagDispatch(action);
     } else if (type === 'SET_VIRKSOMHEDER_STATE' || type === 'SET_KONTAKTER_STATE') {
       partDispatch(action);
-    } else if (type === 'SET_BLOKINFO_SKABELONER_STATE') {
+    } else if (type === 'SET_BLOKINFO_SKABELONER_STATE' || type === 'SET_VARELISTE_STATE' || type === 'SET_FLOWREGLER_STATE') {
       tempDispatch(action);
     } else if (type === 'SET_CHAT_STATE') {
       chatDispatch(action);

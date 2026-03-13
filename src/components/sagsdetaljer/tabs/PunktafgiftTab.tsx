@@ -149,9 +149,9 @@ const PunktafgiftTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, on
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                                 <ReceiptText className="text-purple-600" />
-                                Punktafgifter
+                                Tinglysningsafgifter
                             </h2>
-                            <p className="text-gray-500 text-sm">Administrer punktafgifter for denne sag.</p>
+                            <p className="text-gray-500 text-sm">Administrer tinglysningsafgifter for denne sag.</p>
                         </div>
 
                         <div className="flex flex-wrap gap-2 bg-gray-300 rounded-lg border border-gray-400 p-2">
@@ -182,7 +182,7 @@ const PunktafgiftTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, on
                     <div className="p-3 bg-gray-300 rounded-lg border border-gray-400">
                         <h3 className="text-xs font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
                             <Plus size={14} />
-                            Ny Punktafgift
+                            Ny Tinglysningsafgift
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-6 gap-3 items-end text-xs">
                             <div className="col-span-1">
@@ -367,7 +367,7 @@ const PunktafgiftTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, on
                                         <td className="px-3 py-2 text-center">
                                             <button
                                                 onClick={() => {
-                                                    if (window.confirm('Er du sikker på at du vil slette denne punktafgift?')) {
+                                                    if (window.confirm('Er du sikker på at du vil slette denne tinglysningsafgift?')) {
                                                         handleDeleteLine(line.id);
                                                     }
                                                 }}
@@ -382,7 +382,7 @@ const PunktafgiftTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, on
                                 {!isLoadingLines && filteredLines.length === 0 && (
                                     <tr>
                                         <td colSpan={9} className="px-4 py-12 text-center text-gray-400 italic">
-                                            Ingen punktafgifter fundet.
+                                            Ingen tinglysningsafgifter fundet.
                                         </td>
                                     </tr>
                                 )}

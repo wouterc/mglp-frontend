@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2, Link as LinkIcon, MoreVertical, Copy, Trash2, Edit3 } from 'lucide-react';
+import { MessageSquare, Info, UploadCloud, CheckCircle2, Maximize2, Workflow, MoreVertical, Copy, Trash2, Edit3 } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import SmartDateInput from '../SmartDateInput';
 import { Aktivitet, User, Status, InformationsKilde } from '../../types';
@@ -142,7 +142,7 @@ function AktivitetRow({
 
     return (
         <tr
-            className={`border-b border-gray-200 transition-colors ${isActive ? 'bg-red-50/30 active-row-highlight' : 'hover:bg-gray-50'}`}
+            className={`border-b border-gray-200 transition-all border-l-4 ${isActive ? 'bg-red-50/30 active-row-highlight border-l-red-500 shadow-[inset_0_-1px_0_0_#ef4444]' : 'border-l-transparent hover:bg-blue-50/50 hover:border-l-blue-600 hover:shadow-[inset_0_-1px_0_0_#2563eb]'}`}
             onClick={onFocus}
             onFocus={onFocus}
             onBlur={(e) => {
@@ -197,19 +197,30 @@ function AktivitetRow({
                         )}
                     </div>
 
-                    {/* Slot 2: Link Icon */}
+                    {/* Slot 2: Workflow Icon */}
                     <div className="flex justify-center">
-                        <Tooltip content={aktivitet.har_links ? "Vis linkede dokumenter" : "Link dokumenter"}>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onLinkClick?.(aktivitet); }}
-                                className={`p-0.5 rounded transition-colors ${aktivitet.har_links
-                                    ? (aktivitet.links_status === 'red' ? 'text-red-500 hover:bg-red-50 font-bold' : 'text-green-600 hover:bg-green-50 font-bold')
-                                    : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
-                                    }`}
-                            >
-                                <LinkIcon size={14} fill={aktivitet.har_links ? "currentColor" : "none"} />
-                            </button>
-                        </Tooltip>
+                        <div className="relative group/link inline-block">
+                            {aktivitet.har_links && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onLinkClick?.(aktivitet); }}
+                                    className={`p-0.5 rounded transition-colors ${aktivitet.links_status === 'red' ? 'text-red-500 hover:bg-red-50 font-bold' : 'text-green-600 hover:bg-green-50 font-bold'}`}
+                                    title="Klik for at se relaterede dokumenter"
+                                >
+                                    <Workflow size={14} fill="currentColor" />
+                                </button>
+                            )}
+                            {aktivitet.linked_docs_summary && aktivitet.linked_docs_summary.length > 0 && (
+                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover/link:opacity-100 group-hover/link:visible z-50 transition-all pointer-events-none">
+                                    <div className="font-semibold mb-1 text-gray-300">Kræver dokumenter:</div>
+                                    {aktivitet.linked_docs_summary.map((doc: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-1.5 py-0.5">
+                                            <span className={doc.done ? 'text-green-400' : 'text-red-400'}>{doc.done ? '✓' : '○'}</span>
+                                            <span className="truncate">{doc.titel}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Slot 3: User Comment */}
