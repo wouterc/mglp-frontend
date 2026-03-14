@@ -94,7 +94,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-white">
                 {!bbrInfo ? (
                     <div className="text-center py-10">
                         <ShieldAlert className="mx-auto h-12 w-12 text-gray-300 mb-3" />
