@@ -27,7 +27,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
     const getKodelisteTekst = (kategori: string, kode: string | undefined | null) => {
         if (!kode) return '-';
         const kodeObj = bbrKodelister?.find((k: BbrKodeliste) => k.kategori === kategori && k.kode === kode);
-        return kodeObj ? `${kodeObj.tekst} (${kode})` : kode;
+        return kodeObj ? `(${kode}) ${kodeObj.tekst}` : kode;
     };
 
     const handleUpdateBbr = async () => {
@@ -112,7 +112,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                                 <LayoutGrid size={14} className="text-blue-600" />
                                 Generelle Bygningsoplysninger
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <BbrField label="Anvendelse (Bygning)" value={getKodelisteTekst('byg_anvendelse', bbrInfo.byg_anvendelse?.kode)} />
                                 <BbrField label="Anvendelse (Enhed)" value={getKodelisteTekst('bolig_type', bbrInfo.bolig_type)} />
                                 <BbrField label="Byggeår / Opførelsesår" value={bbrInfo.opfoerelsesaar} />
@@ -138,7 +138,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                                 <LayoutGrid size={14} className="text-blue-600" />
                                 Tilbygninger & Ekstra Arealer
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <BbrField label="Indbygget Garage" value={bbrInfo.areal_indbygget_garage ? `${bbrInfo.areal_indbygget_garage} m²` : null} />
                                 <BbrField label="Indbygget Carport" value={bbrInfo.areal_indbygget_carport ? `${bbrInfo.areal_indbygget_carport} m²` : null} />
                                 <BbrField label="Indbygget Udhus" value={bbrInfo.areal_indbygget_udhus ? `${bbrInfo.areal_indbygget_udhus} m²` : null} />
@@ -154,7 +154,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                                 <FileText size={14} className="text-blue-600" />
                                 Materialer & Boligtype
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <BbrField label="Asbest Materiale" value={getKodelisteTekst('asbestholdigt_materiale', bbrInfo.asbestholdigt_materiale)} />
                                 <BbrField label="Ydervæg (Bygning)" value={getKodelisteTekst('ydervaeg_materiale', bbrInfo.ydervaeg_materiale)} />
                                 <BbrField label="Tag (Bygning)" value={getKodelisteTekst('tag_materiale', bbrInfo.tag_materiale)} />
@@ -167,7 +167,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                                 <Settings size={14} className="text-blue-600" />
                                 Installationer & Indretning
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <BbrField label="Antal Værelser" value={bbrInfo.antal_vaerelser} />
                                 <BbrField label="Antal Toiletter" value={bbrInfo.antal_toiletter} />
                                 <BbrField label="Antal Badeværelser" value={bbrInfo.antal_badevaerelser} />
@@ -193,7 +193,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                                 <ShieldCheck size={14} className="text-blue-600" />
                                 Forsikring & Risiko
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 <BbrField label="Byggeskadeforsikring" value={getKodelisteTekst('omfattet_af_byggeskadeforsikring', bbrInfo.forsikring_omfattet)} />
                                 <BbrField label="Forsikringsselskab" value={bbrInfo.forsikring_selskab} />
                                 <BbrField label="Forsikring Dato" value={bbrInfo.forsikring_dato ? new Date(bbrInfo.forsikring_dato).toLocaleDateString('da-DK') : null} />
@@ -240,16 +240,24 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 };
 
 // Helper component for uniform display of an info field
-const BbrField = ({ label, value }: { label: string, value: string | null | undefined }) => (
-    <div className="bg-gray-300 rounded p-2.5 border border-gray-400/30 flex items-start gap-2 shadow-inner">
-        <CheckCircle2 size={12} className="text-green-600 mt-1 flex-shrink-0" />
-        <div>
-            <div className="text-[10px] uppercase font-bold text-gray-600 tracking-wider mb-0.5">{label}</div>
-            <div className={`text-xs font-medium ${value && value !== '-' ? 'text-gray-900' : 'text-gray-500 italic'}`}>
-                {value || '-'}
+const BbrField = ({ label, value }: { label: string, value: string | null | undefined }) => {
+    const hasValue = value && value !== '-' && value !== '' && value !== null;
+    
+    return (
+        <div className={`rounded p-2.5 border flex items-start gap-2 shadow-sm transition-all duration-200 ${
+            hasValue 
+                ? 'bg-blue-200 border-blue-300 ring-1 ring-blue-200' 
+                : 'bg-gray-300 border-gray-400/30 opacity-70'
+        }`}>
+            <CheckCircle2 size={12} className={`${hasValue ? 'text-blue-800' : 'text-gray-400'} mt-1 flex-shrink-0`} />
+            <div>
+                <div className={`text-[10px] uppercase font-bold tracking-wider mb-0.5 ${hasValue ? 'text-blue-900' : 'text-gray-600'}`}>{label}</div>
+                <div className={`text-xs font-bold ${hasValue ? 'text-gray-900' : 'text-gray-500 italic'}`}>
+                    {value || '-'}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 export default BbrTab;

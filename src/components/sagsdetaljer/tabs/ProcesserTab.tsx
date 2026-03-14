@@ -88,16 +88,16 @@ function ProcesserTab({ sag, onUpdate }: ProcesserTabProps) {
                         <div
                             key={proces.id}
                             onClick={() => toggleProces(proces.id)}
-                            className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border transition-all ${isSelected
-                                ? 'border-blue-600 bg-blue-50 shadow-sm'
-                                : 'border-gray-200 hover:border-gray-400 bg-white hover:bg-gray-50'
+                            className={`cursor-pointer flex items-center justify-between p-4 rounded-lg border-2 transition-all ${isSelected
+                                ? 'border-blue-600 bg-blue-100 shadow-sm'
+                                : 'border-gray-400/20 bg-gray-300 hover:border-gray-400 shadow-inner'
                                 }`}
                         >
                             <div className="flex flex-col">
-                                <span className={`text-xs font-bold uppercase tracking-wider ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
+                                <span className={`text-xs font-bold uppercase tracking-wider ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>
                                     Proces {proces.nr}
                                 </span>
-                                <span className={`font-semibold ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>
+                                <span className={`font-bold ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>
                                     {proces.titel_kort}
                                 </span>
                             </div>

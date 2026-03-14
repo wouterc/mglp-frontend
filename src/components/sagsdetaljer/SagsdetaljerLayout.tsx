@@ -253,7 +253,7 @@ function SagsdetaljerLayout({
                 </nav>
 
                 {/* Højre Indhold (Aktiv Fane) */}
-                <main className={`flex-1 overflow-y-auto flex flex-col p-4 ${activeTab === 'bbr' ? 'bg-gray-300' : 'bg-gray-50'}`}>
+                <main className={`flex-1 overflow-y-auto flex flex-col p-4 ${['bbr', 'processer'].includes(activeTab) ? 'bg-gray-300' : 'bg-gray-50'}`}>
                     {children}
                 </main>
 

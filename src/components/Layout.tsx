@@ -316,7 +316,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
           </button>
 
           {/* Version Info */}
-          <div className={`mt-2 ${erMenuAaben ? 'px-2' : 'text-center'} text-[10px] text-gray-500 font-mono opacity-50`}>
+          <div className={`mt-2 ${erMenuAaben ? 'px-2' : 'text-center'} text-[10px] text-gray-400 font-mono`}>
             {erMenuAaben ? `v.${APP_VERSION}` : APP_VERSION.split('.').pop()}
           </div>
         </div>
