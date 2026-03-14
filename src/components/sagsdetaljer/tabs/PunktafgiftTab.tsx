@@ -182,7 +182,7 @@ const PunktafgiftTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, on
                     <div className="p-3 bg-gray-300 rounded-lg border border-gray-400">
                         <h3 className="text-xs font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
                             <Plus size={14} />
-                            Ny Tinglysningsafgift
+                            Ny Tinglysning
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-6 gap-3 items-end text-xs">
                             <div className="col-span-1">

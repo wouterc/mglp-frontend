@@ -14,6 +14,7 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
     const { state: lookupState } = useLookups();
     const { bbrKodelister } = lookupState;
     const [isUpdating, setIsUpdating] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
     const [toast, setToast] = useState<{ isVisible: boolean; message: string; type: ToastType }>({
         isVisible: false,
         message: '',
@@ -35,6 +36,9 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
         try {
             await SagService.opdaterBbr(sag.id);
             await onUpdate(); // Trickle refresh up og vent til fetch er færdig
+            
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 5000);
         } catch (e: any) {
             console.error('Kunne ikke opdatere BBR data:', e);
             const dataMsg = e.data?.error || e.data?.detail || JSON.stringify(e.data) || 'Der blev ikke returneret nogen fejlbesked.';
@@ -58,9 +62,9 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
     };
 
     return (
-        <div className="bg-white rounded-md shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+        <div className="bg-gray-300 rounded-md shadow-sm border border-gray-300 flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <div className="flex justify-between items-center p-3 sm:px-4 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+            <div className="flex justify-between items-center p-3 sm:px-4 border-b border-gray-400/20 bg-gray-300/50 flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <TableProperties className="text-blue-600" size={18} />
                     <h3 className="font-semibold text-gray-800 text-sm">BBR Oplysninger</h3>
@@ -70,6 +74,14 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
                         <Calendar size={12} className="text-gray-400" />
                         Sidst opdateret: <span className="font-medium text-gray-700">{formatterDato(bbrInfo?.sidst_opdateret)}</span>
                     </div>
+
+                    {showSuccess && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded-md text-[10px] sm:text-xs font-bold animate-in fade-in zoom-in duration-300">
+                             <CheckCircle2 size={14} className="text-green-500" />
+                             <span>BBR opdateret!</span>
+                        </div>
+                    )}
+
                     <button
                         onClick={handleUpdateBbr}
                         disabled={isUpdating}
@@ -96,8 +108,8 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
                         {/* Sektion: Bygningsoplysninger */}
                         <div>
-                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 pb-1 border-b border-gray-100">
-                                <LayoutGrid size={14} className="text-blue-500" />
+                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-800 uppercase tracking-wider mb-3 pb-1 border-b border-gray-400/30">
+                                <LayoutGrid size={14} className="text-blue-600" />
                                 Generelle Bygningsoplysninger
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -122,8 +134,8 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
                         {/* Ny Sektion: Ekstra Arealer */}
                         <div>
-                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 pb-1 border-b border-gray-100">
-                                <LayoutGrid size={14} className="text-blue-500" />
+                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-800 uppercase tracking-wider mb-3 pb-1 border-b border-gray-400/30">
+                                <LayoutGrid size={14} className="text-blue-600" />
                                 Tilbygninger & Ekstra Arealer
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -138,8 +150,8 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
                         {/* Sektion: Materialer */}
                         <div>
-                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 pb-1 border-b border-gray-100">
-                                <FileText size={14} className="text-blue-500" />
+                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-800 uppercase tracking-wider mb-3 pb-1 border-b border-gray-400/30">
+                                <FileText size={14} className="text-blue-600" />
                                 Materialer & Boligtype
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -151,8 +163,8 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
                         {/* Sektion: Installationer & Rum */}
                         <div>
-                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 pb-1 border-b border-gray-100">
-                                <Settings size={14} className="text-blue-500" />
+                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-800 uppercase tracking-wider mb-3 pb-1 border-b border-gray-400/30">
+                                <Settings size={14} className="text-blue-600" />
                                 Installationer & Indretning
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -177,8 +189,8 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
                         {/* Sektion: Forsikring & Risiko */}
                         <div>
-                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 pb-1 border-b border-gray-100">
-                                <ShieldCheck size={14} className="text-blue-500" />
+                            <h4 className="flex items-center gap-2 text-xs font-bold text-gray-800 uppercase tracking-wider mb-3 pb-1 border-b border-gray-400/30">
+                                <ShieldCheck size={14} className="text-blue-600" />
                                 Forsikring & Risiko
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -229,11 +241,11 @@ const BbrTab: React.FC<BbrTabProps> = ({ sag, onUpdate }) => {
 
 // Helper component for uniform display of an info field
 const BbrField = ({ label, value }: { label: string, value: string | null | undefined }) => (
-    <div className="bg-gray-50/50 rounded p-2.5 border border-gray-100 flex items-start gap-2">
-        <CheckCircle2 size={12} className="text-green-500 mt-1 flex-shrink-0" />
+    <div className="bg-gray-300 rounded p-2.5 border border-gray-400/30 flex items-start gap-2 shadow-inner">
+        <CheckCircle2 size={12} className="text-green-600 mt-1 flex-shrink-0" />
         <div>
-            <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-0.5">{label}</div>
-            <div className={`text-xs font-medium ${value && value !== '-' ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+            <div className="text-[10px] uppercase font-bold text-gray-600 tracking-wider mb-0.5">{label}</div>
+            <div className={`text-xs font-medium ${value && value !== '-' ? 'text-gray-900' : 'text-gray-500 italic'}`}>
                 {value || '-'}
             </div>
         </div>

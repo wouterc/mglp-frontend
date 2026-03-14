@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     ReceiptText, Search, Loader2, ArrowUp, ArrowDown, Download,
-    MessageSquare, ExternalLink, ChevronLeft, ChevronRight
+    MessageSquare, ExternalLink, ChevronLeft, ChevronRight, HandCoins
 } from 'lucide-react';
 import { FakturaLine, Status } from '../types';
 import { SagService } from '../services/SagService';
@@ -269,15 +269,15 @@ function FakturaoversigPage() {
                         onClick={() => setActiveTab('faktura')}
                         className={`pb-2 text-2xl font-bold transition-colors border-b-4 flex items-center gap-2 ${activeTab === 'faktura' ? 'border-blue-600 text-gray-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                     >
-                        <ReceiptText className={activeTab === 'faktura' ? 'text-blue-600' : 'text-gray-300'} />
+                        <HandCoins size={24} className={activeTab === 'faktura' ? 'text-blue-600' : 'text-gray-300'} />
                         Fakturaoversigt
                     </button>
                     <button
                         onClick={() => setActiveTab('punktafgift')}
                         className={`pb-2 text-2xl font-bold transition-colors border-b-4 flex items-center gap-2 ${activeTab === 'punktafgift' ? 'border-purple-600 text-gray-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                     >
-                        <ReceiptText className={activeTab === 'punktafgift' ? 'text-purple-600' : 'text-gray-300'} />
-                        Oversigt over Tinglysningsafgifter
+                        <ReceiptText size={24} className={activeTab === 'punktafgift' ? 'text-purple-600' : 'text-gray-300'} />
+                        Tinglysning
                     </button>
                 </div>
 

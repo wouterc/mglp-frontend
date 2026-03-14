@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Building2, User, Landmark, LifeBuoy,
     Building, MapPin, Waves, ChevronLeft, ChevronRight,
     ArrowLeft, Search, Loader2, MailPlus, ListChecks,
-    List, Info, ListTodo, Files, Mail, Inbox, ReceiptText, TableProperties
+    List, Info, ListTodo, Files, Mail, Inbox, ReceiptText, TableProperties, HandCoins
 } from 'lucide-react';
 import { Sag } from '../../types';
 import { useAppState } from '../../StateContext';
@@ -24,13 +24,14 @@ interface SagsdetaljerLayoutProps {
     onTabChange: (tab: TabType) => void;
     onBack: () => void;
     onNavigateToSag: (id: number) => void;
+    isNavigating?: boolean;
 }
 
 const MENU_ITEMS: { id: TabType; label: string; icon: any }[] = [
     { id: 'overblik', label: 'Overblik', icon: LayoutDashboard },
     { id: 'processer', label: 'Processer', icon: ListChecks },
-    { id: 'faktura', label: 'Faktura', icon: ReceiptText },
-    { id: 'punktafgift', label: 'Tinglysningsafgift', icon: ReceiptText },
+    { id: 'faktura', label: 'Faktura', icon: HandCoins },
+    { id: 'punktafgift', label: 'Tinglysning', icon: ReceiptText },
     { id: 'maegler', label: 'Mægler', icon: Building2 },
     { id: 'saelgere', label: 'Sælgere', icon: User },
     { id: 'koebere', label: 'Købere', icon: User },
@@ -49,6 +50,7 @@ function SagsdetaljerLayout({
     onTabChange,
     onBack,
     onNavigateToSag,
+    isNavigating = false,
 }: SagsdetaljerLayoutProps) {
 
     const { state } = useAppState();
@@ -143,6 +145,12 @@ function SagsdetaljerLayout({
             <SagsHeader
                 sag={sag}
                 activePage="detaljer"
+                bottomContent={isNavigating ? (
+                    <div className="flex items-center gap-2 text-blue-600 animate-pulse">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span className="text-xs font-semibold">Opdaterer data...</span>
+                    </div>
+                ) : null}
                 rightContent={
                     <div className="flex items-center gap-4 w-full justify-end">
                         {/* Søgning */}

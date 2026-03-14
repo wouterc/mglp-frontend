@@ -1,6 +1,6 @@
 // --- Fil: src/components/sagsdetaljer/tabs/FakturaTab.tsx ---
 import React, { useState, useEffect, useMemo } from 'react';
-import { ReceiptText, Search, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { HandCoins, Search, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { Sag, FakturaLine, Status, Vareliste } from '../../../types';
 import { SagService } from '../../../services/SagService';
 import { LookupService } from '../../../services/LookupService';
@@ -238,7 +238,7 @@ const FakturaTab: React.FC<{ sag: Sag; onUpdate?: () => void }> = ({ sag, onUpda
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                                <ReceiptText className="text-blue-600" />
+                                <HandCoins className="text-blue-600" />
                                 Fakturaliste
                             </h2>
                             <p className="text-gray-500 text-sm">Administrer fakturalinjer for denne sag.</p>

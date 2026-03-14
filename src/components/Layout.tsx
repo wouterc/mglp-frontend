@@ -4,7 +4,7 @@
 import React, { useState, ReactNode, useEffect } from 'react';
 // @# 2025-11-17 21:55 - Importeret 'Link'
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal, ReceiptText, Database, LayoutPanelTop } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronDown, LayoutGrid, FileText, Folder, ListChecks, Building2, Users, SquareStack, CheckSquare, FileStack, UserCircle, LogOut, Mail, ShieldAlert, Settings, Inbox, MailPlus, MessageSquare, MessageCircleHeart, LibraryBig, SquareTerminal, ReceiptText, Database, LayoutPanelTop, HandCoins } from 'lucide-react';
 import { useAppState } from '../StateContext';
 import { api } from '../api';
 import { KommunikationService } from '../services/KommunikationService';
@@ -39,7 +39,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       return next;
     });
   };
-  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const timerRef = React.useRef<any>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -142,7 +142,7 @@ function Layout({ children, aktivSide, setAktivSide, filterSidebar }: LayoutProp
       titel: 'SAGSBEHANDLING',
       items: [
         { id: 'sagsoversigt', navn: 'Sagsoversigt', ikon: LayoutGrid },
-        { id: 'fakturaoversigt', navn: 'Fakturaoversigt', ikon: ReceiptText },
+        { id: 'fakturaoversigt', navn: 'Fakturaoversigt', ikon: HandCoins },
         { id: 'sagsdetaljer', navn: 'Sagsdetaljer', ikon: FileText },
         { id: 'aktiviteter', navn: 'Aktiviteter', ikon: ListChecks },
         { id: 'dokumenter', navn: 'Dokumenter', ikon: Folder },

@@ -42,13 +42,13 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
     const [sag, setSag] = useState<Sag | null>(sagState.valgtSag && sagState.valgtSag.id === sagId ? sagState.valgtSag : null);
     const [isLoading, setIsLoading] = useState(!sag && !!sagId);
+    const [isNavigating, setIsNavigating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // UI State
     const [activeTab, setActiveTab] = useState<TabType>('overblik');
     const [visRedigerStamdata, setVisRedigerStamdata] = useState(false);
     // Lazy mount: Track hvilke tabs der er blevet aktiveret
-    // En tab mountes første gang den besøges og forbliver monteret derefter
     const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(new Set(['overblik']));
 
     // 1. Hent kun sagens stamdata (Letvægts fetch)
@@ -90,13 +90,24 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
     // Tab-initialisering: Sæt start-fane når sagId ændres eller ved navigation
     useEffect(() => {
         if (sagId) {
+            // Hvis vi er i gang med at navigere internt (via Næste/Forrige), 
+            // så skal vi IKKE røre ved fanerne - de skal bare blive hvor de er.
+            if (isNavigating) return;
+
             const navState = location.state as { initialTab?: TabType } | null;
             const startTab = navState?.initialTab || 'overblik';
+            
             setActiveTab(startTab);
-            // Reset mountede tabs når vi skifter til en ny sag
-            setMountedTabs(new Set([startTab]));
+            
+            // Forbered de tabs der skal være monteret
+            setMountedTabs(prev => {
+                // Hvis vi allerede har fanen monteret, så rør vi ikke ved de andre (bevar state)
+                if (prev.has(startTab)) return prev;
+                // Ellers mounter vi kun den nye start-tab
+                return new Set([startTab]);
+            });
         }
-    }, [sagId, location.state]); // Kør når vi skifter sag eller hopper ind med en specifik fane
+    }, [sagId, location.state, isNavigating]);
 
     // Registrér tab som monteret når den aktiveres
     const handleTabChange = (tab: TabType) => {
@@ -122,18 +133,18 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
 
         if (targetId === sagId) return; // Allerede på sagen
 
-        setIsLoading(true);
+        setIsNavigating(true);
         try {
             // Hent den nye sag
             const nySag = await SagService.getSag(targetId);
             // Naviger via parent, send hele objektet med OG bevar den nuværende fane
             navigateTo('sagsdetaljer', nySag, { initialTab: activeTab });
-            // Hvis komponenten ikke unmounter, skal vi manuelt opdatere state:
+            // Opdater lokalt state straks for at undgå flimmer
             setSag(nySag);
         } catch (e) {
             console.error("Fejl ved sags-navigation:", e);
         } finally {
-            setIsLoading(false);
+            setIsNavigating(false);
         }
     };
 
@@ -212,6 +223,7 @@ function SagsdetaljerPage({ sagId, navigateTo }: SagsdetaljerPageProps): ReactEl
                 onTabChange={handleTabChange}
                 onBack={() => navigateTo('sagsoversigt', null)}
                 onNavigateToSag={handleNavigateToSag}
+                isNavigating={isNavigating}
             >
                 {/* Lazy mount: En tab renderes første gang den aktiveres og forbliver monteret.
                     display:none skjuler inaktive tabs uden at unmounte dem. */}
